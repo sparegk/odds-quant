@@ -134,7 +134,7 @@ The research simulator will support flat staking, percentage staking, capped fra
 
 ### Dashboard
 
-The planned React dashboard will include:
+The React dashboard navigation includes:
 
 - Overview and data-freshness status.
 - Value opportunities and underdog analysis.
@@ -145,6 +145,8 @@ The planned React dashboard will include:
 - Lineup status, player availability, tactical context, and matchup sensitivity.
 - Backtesting and bankroll simulation.
 - CSV imports, providers, jobs, methodology, and disclaimers.
+
+Stored events, odds comparison, provider/import status, freshness, and methodology are connected to the API now. Model-dependent views remain visibly blocked until real prediction, calibration, backtest, and bankroll records exist.
 
 ## Planned Tech Stack
 
@@ -196,8 +198,10 @@ The repository is in the **Phase 1 data-foundation milestone**. It includes:
 - Per-bookmaker raw probability, overround, margin, proportional/power de-vig, fair-odds, freshness, and best-price responses.
 - A separate APScheduler worker with an explicit permitted-provider registry and persisted provider-job status.
 - A non-root backend image, PostgreSQL Docker Compose stack, Render Blueprint, and GitHub Actions checks.
+- A responsive React/Vite/Tailwind dashboard with a typed API client, quantitative price table, freshness states, best-price chart, accessible navigation, and component tests.
+- Frontend Docker, Nginx SPA, Vercel, Render static-site, and CI configuration.
 
-The analysis API, arbitrage service, model training workflow, backtester, and frontend are not implemented yet. No real or synthetic performance result is currently claimed.
+The model-backed opportunity API, arbitrage service, model training workflow, and backtester are not implemented yet. Their dashboard views remain blocked and no real or synthetic performance result is currently claimed.
 
 ## Repository Structure
 
@@ -215,9 +219,15 @@ backend/
     services/    Transactional imports and application workflows
     signals/     Explainable signal policy
   tests/         Backend tests
+frontend/
+  src/
+    api/         Typed versioned API client
+    components/  Quantitative display components and tests
+    lib/         Formatting helpers
+  public/        Frontend assets
 ```
 
-Additional backend modules and the `frontend` application will be added during Phase 1.
+Additional model, signal, arbitrage, and backtesting modules will be added during Phase 1.
 
 Run the current PostgreSQL-backed backend stack from the repository root:
 
@@ -226,6 +236,18 @@ docker compose up --build
 ```
 
 Docker is not required for SQLite development. Full environment, Compose, Render, migration, secret, and production notes are in [DEPLOYMENT.md](DEPLOYMENT.md).
+
+## Local Frontend Setup
+
+Start the backend first, then in another terminal:
+
+```bash
+cd frontend
+npm ci
+npm run dev
+```
+
+Open `http://127.0.0.1:5173`. Set `VITE_API_BASE_URL` in an uncommitted frontend environment file when the API uses another origin.
 
 ## Local Backend Setup
 
@@ -284,9 +306,9 @@ Copy `.env.example` to `.env` for local configuration. Never commit API keys, to
 
 ## Project Status
 
-OddsQuant has a documented architecture, migrated normalized schema, provider boundary, quantitative foundations, labelled demo seed, atomic CSV-to-database odds pipeline, connected stored-data API, scheduler worker, CI, and prepared container deployment. The next milestone is the model-backed value, underdog, and arbitrage analysis slice.
+OddsQuant has a documented architecture, migrated normalized schema, provider boundary, quantitative foundations, labelled demo seed, atomic CSV-to-database odds pipeline, connected stored-data API and dashboard, scheduler worker, CI, and prepared full-stack container deployment. The next milestone is the model-backed value, underdog, and arbitrage analysis slice.
 
-See [context.md](context.md), [ARCHITECTURE.md](ARCHITECTURE.md), [ROADMAP.md](ROADMAP.md), and [AGENTS.md](AGENTS.md) for detailed decisions and operating rules.
+See [context.md](context.md), [ARCHITECTURE.md](ARCHITECTURE.md), [METHODOLOGY.md](METHODOLOGY.md), [ROADMAP.md](ROADMAP.md), and [AGENTS.md](AGENTS.md) for detailed decisions and operating rules.
 
 Data-source, freshness, lineup, player, and tactical requirements are documented in [DATA_SOURCES.md](DATA_SOURCES.md).
 

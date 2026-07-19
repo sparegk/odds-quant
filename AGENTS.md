@@ -10,6 +10,7 @@
 - `backend/app/quant`: pure probability and settlement logic.
 - `backend/app/signals`: explainable signal policy.
 - `backend/tests`: deterministic backend tests.
+- `frontend/src`: React dashboard, typed API client, quantitative components, and tests.
 
 ## Commands
 
@@ -28,8 +29,18 @@ python -m uvicorn app.main:app --reload
 ```
 
 From the repository root, `docker compose up --build` runs PostgreSQL, migrations, the
-API, and worker. Docker/Render changes must preserve non-root execution, health checks,
+API, worker, and frontend. Docker/Render changes must preserve non-root execution, health checks,
 production demo blocking, migration ordering, and secret-manager-only credentials.
+
+From `frontend`:
+
+```bash
+npm ci
+npm run lint
+npm run test
+npm run build
+npm run dev
+```
 
 Import user-supplied odds with `python -m app.cli import-odds path/to/odds.csv`. CSV
 imports are atomic: never weaken completeness, timestamp, identity, or market-settlement

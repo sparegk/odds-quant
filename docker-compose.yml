@@ -54,5 +54,22 @@ services:
       api:
         condition: service_healthy
 
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: http://localhost:${ODDSQUANT_API_PORT:-8000}
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${ODDSQUANT_FRONTEND_PORT:-5173}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
 volumes:
   oddsquant_postgres:

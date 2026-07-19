@@ -1,6 +1,8 @@
 # Architecture
 
-OddsQuant uses a planned React/Vite client and a versioned FastAPI API. SQLAlchemy provides a common persistence layer for SQLite development and PostgreSQL production. Alembic owns schema changes; Docker Compose runs PostgreSQL, the API, and a separate APScheduler worker.
+OddsQuant uses a React/Vite/Tailwind dashboard and a versioned FastAPI API. SQLAlchemy provides a common persistence layer for SQLite development and PostgreSQL production. Alembic owns schema changes; Docker Compose runs PostgreSQL, the API, a separate APScheduler worker, and the frontend.
+
+The frontend consumes only versioned API responses through a typed client. It displays stored market comparisons and data operations now, while model-dependent pages remain blocked until real prediction and evaluation records exist. Static frontend deployment injects the public API origin at build time through `VITE_API_BASE_URL`.
 
 External adapters register through the process-local collector registry. The worker converts their validated normalized DTOs into the same atomic import path used by CSV uploads and records each scheduled attempt in `provider_jobs`. No external adapter is enabled by default. Development may seed labelled synthetic odds; production blocks demo seeding.
 

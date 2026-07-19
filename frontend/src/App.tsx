@@ -1,0 +1,512 @@
+import {
+  Activity,
+  AlertTriangle,
+  BarChart3,
+  Beaker,
+  BookOpen,
+  CalendarDays,
+  CircleDollarSign,
+  Database,
+  FlaskConical,
+  Gauge,
+  GitCompareArrows,
+  LineChart,
+  RefreshCw,
+  ScanSearch,
+  ShieldCheck,
+  TrendingUp,
+} from 'lucide-react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+
+import { API_BASE_URL, loadComparison, loadDashboard } from './api/client'
+import { FreshnessBadge } from './components/FreshnessBadge'
+import { QuantPriceTable } from './components/QuantPriceTable'
+import { formatDateTime, humanizeCode } from './lib/format'
+import type { DashboardData, EventSummary, MarketComparison } from './types'
+
+type ViewKey =
+  | 'overview'
+  | 'opportunities'
+  | 'underdogs'
+  | 'event'
+  | 'comparison'
+  | 'builder'
+  | 'models'
+  | 'backtests'
+  | 'bankroll'
+  | 'data'
+  | 'methodology'
+
+const navigation = [
+  { key: 'overview', label: 'Overview', icon: Gauge },
+  { key: 'opportunities', label: 'Value opportunities', icon: TrendingUp },
+  { key: 'underdogs', label: 'Underdog scanner', icon: ScanSearch },
+  { key: 'event', label: 'Event markets', icon: CalendarDays },
+  { key: 'comparison', label: 'Odds comparison', icon: GitCompareArrows },
+  { key: 'builder', label: 'Bet Builder Lab', icon: Beaker },
+  { key: 'models', label: 'Model performance', icon: LineChart },
+  { key: 'backtests', label: 'Backtesting', icon: FlaskConical },
+  { key: 'bankroll', label: 'Bankroll research', icon: CircleDollarSign },
+  { key: 'data', label: 'Data operations', icon: Database },
+  { key: 'methodology', label: 'Methodology', icon: BookOpen },
+] as const
+
+const BestPriceChart = lazy(async () => {
+  const module = await import('./components/BestPriceChart')
+  return { default: module.BestPriceChart }
+})
+
+const DASHBOARD_OPENED_AT = Date.now()
+
+function navigateTo(view: ViewKey) {
+  window.location.hash = view
+}
+
+function readView(): ViewKey {
+  const candidate = window.location.hash.slice(1)
+  return navigation.some((item) => item.key === candidate) ? (candidate as ViewKey) : 'overview'
+}
+
+function App() {
+  const [view, setView] = useState<ViewKey>(readView)
+  const [dashboard, setDashboard] = useState<DashboardData | null>(null)
+  const [selectedEventId, setSelectedEventId] = useState<number | null>(null)
+  const [markets, setMarkets] = useState<MarketComparison[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const refresh = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const loaded = await loadDashboard()
+      setDashboard(loaded)
+      setSelectedEventId((current) => current ?? loaded.events[0]?.id ?? null)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to reach the OddsQuant API')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    void loadDashboard()
+      .then((loaded) => {
+        if (!active) return
+        setDashboard(loaded)
+        setSelectedEventId(loaded.events[0]?.id ?? null)
+      })
+      .catch((caught: unknown) => {
+        if (active) setError(caught instanceof Error ? caught.message : 'Unable to reach the OddsQuant API')
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
+    const onHashChange = () => setView(readView())
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
+  }, [])
+
+  useEffect(() => {
+    if (selectedEventId === null) {
+      return
+    }
+    let active = true
+    void loadComparison(selectedEventId)
+      .then((result) => {
+        if (active) setMarkets(result)
+      })
+      .catch(() => {
+        if (active) setMarkets([])
+      })
+    return () => {
+      active = false
+    }
+  }, [selectedEventId])
+
+  const selectView = (next: ViewKey) => {
+    navigateTo(next)
+    setView(next)
+  }
+
+  return (
+    <div className="min-h-screen bg-[#f4f6f5] text-zinc-900">
+      <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 border-r border-zinc-800 bg-[#15191e] text-zinc-100 lg:flex lg:flex-col">
+        <div className="flex h-16 items-center gap-3 border-b border-zinc-800 px-5">
+          <span className="grid h-9 w-9 place-items-center rounded-[6px] bg-emerald-400 text-zinc-950">
+            <Activity aria-hidden="true" size={21} strokeWidth={2.5} />
+          </span>
+          <div>
+            <div className="text-base font-bold">OddsQuant</div>
+            <div className="text-xs text-zinc-400">Football intelligence</div>
+          </div>
+        </div>
+        <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Primary navigation">
+          {navigation.map((item) => {
+            const Icon = item.icon
+            const active = view === item.key
+            return (
+              <button
+                key={item.key}
+                className={`mb-1 flex h-10 w-full items-center gap-3 rounded-[5px] px-3 text-left text-sm transition-colors ${
+                  active ? 'bg-zinc-100 font-semibold text-zinc-950' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'
+                }`}
+                onClick={() => selectView(item.key)}
+                type="button"
+              >
+                <Icon aria-hidden="true" size={17} />
+                {item.label}
+              </button>
+            )
+          })}
+        </nav>
+        <div className="border-t border-zinc-800 p-4 text-xs leading-5 text-zinc-500">
+          Research only. No automated betting.
+        </div>
+      </aside>
+
+      <div className="lg:pl-64">
+        <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/95 backdrop-blur">
+          <div className="flex h-16 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+            <div className="min-w-0">
+              <h1 className="truncate text-lg font-bold">{navigation.find((item) => item.key === view)?.label}</h1>
+              <p className="truncate text-xs text-zinc-500">Point-in-time market and model research</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="hidden rounded-[4px] border border-sky-200 bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-800 sm:inline-flex">
+                {dashboard?.status.data_mode === 'demo_or_user_supplied' ? 'Demo / user data' : dashboard?.status.data_mode ?? 'Connecting'}
+              </span>
+              <button
+                aria-label="Refresh dashboard data"
+                className="grid h-9 w-9 place-items-center rounded-[5px] border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+                disabled={loading}
+                onClick={() => void refresh()}
+                title="Refresh dashboard data"
+                type="button"
+              >
+                <RefreshCw aria-hidden="true" className={loading ? 'animate-spin' : ''} size={16} />
+              </button>
+            </div>
+          </div>
+          <div className="overflow-x-auto border-t border-zinc-100 px-3 py-2 lg:hidden">
+            <div className="flex min-w-max gap-1">
+              {navigation.map((item) => (
+                <button
+                  key={item.key}
+                  className={`rounded-[4px] px-3 py-1.5 text-xs font-semibold ${view === item.key ? 'bg-zinc-900 text-white' : 'text-zinc-600'}`}
+                  onClick={() => selectView(item.key)}
+                  type="button"
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </header>
+
+        <main className="px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
+          {error ? <ConnectionError message={error} onRetry={() => void refresh()} /> : null}
+          {!error && dashboard ? (
+            <ActiveView
+              dashboard={dashboard}
+              markets={markets}
+              onSelectEvent={setSelectedEventId}
+              selectedEventId={selectedEventId}
+              view={view}
+            />
+          ) : null}
+          {!error && !dashboard ? <LoadingState /> : null}
+        </main>
+
+        <footer className="border-t border-zinc-200 bg-white px-4 py-4 text-xs leading-5 text-zinc-500 sm:px-6 lg:px-8">
+          Statistical edges can disappear. Historical results do not ensure future performance. Odds change rapidly. Follow local laws, age restrictions, and bookmaker terms; set strict financial limits and never chase losses.
+        </footer>
+      </div>
+    </div>
+  )
+}
+
+interface ActiveViewProps {
+  view: ViewKey
+  dashboard: DashboardData
+  markets: MarketComparison[]
+  selectedEventId: number | null
+  onSelectEvent: (eventId: number) => void
+}
+
+function ActiveView(props: ActiveViewProps) {
+  switch (props.view) {
+    case 'overview':
+      return <Overview dashboard={props.dashboard} onSelectEvent={props.onSelectEvent} />
+    case 'event':
+      return <EventMarkets {...props} />
+    case 'comparison':
+      return <OddsComparison {...props} />
+    case 'data':
+      return <DataOperations dashboard={props.dashboard} />
+    case 'methodology':
+      return <Methodology />
+    case 'opportunities':
+      return <UnavailableModule title="Value opportunities" requirement="A trained and calibrated model version with stored predictions" />
+    case 'underdogs':
+      return <UnavailableModule title="Underdog scanner" requirement="Model calibration by probability bucket and fresh market prices" />
+    case 'builder':
+      return <UnavailableModule title="Bet Builder Laboratory" requirement="A stored scoreline distribution for the selected event" />
+    case 'models':
+      return <UnavailableModule title="Model performance" requirement="Chronologically trained model versions and held-out evaluation" />
+    case 'backtests':
+      return <UnavailableModule title="Backtesting" requirement="Timestamped historical predictions, odds snapshots, and settled results" />
+    case 'bankroll':
+      return <UnavailableModule title="Bankroll research" requirement="Validated signal history and uncertainty-aware return assumptions" />
+  }
+}
+
+function Overview({ dashboard, onSelectEvent }: { dashboard: DashboardData; onSelectEvent: (eventId: number) => void }) {
+  const snapshotCount = dashboard.providers.reduce((sum, provider) => sum + provider.snapshot_count, 0)
+  const latestOdds = dashboard.events
+    .map((event) => event.latest_odds_at)
+    .filter((value): value is string => value !== null)
+    .sort()
+    .at(-1)
+
+  return (
+    <div className="space-y-6">
+      <section className="grid grid-cols-2 border border-zinc-200 bg-white md:grid-cols-4">
+        <Metric label="Tracked events" value={dashboard.events.length.toString()} />
+        <Metric label="Odds snapshots" value={snapshotCount.toString()} />
+        <Metric label="Data providers" value={dashboard.providers.length.toString()} />
+        <Metric label="Model status" value="Untrained" tone="amber" />
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.7fr)]">
+        <div>
+          <SectionHeading eyebrow="Schedule" title="Tracked football events" />
+          <div className="overflow-hidden border-y border-zinc-200 bg-white">
+            {dashboard.events.length ? (
+              dashboard.events.slice(0, 8).map((event) => (
+                <EventRow key={event.id} event={event} onSelect={onSelectEvent} />
+              ))
+            ) : (
+              <EmptyRow text="No events have been imported." />
+            )}
+          </div>
+        </div>
+
+        <div>
+          <SectionHeading eyebrow="Integrity" title="Research readiness" />
+          <div className="border-y border-zinc-200 bg-white p-5">
+            <ReadinessRow label="Stored market data" ready={snapshotCount > 0} />
+            <ReadinessRow label="Recent observation" ready={latestOdds !== undefined} detail={formatDateTime(latestOdds ?? null)} />
+            <ReadinessRow label="Independent model" ready={false} detail="No trained version" />
+            <ReadinessRow label="Backtest evidence" ready={false} detail="No completed run" />
+          </div>
+          <div className="mt-4 border-l-4 border-amber-400 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
+            Market comparisons are active. Value, underdog, and staking outputs remain blocked until independent predictions and calibration evidence exist.
+          </div>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function EventSelector({ events, selectedEventId, onSelectEvent }: Pick<ActiveViewProps, 'selectedEventId' | 'onSelectEvent'> & { events: EventSummary[] }) {
+  return (
+    <label className="block max-w-xl">
+      <span className="mb-1.5 block text-xs font-semibold uppercase text-zinc-500">Event</span>
+      <select
+        className="h-10 w-full rounded-[5px] border border-zinc-300 bg-white px-3 text-sm font-medium outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+        onChange={(event) => onSelectEvent(Number(event.target.value))}
+        value={selectedEventId ?? ''}
+      >
+        {events.map((event) => (
+          <option key={event.id} value={event.id}>
+            {event.home_team} vs {event.away_team} - {event.competition}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+function EventMarkets(props: ActiveViewProps) {
+  const event = props.dashboard.events.find((candidate) => candidate.id === props.selectedEventId)
+  return (
+    <div className="space-y-6">
+      <EventSelector events={props.dashboard.events} onSelectEvent={props.onSelectEvent} selectedEventId={props.selectedEventId} />
+      {event ? (
+        <section className="border-y border-zinc-200 bg-white">
+          <div className="grid gap-4 border-b border-zinc-200 px-5 py-5 md:grid-cols-[1fr_auto]">
+            <div>
+              <p className="text-xs font-semibold uppercase text-zinc-500">{event.competition} / {event.season}</p>
+              <h2 className="mt-1 text-xl font-bold">{event.home_team} vs {event.away_team}</h2>
+              <p className="mt-1 text-sm text-zinc-500">{formatDateTime(event.kickoff_at)}</p>
+            </div>
+            <span className="self-start rounded-[4px] border border-zinc-300 px-2 py-1 text-xs font-semibold">{event.is_demo ? 'DEMO EVENT' : event.status.toUpperCase()}</span>
+          </div>
+          {props.markets.length ? (
+            props.markets.map((market) => (
+              <div key={market.market_id} className="grid gap-4 border-b border-zinc-100 px-5 py-4 last:border-0 md:grid-cols-[1fr_auto]">
+                <div>
+                  <h3 className="font-semibold">{humanizeCode(market.market_type)} {market.line === null ? '' : market.line}</h3>
+                  <p className="mt-1 text-xs text-zinc-500">{market.period} / {market.settlement_rule_key} / {market.currency}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {market.best_prices.map((price) => (
+                    <span key={price.selection_code} className="rounded-[4px] border border-zinc-200 bg-zinc-50 px-2.5 py-1.5 text-xs">
+                      <strong>{price.selection_name}</strong> {price.decimal_odds.toFixed(2)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))
+          ) : (
+            <EmptyRow text="No complete market snapshots are available for this event." />
+          )}
+        </section>
+      ) : (
+        <EmptyState title="No event selected" detail="Import an event and coherent odds snapshot to inspect its markets." />
+      )}
+    </div>
+  )
+}
+
+function OddsComparison(props: ActiveViewProps) {
+  return (
+    <div className="w-full min-w-0 max-w-[calc(100vw-2rem)] space-y-6 overflow-hidden lg:max-w-none">
+      <EventSelector events={props.dashboard.events} onSelectEvent={props.onSelectEvent} selectedEventId={props.selectedEventId} />
+      {props.markets.map((market) => (
+        <section key={market.market_id} className="min-w-0 space-y-4">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <SectionHeading eyebrow={`${market.period} / ${market.currency}`} title={humanizeCode(market.market_type)} />
+            <span className="max-w-full text-xs text-zinc-500">Proportional and power de-vig available</span>
+          </div>
+          <div className="grid min-w-0 gap-5 bg-white py-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+            <QuantPriceTable market={market} />
+            <div className="min-w-0 border-l-0 border-zinc-200 px-4 xl:border-l">
+              <h3 className="mb-2 text-sm font-semibold">Best available prices</h3>
+              <Suspense fallback={<div className="h-64 animate-pulse bg-zinc-100" aria-label="Loading chart" />}>
+                <BestPriceChart market={market} />
+              </Suspense>
+            </div>
+          </div>
+        </section>
+      ))}
+      {!props.markets.length ? <EmptyState title="No comparable prices" detail="The selected event has no complete bookmaker snapshot as of now." /> : null}
+    </div>
+  )
+}
+
+function DataOperations({ dashboard }: { dashboard: DashboardData }) {
+  return (
+    <div className="space-y-7">
+      <section>
+        <SectionHeading eyebrow="Sources" title="Provider status" />
+        <div className="overflow-x-auto border-y border-zinc-200 bg-white">
+          <table className="w-full min-w-[700px] text-left text-sm">
+            <thead className="bg-zinc-50 text-xs uppercase text-zinc-500"><tr><th className="px-4 py-3">Provider</th><th className="px-4 py-3">Kind</th><th className="px-4 py-3 text-right">Events</th><th className="px-4 py-3 text-right">Snapshots</th><th className="px-4 py-3">Classification</th></tr></thead>
+            <tbody>{dashboard.providers.map((provider) => <tr key={provider.id} className="border-t border-zinc-100"><td className="px-4 py-3 font-semibold">{provider.name}</td><td className="px-4 py-3">{humanizeCode(provider.kind)}</td><td className="px-4 py-3 text-right font-mono">{provider.event_count}</td><td className="px-4 py-3 text-right font-mono">{provider.snapshot_count}</td><td className="px-4 py-3"><span className={`rounded-[4px] border px-2 py-1 text-xs font-semibold ${provider.is_demo ? 'border-sky-200 bg-sky-50 text-sky-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>{provider.is_demo ? 'DEMO' : 'EXTERNAL'}</span></td></tr>)}</tbody>
+          </table>
+        </div>
+      </section>
+      <section className="grid gap-7 xl:grid-cols-2">
+        <div>
+          <SectionHeading eyebrow="Ingestion" title="Recent import jobs" />
+          <JobList items={dashboard.imports.map((job) => ({ id: job.id, title: job.filename, detail: `${job.rows_imported}/${job.rows_received} rows`, status: job.status, timestamp: job.created_at }))} />
+        </div>
+        <div>
+          <SectionHeading eyebrow="Scheduler" title="Provider jobs" />
+          <JobList items={dashboard.jobs.map((job) => ({ id: job.id, title: job.provider, detail: job.message || job.job_type, status: job.status, timestamp: job.created_at }))} />
+        </div>
+      </section>
+      <div className="border-l-4 border-sky-500 bg-sky-50 px-4 py-3 text-sm text-sky-950">
+        API endpoint: <code className="font-mono">{API_BASE_URL}/api/v1/imports/odds</code>. Production uploads require the configured administrative key.
+      </div>
+    </div>
+  )
+}
+
+function Methodology() {
+  const methods = [
+    ['Market probability', 'Decimal prices are converted to raw implied probabilities. Complete markets are de-vigged with proportional and power methods; overlapping outcomes are never treated as independent.'],
+    ['Model probability', 'Independent football models must use only evidence available before kickoff, preserve model versions, and report uncertainty rather than copying bookmaker probabilities.'],
+    ['Signals', 'Model edge, line-shopping improvement, and bookmaker margin remain separate. Stale data, weak calibration, missing inputs, or uncertainty wider than the edge block a strong signal.'],
+    ['Historical evaluation', 'Training and evaluation use chronological cutoffs and walk-forward tests. Final lineups, corrected results, and closing prices cannot leak into earlier predictions.'],
+    ['Arbitrage', 'Only mutually exclusive and exhaustive outcomes with identical settlement rules can be combined. Taxes, fees, stake limits, rounding, void risk, and price movement must be included.'],
+  ]
+  return (
+    <div className="max-w-5xl">
+      <SectionHeading eyebrow="Statistical integrity" title="Research methodology" />
+      <div className="border-y border-zinc-200 bg-white">
+        {methods.map(([title, detail]) => (
+          <div key={title} className="grid gap-2 border-b border-zinc-100 px-5 py-5 last:border-0 md:grid-cols-[190px_1fr]">
+            <h3 className="font-semibold">{title}</h3><p className="text-sm leading-6 text-zinc-600">{detail}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-5 flex gap-3 border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-950">
+        <AlertTriangle aria-hidden="true" className="mt-0.5 shrink-0" size={19} />
+        <p>No prediction guarantees profit. Odds and statistical relationships change, historical performance does not ensure future performance, and this project is not affiliated with any bookmaker.</p>
+      </div>
+    </div>
+  )
+}
+
+function UnavailableModule({ title, requirement }: { title: string; requirement: string }) {
+  return (
+    <div className="grid min-h-[420px] place-items-center border-y border-zinc-200 bg-white p-6 text-center">
+      <div className="max-w-lg">
+        <span className="mx-auto grid h-12 w-12 place-items-center rounded-[6px] bg-zinc-100 text-zinc-600"><ShieldCheck aria-hidden="true" size={24} /></span>
+        <p className="mt-5 text-xs font-bold uppercase text-amber-700">Insufficient validated data</p>
+        <h2 className="mt-2 text-xl font-bold">{title} is blocked</h2>
+        <p className="mt-3 text-sm leading-6 text-zinc-600">Required: {requirement}. OddsQuant will not display synthetic performance or infer a model edge from market prices alone.</p>
+      </div>
+    </div>
+  )
+}
+
+function Metric({ label, value, tone = 'default' }: { label: string; value: string; tone?: 'default' | 'amber' }) {
+  return <div className="min-h-24 border-r border-b border-zinc-200 p-4 last:border-r-0 md:border-b-0"><p className="text-xs font-semibold uppercase text-zinc-500">{label}</p><p className={`mt-2 text-2xl font-bold ${tone === 'amber' ? 'text-amber-700' : 'text-zinc-950'}`}>{value}</p></div>
+}
+
+function SectionHeading({ eyebrow, title }: { eyebrow: string; title: string }) {
+  return <div className="mb-3"><p className="text-xs font-bold uppercase text-emerald-700">{eyebrow}</p><h2 className="mt-1 text-lg font-bold">{title}</h2></div>
+}
+
+function EventRow({ event, onSelect }: { event: EventSummary; onSelect: (eventId: number) => void }) {
+  const ageSeconds = event.latest_odds_at ? Math.max(0, Math.floor((DASHBOARD_OPENED_AT - new Date(event.latest_odds_at).getTime()) / 1000)) : 0
+  return <button className="grid w-full gap-2 border-b border-zinc-100 px-4 py-3 text-left hover:bg-zinc-50 last:border-0 sm:grid-cols-[1fr_auto_auto] sm:items-center" onClick={() => { onSelect(event.id); navigateTo('event') }} type="button"><div><p className="font-semibold">{event.home_team} <span className="font-normal text-zinc-400">vs</span> {event.away_team}</p><p className="mt-1 text-xs text-zinc-500">{event.competition} / {formatDateTime(event.kickoff_at)}</p></div><span className="text-xs font-medium text-zinc-500">{event.is_demo ? 'DEMO' : event.status.toUpperCase()}</span>{event.latest_odds_at ? <FreshnessBadge seconds={ageSeconds} stale={ageSeconds > 300} /> : <span className="text-xs text-zinc-400">No odds</span>}</button>
+}
+
+function ReadinessRow({ label, ready, detail }: { label: string; ready: boolean; detail?: string }) {
+  return <div className="flex items-center justify-between gap-4 border-b border-zinc-100 py-3 first:pt-0 last:border-0 last:pb-0"><div><p className="text-sm font-semibold">{label}</p>{detail ? <p className="mt-0.5 text-xs text-zinc-500">{detail}</p> : null}</div><span className={`rounded-[4px] border px-2 py-1 text-xs font-bold ${ready ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>{ready ? 'READY' : 'BLOCKED'}</span></div>
+}
+
+function JobList({ items }: { items: Array<{ id: number; title: string; detail: string; status: string; timestamp: string }> }) {
+  if (!items.length) return <div className="border-y border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-500">No jobs recorded.</div>
+  return <div className="border-y border-zinc-200 bg-white">{items.slice(0, 8).map((item) => <div key={item.id} className="flex items-start justify-between gap-3 border-b border-zinc-100 px-4 py-3 last:border-0"><div className="min-w-0"><p className="truncate text-sm font-semibold">{item.title}</p><p className="mt-1 truncate text-xs text-zinc-500">{item.detail} / {formatDateTime(item.timestamp)}</p></div><span className={`rounded-[4px] border px-2 py-1 text-xs font-bold ${item.status === 'completed' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : item.status === 'failed' || item.status === 'rejected' ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>{item.status.toUpperCase()}</span></div>)}</div>
+}
+
+function EmptyState({ title, detail }: { title: string; detail: string }) {
+  return <div className="border-y border-zinc-200 bg-white px-6 py-12 text-center"><BarChart3 aria-hidden="true" className="mx-auto text-zinc-400" size={28} /><h2 className="mt-3 font-bold">{title}</h2><p className="mx-auto mt-2 max-w-md text-sm text-zinc-500">{detail}</p></div>
+}
+
+function EmptyRow({ text }: { text: string }) {
+  return <div className="px-4 py-8 text-center text-sm text-zinc-500">{text}</div>
+}
+
+function LoadingState() {
+  return <div className="grid min-h-[420px] place-items-center"><div className="text-center"><RefreshCw aria-hidden="true" className="mx-auto animate-spin text-emerald-700" size={24} /><p className="mt-3 text-sm text-zinc-500">Loading market data</p></div></div>
+}
+
+function ConnectionError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return <div className="border border-rose-200 bg-rose-50 p-5"><div className="flex items-start gap-3"><AlertTriangle aria-hidden="true" className="mt-0.5 text-rose-700" size={20} /><div><h2 className="font-bold text-rose-950">API unavailable</h2><p className="mt-1 text-sm text-rose-800">{message}</p><button className="mt-3 rounded-[5px] bg-rose-800 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-900" onClick={onRetry} type="button">Retry connection</button></div></div></div>
+}
+
+export default App

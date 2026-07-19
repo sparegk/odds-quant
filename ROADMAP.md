@@ -6,7 +6,7 @@
 
 ## Phase 1: Runnable Football MVP
 
-Completed foundation slices: Alembic schema lifecycle, labelled demo odds, atomic CSV ingestion, stored-data API, scheduled-provider boundary, Docker Compose, Render configuration, and backend CI. Live deployment has not been claimed or tested.
+Completed foundation slices: Alembic schema lifecycle, labelled demo odds, atomic CSV ingestion, stored-data API, connected React dashboard, scheduled-provider boundary, full-stack Docker Compose, Render/Vercel configuration, and backend/frontend CI. Live deployment has not been claimed or tested.
 
 - Alembic migration and deterministic labelled demo dataset.
 - Timestamped team, player, coach, roster, appearance, availability, lineup, formation, tactical, and matchup data contracts.

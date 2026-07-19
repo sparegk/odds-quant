@@ -20,18 +20,22 @@ def test_compose_orders_database_api_and_worker() -> None:
     database = services["db"]
     api = services["api"]
     worker = services["worker"]
+    frontend = services["frontend"]
     assert database["image"] == "postgres:17-alpine"
     assert api["depends_on"]["db"]["condition"] == "service_healthy"
     assert worker["depends_on"]["api"]["condition"] == "service_healthy"
     assert "alembic upgrade head" in api["command"]
     assert worker["environment"]["ODDSQUANT_SEED_DEMO"] == "true"
+    assert frontend["depends_on"]["api"]["condition"] == "service_healthy"
+    assert frontend["ports"] == ["${ODDSQUANT_FRONTEND_PORT:-5173}:8080"]
 
 
 def test_render_is_production_safe_and_migrates_before_deploy() -> None:
     blueprint = _yaml("render.yaml")
     services = blueprint["services"]
     assert isinstance(services, list)
-    web = next(service for service in services if service["type"] == "web")
+    web = next(service for service in services if service["name"] == "oddsquant-api")
+    frontend = next(service for service in services if service["name"] == "oddsquant-web")
     worker = next(service for service in services if service["type"] == "worker")
     assert web["preDeployCommand"] == "python -m alembic upgrade head"
     assert web["autoDeployTrigger"] == "checksPass"
@@ -41,6 +45,8 @@ def test_render_is_production_safe_and_migrates_before_deploy() -> None:
     assert web_environment["ODDSQUANT_SEED_DEMO"]["value"] == "false"
     assert web_environment["ODDSQUANT_ADMIN_API_KEY"]["generateValue"] is True
     assert worker_environment["ODDSQUANT_SEED_DEMO"]["value"] == "false"
+    assert frontend["runtime"] == "static"
+    assert frontend["buildCommand"] == "npm ci && npm run build"
 
 
 def test_backend_image_runs_as_non_root_without_embedded_secrets() -> None:
@@ -51,6 +57,11 @@ def test_backend_image_runs_as_non_root_without_embedded_secrets() -> None:
     assert "ADMIN_API_KEY" not in dockerfile
     assert "PASSWORD=" not in dockerfile
 
+    frontend = (ROOT / "frontend" / "Dockerfile").read_text(encoding="utf-8")
+    assert frontend.startswith("FROM node:24-alpine AS build")
+    assert "nginxinc/nginx-unprivileged" in frontend
+    assert "COPY --from=build /app/dist" in frontend
+
 
 def test_ci_checks_migrations_and_builds_backend_image() -> None:
     _yaml(".github/workflows/ci.yml")
@@ -59,3 +70,6 @@ def test_ci_checks_migrations_and_builds_backend_image() -> None:
     assert "python -m alembic check" in workflow
     assert "python -m pytest -q" in workflow
     assert "docker build --tag oddsquant-api:ci backend" in workflow
+    assert "npm run test" in workflow
+    assert "npm run build" in workflow
+    assert "docker build --tag oddsquant-web:ci frontend" in workflow
