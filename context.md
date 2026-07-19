@@ -70,4 +70,6 @@ The first complete backtester will report predictive calibration and betting-str
 
 ## Current Status
 
-Phase 0 establishes project configuration, normalized persistence models, provider contracts, pure quantitative functions, a health API, and initial tests. Phase 1 will add migrations, deterministic demo seeding, team/player/lineup data contracts, CSV ingestion, model training, stored signals, a tax-aware football arbitrage scanner, backtesting, bankroll simulation, and the connected React dashboard.
+The data-foundation portion of Phase 1 is operational. The checked-in Alembic baseline creates the point-in-time schema, and the backend now has strict odds CSV contracts, atomic coherent-snapshot ingestion, immutable raw import records, rejected-job audit records, and a current-date synthetic demo seed. Demo seeding is deterministic for an explicit `as_of` value and idempotent at the price-snapshot level.
+
+The next slice will expose the stored data through versioned API routes, then connect probability, signal, arbitrage, modelling, backtesting, and frontend workflows. No model performance or profitability result is claimed by the seed data.

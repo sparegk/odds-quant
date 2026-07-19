@@ -6,6 +6,14 @@ OddsQuant may ingest football data from licensed sports-data APIs, official comp
 
 Every record must identify its provider, source type, source key, source update time, ingestion time, effective period, and whether it is real, manually entered, or generated. Raw permitted responses should be retained immutably with a checksum so normalization can be reproduced.
 
+## Odds CSV Contract
+
+The implemented `odds-csv-v1` importer accepts UTF-8 files up to 5 MiB and 20,000 rows. Required fields identify the provider event, competition and season, teams, offset-aware kickoff and observation times, bookmaker, market, selection, and decimal price. Optional fields carry the market line, provider update time, period, currency, settlement key, and closing flag.
+
+Rows are grouped into bookmaker snapshots by event, market, line, period, currency, settlement rule, and observation time. Each group must contain the exact complete selection set for its market. An incomplete 1X2, totals, both-teams-to-score, double-chance, or supported team-total snapshot rejects the entire import; so do duplicate outcomes, future observations, post-kickoff pre-match prices, conflicting event identities, mixed closing flags, and odds at or below 1.0.
+
+Accepted files preserve their SHA-256 digest and normalized payload in `raw_ingestions`. Rejected files create an auditable import job but cannot partially create football or odds records. Re-importing an identical snapshot is idempotent; reusing the same identity with changed prices is rejected rather than rewriting history.
+
 ## Football Data Required
 
 ### Teams And Matches

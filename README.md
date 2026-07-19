@@ -178,7 +178,7 @@ The planned React dashboard will include:
 
 ## Current Implementation
 
-The repository is currently at **Phase 0: foundation**. It includes:
+The repository is in the **Phase 1 data-foundation milestone**. It includes:
 
 - FastAPI application configuration and CORS handling.
 - `GET /health` and `GET /api/v1/status`.
@@ -188,8 +188,12 @@ The repository is currently at **Phase 0: foundation**. It includes:
 - Poisson scoreline and joint bet-builder probability primitives.
 - Settlement and explainable signal-policy primitives.
 - Initial API tests and project documentation.
+- A reproducible Alembic baseline for the complete point-in-time schema.
+- Strict football odds CSV contracts with UTC, event-identity, market-line, settlement, and complete-selection validation.
+- Atomic CSV persistence for events, teams, competitions, bookmakers, markets, selections, raw payloads, import jobs, and timestamped odds snapshots.
+- A clearly labelled, current-date synthetic football seed that is idempotent for the same `as_of` timestamp.
 
-The connected Phase 1 data pipeline, demo seed, migrations, arbitrage service, model training workflow, backtester, and frontend are not implemented yet. No real or synthetic performance result is currently claimed.
+The analysis API, arbitrage service, model training workflow, backtester, and frontend are not implemented yet. No real or synthetic performance result is currently claimed.
 
 ## Repository Structure
 
@@ -201,6 +205,8 @@ backend/
     db/          SQLAlchemy models and sessions
     providers/   Data-provider contracts
     quant/       Pure probability and odds calculations
+    schemas/     Validated ingestion and API contracts
+    services/    Transactional imports and application workflows
     signals/     Explainable signal policy
   tests/         Backend tests
 ```
@@ -213,8 +219,24 @@ Additional backend modules and the `frontend` application will be added during P
 cd backend
 python -m venv .venv
 python -m pip install -e ".[dev]"
+python -m alembic upgrade head
+python -m app.cli seed-demo
 python -m uvicorn app.main:app --reload
 ```
+
+`seed-demo` creates synthetic teams, events, bookmakers, and recent pre-match prices labelled `DEMO DATA`. It does not represent a real league, real bookmaker feed, trained model, or profitable result. To make a reproducible seed, supply an offset-aware timestamp:
+
+```bash
+python -m app.cli seed-demo --as-of 2026-07-19T10:00:00+00:00
+```
+
+Import a user-provided UTF-8 CSV after applying migrations:
+
+```bash
+python -m app.cli import-odds path/to/odds.csv
+```
+
+Required columns are `provider_event_key`, `competition`, `country`, `season`, `kickoff_at`, `home_team`, `away_team`, `bookmaker`, `market_type`, `selection_code`, `selection_name`, `decimal_odds`, and `observed_at`. Optional columns are `line`, `source_updated_at`, `period`, `currency`, `settlement_rule_key`, and `is_closing`. Timestamps must include a UTC offset. Imports reject the entire file if an event identity conflicts or a bookmaker snapshot lacks the exact outcome set required by its market.
 
 Open the API documentation at `http://127.0.0.1:8000/docs` or check:
 
@@ -228,14 +250,14 @@ Run the available checks from `backend`:
 python -m pytest
 python -m ruff check .
 python -m ruff format --check .
-python -m mypy app
+python -m mypy app tests
 ```
 
 Copy `.env.example` to `.env` for local configuration. Never commit API keys, tokens, bookmaker credentials, cookies, or proprietary data.
 
 ## Project Status
 
-OddsQuant has a documented architecture, normalized persistence model, provider boundary, quantitative foundations, and a minimal FastAPI service. The next milestone is a runnable vertical slice with Alembic migrations, labelled demo data, CSV import, stored odds, and the first connected analysis endpoint.
+OddsQuant has a documented architecture, migrated normalized schema, provider boundary, quantitative foundations, labelled demo seed, and atomic CSV-to-database odds pipeline. The next milestone is the first connected events, imports, providers, and analysis API slice.
 
 See [context.md](context.md), [ARCHITECTURE.md](ARCHITECTURE.md), [ROADMAP.md](ROADMAP.md), and [AGENTS.md](AGENTS.md) for detailed decisions and operating rules.
 

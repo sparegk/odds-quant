@@ -5,6 +5,8 @@
 - `backend/app/api`: versioned FastAPI routes.
 - `backend/app/db`: SQLAlchemy models and sessions.
 - `backend/app/providers`: legal data-source adapters.
+- `backend/app/schemas`: strict ingestion and API data contracts.
+- `backend/app/services`: transactional imports and application workflows.
 - `backend/app/quant`: pure probability and settlement logic.
 - `backend/app/signals`: explainable signal policy.
 - `backend/tests`: deterministic backend tests.
@@ -15,12 +17,18 @@ From `backend`:
 
 ```bash
 python -m pip install -e ".[dev]"
+python -m alembic upgrade head
+python -m app.cli seed-demo
 python -m pytest
 python -m ruff check .
 python -m ruff format --check .
-python -m mypy app
+python -m mypy app tests
 python -m uvicorn app.main:app --reload
 ```
+
+Import user-supplied odds with `python -m app.cli import-odds path/to/odds.csv`. CSV
+imports are atomic: never weaken completeness, timestamp, identity, or market-settlement
+validation to accept a partial feed.
 
 ## Non-Negotiable Rules
 
