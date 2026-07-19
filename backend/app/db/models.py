@@ -444,7 +444,11 @@ class MatchResult(Base):
     observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     settled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     supersedes_id: Mapped[int | None] = mapped_column(ForeignKey("match_results.id"))
-    __table_args__ = (UniqueConstraint("event_id", "provider_id", "observed_at"),)
+    __table_args__ = (
+        UniqueConstraint("event_id", "provider_id", "observed_at"),
+        CheckConstraint("home_goals >= 0 AND away_goals >= 0"),
+        CheckConstraint("settled_at <= observed_at"),
+    )
 
 
 class TeamStatistic(Base):
@@ -480,10 +484,18 @@ class ModelVersion(Base, TimestampMixin):
     kind: Mapped[str] = mapped_column(String(60))
     training_start: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     training_end: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    data_fingerprint: Mapped[str] = mapped_column(String(64))
+    feature_version: Mapped[str] = mapped_column(String(60))
+    sample_size: Mapped[int] = mapped_column(Integer)
+    evaluation_status: Mapped[str] = mapped_column(String(30), default="unvalidated")
     config: Mapped[dict[str, object]] = mapped_column(JSON)
     metrics: Mapped[dict[str, object]] = mapped_column(JSON)
     status: Mapped[str] = mapped_column(String(30))
     is_demo: Mapped[bool] = mapped_column(Boolean, default=False)
+    __table_args__ = (
+        CheckConstraint("training_end > training_start"),
+        CheckConstraint("sample_size > 0"),
+    )
 
 
 class ModelEventOutput(Base):
@@ -502,7 +514,12 @@ class ModelEventOutput(Base):
     away_lambda: Mapped[float] = mapped_column(Float)
     score_matrix: Mapped[list[list[float]]] = mapped_column(JSON)
     sample_size: Mapped[int] = mapped_column(Integer)
-    __table_args__ = (UniqueConstraint("event_id", "model_version_id", "predicted_at"),)
+    __table_args__ = (
+        UniqueConstraint("event_id", "model_version_id", "predicted_at"),
+        CheckConstraint("inputs_as_of <= predicted_at"),
+        CheckConstraint("home_lambda > 0 AND away_lambda > 0"),
+        CheckConstraint("sample_size > 0"),
+    )
 
 
 class ModelPrediction(Base):
@@ -514,7 +531,15 @@ class ModelPrediction(Base):
     lower_probability: Mapped[float] = mapped_column(Float)
     upper_probability: Mapped[float] = mapped_column(Float)
     fair_odds: Mapped[float] = mapped_column(Float)
-    __table_args__ = (UniqueConstraint("output_id", "selection_id"),)
+    __table_args__ = (
+        UniqueConstraint("output_id", "selection_id"),
+        CheckConstraint(
+            "probability >= 0 AND probability <= 1 "
+            "AND lower_probability >= 0 AND lower_probability <= probability "
+            "AND upper_probability >= probability AND upper_probability <= 1"
+        ),
+        CheckConstraint("fair_odds >= 1"),
+    )
 
 
 class ValueSignal(Base):

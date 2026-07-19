@@ -52,6 +52,24 @@ export interface ProviderJob {
   finished_at: string | null
 }
 
+export interface ModelVersion {
+  id: number
+  name: string
+  version: string
+  kind: string
+  training_start: string
+  training_end: string
+  data_fingerprint: string
+  feature_version: string
+  sample_size: number
+  evaluation_status: string
+  config: Record<string, unknown>
+  metrics: Record<string, unknown>
+  status: string
+  is_demo: boolean
+  created_at: string
+}
+
 export interface PriceComparison {
   selection_code: string
   selection_name: string
@@ -106,4 +124,5 @@ export interface DashboardData {
   providers: ProviderSummary[]
   imports: ImportJob[]
   jobs: ProviderJob[]
+  models: ModelVersion[]
 }

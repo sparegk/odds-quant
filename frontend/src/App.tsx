@@ -260,7 +260,7 @@ function ActiveView(props: ActiveViewProps) {
     case 'builder':
       return <UnavailableModule title="Bet Builder Laboratory" requirement="A stored scoreline distribution for the selected event" />
     case 'models':
-      return <UnavailableModule title="Model performance" requirement="Chronologically trained model versions and held-out evaluation" />
+      return <ModelPerformance dashboard={props.dashboard} />
     case 'backtests':
       return <UnavailableModule title="Backtesting" requirement="Timestamped historical predictions, odds snapshots, and settled results" />
     case 'bankroll':
@@ -282,7 +282,11 @@ function Overview({ dashboard, onSelectEvent }: { dashboard: DashboardData; onSe
         <Metric label="Tracked events" value={dashboard.events.length.toString()} />
         <Metric label="Odds snapshots" value={snapshotCount.toString()} />
         <Metric label="Data providers" value={dashboard.providers.length.toString()} />
-        <Metric label="Model status" value="Untrained" tone="amber" />
+        <Metric
+          label="Model status"
+          value={dashboard.models.length ? "Baseline available" : "Untrained"}
+          tone={dashboard.models.length ? "default" : "amber"}
+        />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.7fr)]">
@@ -304,7 +308,11 @@ function Overview({ dashboard, onSelectEvent }: { dashboard: DashboardData; onSe
           <div className="border-y border-zinc-200 bg-white p-5">
             <ReadinessRow label="Stored market data" ready={snapshotCount > 0} />
             <ReadinessRow label="Recent observation" ready={latestOdds !== undefined} detail={formatDateTime(latestOdds ?? null)} />
-            <ReadinessRow label="Independent model" ready={false} detail="No trained version" />
+            <ReadinessRow
+              label="Independent model"
+              ready={dashboard.models.length > 0}
+              detail={dashboard.models[0]?.version ?? "No trained version"}
+            />
             <ReadinessRow label="Backtest evidence" ready={false} detail="No completed run" />
           </div>
           <div className="mt-4 border-l-4 border-amber-400 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
@@ -312,6 +320,40 @@ function Overview({ dashboard, onSelectEvent }: { dashboard: DashboardData; onSe
           </div>
         </div>
       </section>
+    </div>
+  )
+}
+
+function ModelPerformance({ dashboard }: { dashboard: DashboardData }) {
+  return (
+    <div className="space-y-6">
+      <SectionHeading eyebrow="Version registry" title="Football probability models" />
+      {dashboard.models.length ? (
+        <div className="overflow-x-auto border-y border-zinc-200 bg-white">
+          <table className="w-full min-w-[820px] text-left text-sm">
+            <thead className="bg-zinc-50 text-xs uppercase text-zinc-500">
+              <tr><th className="px-4 py-3">Version</th><th className="px-4 py-3">Training cutoff</th><th className="px-4 py-3 text-right">Matches</th><th className="px-4 py-3">Feature version</th><th className="px-4 py-3">Evaluation</th><th className="px-4 py-3">Data fingerprint</th></tr>
+            </thead>
+            <tbody>
+              {dashboard.models.map((model) => (
+                <tr key={model.id} className="border-t border-zinc-100">
+                  <td className="px-4 py-3"><p className="font-semibold">{model.version}</p><p className="mt-1 text-xs text-zinc-500">{model.is_demo ? "DEMO TRAINING DATA" : model.name}</p></td>
+                  <td className="px-4 py-3">{formatDateTime(model.training_end)}</td>
+                  <td className="px-4 py-3 text-right font-mono">{model.sample_size}</td>
+                  <td className="px-4 py-3 font-mono text-xs">{model.feature_version}</td>
+                  <td className="px-4 py-3"><span className="rounded-[4px] border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800">{model.evaluation_status.toUpperCase()}</span></td>
+                  <td className="px-4 py-3 font-mono text-xs">{model.data_fingerprint.slice(0, 12)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <EmptyState title="No trained model versions" detail="Import historical results and train the Poisson baseline to populate this registry." />
+      )}
+      <div className="border-l-4 border-amber-400 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
+        A trained baseline is not performance evidence. Value signals remain blocked until chronological held-out calibration and uncertainty checks pass.
+      </div>
     </div>
   )
 }

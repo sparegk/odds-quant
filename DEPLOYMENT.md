@@ -33,8 +33,11 @@ cd backend
 python -m pip install -e ".[dev]"
 python -m alembic upgrade head
 python -m app.cli seed-demo
+python -m app.cli seed-demo-results
 python -m uvicorn app.main:app --reload
 ```
+
+The two seed commands are separate and explicitly synthetic. Use `import-results`, `train-poisson`, and `predict-event` for the local model workflow; production disables scheduled demo seeding and should ingest only authorized, timestamped sources.
 
 Run the scheduler separately with `python -m app.jobs.scheduler`. Production never seeds demo data, even if `ODDSQUANT_SEED_DEMO` is accidentally true.
 

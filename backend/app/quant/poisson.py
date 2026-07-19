@@ -9,7 +9,7 @@ from app.quant.odds import fair_odds
 ScoreMatrix = NDArray[np.float64]
 
 
-def score_matrix(home_lambda: float, away_lambda: float, max_goals: int = 15) -> ScoreMatrix:
+def score_matrix(home_lambda: float, away_lambda: float, max_goals: int = 20) -> ScoreMatrix:
     if home_lambda <= 0 or away_lambda <= 0:
         raise ValueError("Expected goals must be positive")
     goals = np.arange(max_goals + 1)
@@ -37,29 +37,40 @@ def selection_wins(
     home_goals: int, away_goals: int, market_type: str, code: str, line: float | None
 ) -> bool:
     if market_type == "MATCH_RESULT":
-        return {
+        outcomes = {
             "HOME": home_goals > away_goals,
             "DRAW": home_goals == away_goals,
             "AWAY": home_goals < away_goals,
-        }[code]
-    if market_type == "BTTS":
+        }
+        if code not in outcomes:
+            raise ValueError(f"Unsupported MATCH_RESULT selection: {code}")
+        return outcomes[code]
+    if market_type in {"BTTS", "BOTH_TEAMS_TO_SCORE"}:
+        if code not in {"YES", "NO"}:
+            raise ValueError(f"Unsupported {market_type} selection: {code}")
         yes = home_goals > 0 and away_goals > 0
         return yes if code == "YES" else not yes
     if market_type == "DOUBLE_CHANCE":
-        return {
+        outcomes = {
             "HOME_OR_DRAW": home_goals >= away_goals,
             "DRAW_OR_AWAY": home_goals <= away_goals,
+            "AWAY_OR_DRAW": home_goals <= away_goals,
             "HOME_OR_AWAY": home_goals != away_goals,
-        }[code]
+        }
+        if code not in outcomes:
+            raise ValueError(f"Unsupported DOUBLE_CHANCE selection: {code}")
+        return outcomes[code]
     if line is None:
         raise ValueError(f"{market_type} requires a line")
     goals = home_goals + away_goals
-    if market_type == "HOME_TEAM_TOTAL":
+    if market_type in {"HOME_TEAM_TOTAL", "TEAM_TOTAL_HOME"}:
         goals = home_goals
-    elif market_type == "AWAY_TEAM_TOTAL":
+    elif market_type in {"AWAY_TEAM_TOTAL", "TEAM_TOTAL_AWAY"}:
         goals = away_goals
     elif market_type != "TOTAL_GOALS":
         raise ValueError(f"Unsupported market type: {market_type}")
+    if code not in {"OVER", "UNDER"}:
+        raise ValueError(f"Unsupported {market_type} selection: {code}")
     return goals > line if code == "OVER" else goals < line
 
 
@@ -70,9 +81,12 @@ def derive_market(
         "MATCH_RESULT": ["HOME", "DRAW", "AWAY"],
         "TOTAL_GOALS": ["OVER", "UNDER"],
         "BTTS": ["YES", "NO"],
+        "BOTH_TEAMS_TO_SCORE": ["YES", "NO"],
         "DOUBLE_CHANCE": ["HOME_OR_DRAW", "DRAW_OR_AWAY", "HOME_OR_AWAY"],
         "HOME_TEAM_TOTAL": ["OVER", "UNDER"],
         "AWAY_TEAM_TOTAL": ["OVER", "UNDER"],
+        "TEAM_TOTAL_HOME": ["OVER", "UNDER"],
+        "TEAM_TOTAL_AWAY": ["OVER", "UNDER"],
     }.get(market_type)
     if codes is None:
         raise ValueError(f"Unsupported market type: {market_type}")

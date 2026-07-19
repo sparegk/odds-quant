@@ -71,6 +71,10 @@ The system distinguishes `source_updated_at`, `observed_at`, `ingested_at`, and 
 - Closing odds are the last valid snapshot strictly before kickoff. Post-kickoff data can never be relabelled as closing data.
 - Results become training data only after final status and reconciliation. Corrections create a new version rather than silently rewriting lineage.
 
+User result CSVs require canonical event/team identity, final home and away goals, kickoff, settlement, provider observation, and optional source-update timestamps. The importer rejects naive timestamps, future observations, negative goals, conflicting provider event identities, and settlement times before kickoff or after observation. Every accepted payload is retained with a content hash; later score corrections append a `supersedes_id` chain.
+
+Training canonicalizes results by competition, kickoff, home team, and away team so the same fixture from multiple permitted providers is counted once. Consistent duplicates use the latest observation available by the cutoff; conflicting final scores block training until the source discrepancy is resolved.
+
 Freshness thresholds are configurable per provider and competition because update schedules differ, but any override must be visible and tested. A provider's slower rate limit may reduce coverage; it must not be hidden by pretending cached data is current.
 
 ## Adaptive Collection

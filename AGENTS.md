@@ -20,6 +20,7 @@ From `backend`:
 python -m pip install -e ".[dev]"
 python -m alembic upgrade head
 python -m app.cli seed-demo
+python -m app.cli seed-demo-results
 python -m app.jobs.scheduler
 python -m pytest
 python -m ruff check .
@@ -45,6 +46,8 @@ npm run dev
 Import user-supplied odds with `python -m app.cli import-odds path/to/odds.csv`. CSV
 imports are atomic: never weaken completeness, timestamp, identity, or market-settlement
 validation to accept a partial feed.
+
+Import historical results with `python -m app.cli import-results path/to/results.csv`, train with `python -m app.cli train-poisson ...`, and persist a pre-kickoff prediction with `python -m app.cli predict-event ...`. Model versions must retain their exact cutoff, feature version, input fingerprint, sample size, and evaluation status.
 
 Multipart imports use `POST /api/v1/imports/odds`. Local development may omit an admin
 key; production must set `ODDSQUANT_ADMIN_API_KEY` and send `X-Admin-Key`.

@@ -13,7 +13,7 @@ describe('API client', () => {
       let payload: unknown = []
       if (url.endsWith('/api/v1/status')) {
         payload = {
-          phase: 'data_foundation',
+          phase: 'model_baseline',
           sports: ['football'],
           data_mode: 'demo_or_user_supplied',
           automated_betting: false,
@@ -26,7 +26,7 @@ describe('API client', () => {
     const data = await loadDashboard()
 
     expect(data.status.automated_betting).toBe(false)
-    expect(fetchMock).toHaveBeenCalledTimes(5)
+    expect(fetchMock).toHaveBeenCalledTimes(6)
   })
 
   it('requests comparison data for the selected event', async () => {

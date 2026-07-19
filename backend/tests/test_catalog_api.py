@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Generator, Iterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -9,10 +9,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Event, OddsSnapshot
+from app.db.models import Competition, Event, OddsSnapshot
 from app.db.session import Base, get_db
 from app.main import app
-from app.services.demo_seed import build_demo_odds_csv, seed_demo_data
+from app.services.demo_seed import build_demo_odds_csv, build_demo_results_csv, seed_demo_data
 
 
 @pytest.fixture
@@ -136,3 +136,54 @@ def test_unknown_event_returns_not_found(api: tuple[TestClient, Session, datetim
     client, _, _ = api
     assert client.get("/api/v1/events/999999").status_code == 404
     assert client.get("/api/v1/odds/comparison", params={"event_id": 999999}).status_code == 404
+
+
+def test_results_training_and_prediction_api_are_connected(
+    api: tuple[TestClient, Session, datetime],
+) -> None:
+    client, session, as_of = api
+    result_upload = client.post(
+        "/api/v1/imports/results",
+        files={
+            "file": (
+                "historical-results.csv",
+                build_demo_results_csv(as_of),
+                "text/csv",
+            )
+        },
+    )
+    assert result_upload.status_code == 201
+    assert result_upload.json()["results_created"] == 32
+
+    competition_id = session.scalar(select(Competition.id))
+    target = session.scalar(
+        select(Event).where(Event.status == "scheduled").order_by(Event.kickoff_at)
+    )
+    assert competition_id is not None and target is not None
+    training = client.post(
+        "/api/v1/models/train",
+        json={
+            "competition_id": competition_id,
+            "training_start": (as_of - timedelta(days=150)).isoformat(),
+            "training_end": as_of.isoformat(),
+            "minimum_matches": 20,
+            "minimum_team_matches": 3,
+            "shrinkage_matches": 5,
+        },
+    )
+    assert training.status_code == 201
+    assert training.json()["evaluation_status"] == "unvalidated"
+
+    prediction = client.post(
+        f"/api/v1/models/{training.json()['id']}/predict",
+        json={
+            "event_id": target.id,
+            "predicted_at": as_of.isoformat(),
+            "inputs_as_of": as_of.isoformat(),
+        },
+    )
+    assert prediction.status_code == 201
+    assert len(prediction.json()["predictions"]) == 3
+    stored = client.get(f"/api/v1/events/{target.id}/predictions")
+    assert stored.status_code == 200
+    assert stored.json()[0]["id"] == prediction.json()["id"]

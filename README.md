@@ -180,7 +180,7 @@ Stored events, odds comparison, provider/import status, freshness, and methodolo
 
 ## Current Implementation
 
-The repository is in the **Phase 1 data-foundation milestone**. It includes:
+The repository is in the **Phase 1 model-baseline milestone**. It includes:
 
 - FastAPI application configuration and CORS handling.
 - `GET /health` and `GET /api/v1/status`.
@@ -200,8 +200,13 @@ The repository is in the **Phase 1 data-foundation milestone**. It includes:
 - A non-root backend image, PostgreSQL Docker Compose stack, Render Blueprint, and GitHub Actions checks.
 - A responsive React/Vite/Tailwind dashboard with a typed API client, quantitative price table, freshness states, best-price chart, accessible navigation, and component tests.
 - Frontend Docker, Nginx SPA, Vercel, Render static-site, and CI configuration.
+- Atomic historical-result CSV ingestion with raw provenance, corrections, and strict timestamp ordering.
+- A deterministic 32-match synthetic history generator covering every demo team at home and away.
+- A versioned, shrunk Poisson team-strength baseline trained only from final results observed by its cutoff.
+- Stored score matrices, expected goals, selection probabilities, uncertainty intervals, data fingerprints, and immutable prediction timestamps.
+- Model registry, training, prediction, and event-prediction API routes plus CLI equivalents.
 
-The model-backed opportunity API, arbitrage service, model training workflow, and backtester are not implemented yet. Their dashboard views remain blocked and no real or synthetic performance result is currently claimed.
+The model is deliberately marked `unvalidated`: no chronological held-out calibration, value-signal service, arbitrage service, or backtester is implemented yet. No real or synthetic performance result is currently claimed.
 
 ## Repository Structure
 
@@ -257,6 +262,7 @@ python -m venv .venv
 python -m pip install -e ".[dev]"
 python -m alembic upgrade head
 python -m app.cli seed-demo
+python -m app.cli seed-demo-results
 python -m uvicorn app.main:app --reload
 ```
 
@@ -264,17 +270,32 @@ python -m uvicorn app.main:app --reload
 
 ```bash
 python -m app.cli seed-demo --as-of 2026-07-19T10:00:00+00:00
+python -m app.cli seed-demo-results --as-of 2026-07-19T10:00:00+00:00
 ```
+
+`seed-demo-results` creates 32 timestamped synthetic final results before the anchor. It exists to exercise training and leakage controls; it is not real team history or performance evidence.
 
 Import a user-provided UTF-8 CSV after applying migrations:
 
 ```bash
 python -m app.cli import-odds path/to/odds.csv
+python -m app.cli import-results path/to/results.csv
 ```
 
-The same workflow is available at `POST /api/v1/imports/odds` as a multipart upload. Development permits local uploads without a key. Set `ODDSQUANT_ADMIN_API_KEY` and send it as `X-Admin-Key` for protected environments; production fails closed when the key is unset.
+The same workflows are available at `POST /api/v1/imports/odds` and `POST /api/v1/imports/results` as multipart uploads. Development permits local uploads without a key. Set `ODDSQUANT_ADMIN_API_KEY` and send it as `X-Admin-Key` for protected environments; production fails closed when the key is unset.
 
 Required columns are `provider_event_key`, `competition`, `country`, `season`, `kickoff_at`, `home_team`, `away_team`, `bookmaker`, `market_type`, `selection_code`, `selection_name`, `decimal_odds`, and `observed_at`. Optional columns are `line`, `source_updated_at`, `period`, `currency`, `settlement_rule_key`, and `is_closing`. Timestamps must include a UTC offset. Imports reject the entire file if an event identity conflicts or a bookmaker snapshot lacks the exact outcome set required by its market.
+
+Result CSVs require `provider_event_key`, `competition`, `country`, `season`, `kickoff_at`, `home_team`, `away_team`, `home_goals`, `away_goals`, `settled_at`, and `observed_at`; `source_updated_at` is optional. Results must be final and observed no earlier than settlement. Later corrected scores append a superseding observation rather than rewriting history.
+
+Train and apply the baseline after results and target-event odds exist:
+
+```bash
+python -m app.cli train-poisson 1 2026-03-01T00:00:00+00:00 2026-07-19T10:00:00+00:00
+python -m app.cli predict-event 1 33 --predicted-at 2026-07-19T10:00:00+00:00
+```
+
+Use IDs returned by your own database. Training rejects future cutoffs and insufficient samples. Prediction rejects post-kickoff timestamps, competition mismatches, training windows later than `inputs_as_of`, and teams without the configured venue-specific history.
 
 Open the API documentation at `http://127.0.0.1:8000/docs` or check:
 
@@ -289,9 +310,14 @@ Current stored-data routes include:
 - `GET /api/v1/jobs`
 - `GET /api/v1/imports` and `GET /api/v1/imports/{job_id}`
 - `POST /api/v1/imports/odds`
+- `POST /api/v1/imports/results`
 - `GET /api/v1/odds/comparison?event_id={event_id}`
+- `GET /api/v1/models` and `GET /api/v1/models/{model_id}`
+- `POST /api/v1/models/train`
+- `POST /api/v1/models/{model_id}/predict`
+- `GET /api/v1/events/{event_id}/predictions`
 
-Odds comparison is market analysis, not a model-value signal. It does not report expected value or an opportunity until an independently trained, timestamped model prediction exists.
+Odds comparison and model prediction remain separate records. The API does not report expected value or an opportunity until the next signal layer joins a fresh compatible price to an independently trained, calibrated prediction.
 
 Run the available checks from `backend`:
 
@@ -306,7 +332,7 @@ Copy `.env.example` to `.env` for local configuration. Never commit API keys, to
 
 ## Project Status
 
-OddsQuant has a documented architecture, migrated normalized schema, provider boundary, quantitative foundations, labelled demo seed, atomic CSV-to-database odds pipeline, connected stored-data API and dashboard, scheduler worker, CI, and prepared full-stack container deployment. The next milestone is the model-backed value, underdog, and arbitrage analysis slice.
+OddsQuant now has a migrated point-in-time data layer, atomic odds and result ingestion, a leakage-safe versioned Poisson baseline, stored scoreline predictions, a connected model registry dashboard, provider scheduling, CI, and prepared full-stack deployment. The next milestone is chronological model evaluation followed by value, underdog, and tax-aware arbitrage services.
 
 See [context.md](context.md), [ARCHITECTURE.md](ARCHITECTURE.md), [METHODOLOGY.md](METHODOLOGY.md), [ROADMAP.md](ROADMAP.md), and [AGENTS.md](AGENTS.md) for detailed decisions and operating rules.
 

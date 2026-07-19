@@ -7,7 +7,20 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.schemas.odds import ImportSummary
+from app.schemas.results import ResultImportRow, ResultImportSummary
 from app.services.odds_import import import_odds_csv
+from app.services.results_import import import_results_csv, serialize_result_rows_csv
+
+DEMO_TEAMS = (
+    "Northbridge FC",
+    "Riverside Athletic",
+    "Harbour City",
+    "Kingsport United",
+    "Easton Rovers",
+    "Vale Town",
+    "Redwood Albion",
+    "Metro Wanderers",
+)
 
 
 def build_demo_odds_csv(as_of: datetime) -> bytes:
@@ -79,6 +92,36 @@ def build_demo_odds_csv(as_of: datetime) -> bytes:
     return stream.getvalue().encode("utf-8")
 
 
+def build_demo_results_csv(as_of: datetime) -> bytes:
+    if as_of.tzinfo is None or as_of.utcoffset() is None:
+        raise ValueError("as_of must include a UTC offset")
+    anchor = as_of.astimezone(UTC).replace(second=0, microsecond=0)
+    rows: list[ResultImportRow] = []
+    for index in range(32):
+        home_index = index % len(DEMO_TEAMS)
+        away_index = (index * 3 + 1) % len(DEMO_TEAMS)
+        kickoff = anchor - timedelta(days=110 - index * 3)
+        settled_at = kickoff + timedelta(hours=2)
+        observed_at = settled_at + timedelta(hours=1)
+        rows.append(
+            ResultImportRow(
+                provider_event_key=f"demo-history-{anchor:%Y%m%d}-{index + 1}",
+                competition="Synthetic Premier Division",
+                country="Demo Republic",
+                season=f"{anchor.year}/{anchor.year + 1}",
+                kickoff_at=kickoff,
+                home_team=DEMO_TEAMS[home_index],
+                away_team=DEMO_TEAMS[away_index],
+                home_goals=(index * 2 + home_index) % 4,
+                away_goals=(index + away_index) % 3,
+                settled_at=settled_at,
+                observed_at=observed_at,
+                source_updated_at=observed_at,
+            )
+        )
+    return serialize_result_rows_csv(rows)
+
+
 def seed_demo_data(
     session: Session,
     *,
@@ -92,6 +135,24 @@ def seed_demo_data(
         content=build_demo_odds_csv(anchor),
         provider_slug="demo-seed-v1",
         provider_name="OddsQuant synthetic demonstration provider",
+        is_demo=True,
+        now=ingested_at or datetime.now(UTC),
+    )
+
+
+def seed_demo_results(
+    session: Session,
+    *,
+    as_of: datetime | None = None,
+    ingested_at: datetime | None = None,
+) -> ResultImportSummary:
+    anchor = as_of or datetime.now(UTC)
+    return import_results_csv(
+        session,
+        filename=f"DEMO_results_{anchor.astimezone(UTC):%Y%m%d_%H%M}.csv",
+        content=build_demo_results_csv(anchor),
+        provider_slug="demo-results-v1",
+        provider_name="OddsQuant synthetic historical results provider",
         is_demo=True,
         now=ingested_at or datetime.now(UTC),
     )

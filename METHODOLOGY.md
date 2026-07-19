@@ -15,11 +15,15 @@ Both are estimates of market consensus, not model predictions. OddsQuant retains
 
 ## Football Probability Model
 
-The first model pipeline will estimate home and away scoring rates from historical matches available before the prediction cutoff. Independent Poisson score probabilities provide a transparent baseline; Dixon-Coles and other adjustments can be added only when chronological validation demonstrates improved calibration.
+The implemented baseline estimates league home/away goal rates plus venue-specific attack and defence ratios. Each ratio is shrunk toward the league average by a configurable prior-match count. Training selects only final results whose kickoff precedes the exclusive training cutoff and whose result observation and settlement timestamps are at or before that cutoff.
+
+Expected goals combine the home team's home attack, the away team's away defence, the league home rate, and the corresponding away components. Rates are bounded to a documented numerical range before independent Poisson score probabilities are calculated. This is an interpretable baseline, not yet a calibrated production model; Dixon-Coles and other adjustments can be added only when walk-forward validation demonstrates an improvement.
 
 A scoreline matrix derives probabilities for match result, totals, both teams to score, double chance, supported team totals, and supported joint bet-builder outcomes. Player availability, expected and confirmed lineups, coach regimes, and tactical matchups remain distinct evidence classes so their incremental value can be tested without double counting.
 
 Every stored prediction must identify its model version, prediction time, input cutoff, training interval, feature version, sample size, uncertainty interval, and evidence class. Missing or post-cutoff evidence cannot be silently substituted.
+
+The current selection intervals are Wilson sampling intervals based on the training-match count. They communicate limited sample reliability but do not capture all parameter, lineup, tactical, or regime uncertainty. The model therefore remains `unvalidated` until chronological held-out calibration exists.
 
 ## Value And Confidence
 
