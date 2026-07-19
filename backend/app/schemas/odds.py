@@ -49,7 +49,7 @@ class OddsImportRow(BaseModel):
     line: Decimal | None = Field(default=None, gt=0, max_digits=8, decimal_places=2)
     selection_code: str = Field(min_length=1, max_length=40)
     selection_name: str = Field(min_length=1, max_length=120)
-    decimal_odds: Decimal = Field(gt=1, le=10_000, max_digits=12, decimal_places=5)
+    decimal_odds: Decimal = Field(gt=1, le=1_000, max_digits=12, decimal_places=5)
     observed_at: datetime
     source_updated_at: datetime | None = None
     period: str = Field(default="FULL_TIME", min_length=1, max_length=30)

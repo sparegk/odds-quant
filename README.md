@@ -192,6 +192,8 @@ The repository is in the **Phase 1 data-foundation milestone**. It includes:
 - Strict football odds CSV contracts with UTC, event-identity, market-line, settlement, and complete-selection validation.
 - Atomic CSV persistence for events, teams, competitions, bookmakers, markets, selections, raw payloads, import jobs, and timestamped odds snapshots.
 - A clearly labelled, current-date synthetic football seed that is idempotent for the same `as_of` timestamp.
+- Connected `events`, `providers`, `imports`, and `odds/comparison` API routes backed by stored data.
+- Per-bookmaker raw probability, overround, margin, proportional/power de-vig, fair-odds, freshness, and best-price responses.
 
 The analysis API, arbitrage service, model training workflow, backtester, and frontend are not implemented yet. No real or synthetic performance result is currently claimed.
 
@@ -236,6 +238,8 @@ Import a user-provided UTF-8 CSV after applying migrations:
 python -m app.cli import-odds path/to/odds.csv
 ```
 
+The same workflow is available at `POST /api/v1/imports/odds` as a multipart upload. Development permits local uploads without a key. Set `ODDSQUANT_ADMIN_API_KEY` and send it as `X-Admin-Key` for protected environments; production fails closed when the key is unset.
+
 Required columns are `provider_event_key`, `competition`, `country`, `season`, `kickoff_at`, `home_team`, `away_team`, `bookmaker`, `market_type`, `selection_code`, `selection_name`, `decimal_odds`, and `observed_at`. Optional columns are `line`, `source_updated_at`, `period`, `currency`, `settlement_rule_key`, and `is_closing`. Timestamps must include a UTC offset. Imports reject the entire file if an event identity conflicts or a bookmaker snapshot lacks the exact outcome set required by its market.
 
 Open the API documentation at `http://127.0.0.1:8000/docs` or check:
@@ -243,6 +247,16 @@ Open the API documentation at `http://127.0.0.1:8000/docs` or check:
 ```bash
 curl http://127.0.0.1:8000/health
 ```
+
+Current stored-data routes include:
+
+- `GET /api/v1/events` and `GET /api/v1/events/{event_id}`
+- `GET /api/v1/providers`
+- `GET /api/v1/imports` and `GET /api/v1/imports/{job_id}`
+- `POST /api/v1/imports/odds`
+- `GET /api/v1/odds/comparison?event_id={event_id}`
+
+Odds comparison is market analysis, not a model-value signal. It does not report expected value or an opportunity until an independently trained, timestamped model prediction exists.
 
 Run the available checks from `backend`:
 
@@ -257,7 +271,7 @@ Copy `.env.example` to `.env` for local configuration. Never commit API keys, to
 
 ## Project Status
 
-OddsQuant has a documented architecture, migrated normalized schema, provider boundary, quantitative foundations, labelled demo seed, and atomic CSV-to-database odds pipeline. The next milestone is the first connected events, imports, providers, and analysis API slice.
+OddsQuant has a documented architecture, migrated normalized schema, provider boundary, quantitative foundations, labelled demo seed, atomic CSV-to-database odds pipeline, and connected stored-data API. The next milestone is the model-backed value, underdog, and arbitrage analysis slice.
 
 See [context.md](context.md), [ARCHITECTURE.md](ARCHITECTURE.md), [ROADMAP.md](ROADMAP.md), and [AGENTS.md](AGENTS.md) for detailed decisions and operating rules.
 

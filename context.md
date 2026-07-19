@@ -72,4 +72,6 @@ The first complete backtester will report predictive calibration and betting-str
 
 The data-foundation portion of Phase 1 is operational. The checked-in Alembic baseline creates the point-in-time schema, and the backend now has strict odds CSV contracts, atomic coherent-snapshot ingestion, immutable raw import records, rejected-job audit records, and a current-date synthetic demo seed. Demo seeding is deterministic for an explicit `as_of` value and idempotent at the price-snapshot level.
 
-The next slice will expose the stored data through versioned API routes, then connect probability, signal, arbitrage, modelling, backtesting, and frontend workflows. No model performance or profitability result is claimed by the seed data.
+Versioned routes now expose events, event detail, providers, import jobs, multipart odds import, and stored odds comparison. Comparison responses calculate raw implied probability, bookmaker overround and margin, proportional and power de-vig probabilities, corresponding fair odds, freshness, and best available price from each bookmaker's latest coherent snapshot as of the requested time.
+
+These market calculations are deliberately not labelled `VALUE`: expected value and probability edge require an independently trained, timestamped model prediction. The next slice will connect modelling, signals, underdogs, arbitrage, backtesting, and frontend workflows. No model performance or profitability result is claimed by the seed data.

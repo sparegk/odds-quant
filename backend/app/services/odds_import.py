@@ -365,6 +365,16 @@ def _persist_snapshot(
         slug=bookmaker_slug,
         defaults={"name": first.bookmaker, "is_demo": is_demo},
     )
+    if bookmaker.name.casefold() != first.bookmaker.casefold() or bookmaker.is_demo != is_demo:
+        raise OddsImportError(
+            [
+                _error(
+                    None,
+                    "bookmaker",
+                    "bookmaker slug conflicts with an existing name or demo classification",
+                )
+            ]
+        )
     market = _one_or_create(
         session,
         Market,

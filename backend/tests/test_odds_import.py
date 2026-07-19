@@ -105,6 +105,17 @@ def test_conflicting_reimport_preserves_original_snapshot(session: Session) -> N
     assert rejected is not None
 
 
+def test_live_import_cannot_reuse_demo_bookmaker_identity(session: Session) -> None:
+    original = build_demo_odds_csv(AS_OF)
+    seed_demo_data(session, as_of=AS_OF)
+
+    with pytest.raises(OddsImportError) as caught:
+        import_odds_csv(session, filename="mislabelled.csv", content=original, now=AS_OF)
+
+    assert any("demo classification" in str(error["message"]) for error in caught.value.errors)
+    assert session.scalar(select(func.count()).select_from(OddsSnapshot)) == 8
+
+
 def test_parser_rejects_naive_timestamps() -> None:
     content = build_demo_odds_csv(AS_OF).replace(
         b"2026-07-20T10:00:00+00:00", b"2026-07-20T10:00:00", 1

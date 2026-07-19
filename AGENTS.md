@@ -30,6 +30,9 @@ Import user-supplied odds with `python -m app.cli import-odds path/to/odds.csv`.
 imports are atomic: never weaken completeness, timestamp, identity, or market-settlement
 validation to accept a partial feed.
 
+Multipart imports use `POST /api/v1/imports/odds`. Local development may omit an admin
+key; production must set `ODDSQUANT_ADMIN_API_KEY` and send `X-Admin-Key`.
+
 ## Non-Negotiable Rules
 
 - Use only information available before an event kickoff; tests must reject look-ahead leakage.
