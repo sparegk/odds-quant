@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     admin_api_key: str | None = None
     seed_demo: bool = True
     odds_stale_after_seconds: int = Field(default=300, ge=1)
+    provider_poll_seconds: int = Field(default=300, ge=30)
 
     @field_validator("admin_api_key", mode="before")
     @classmethod
@@ -23,6 +24,13 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [part.strip() for part in self.cors_origins.split(",") if part.strip()]
+
+    @field_validator("database_url", mode="after")
+    @classmethod
+    def use_psycopg_three(cls, value: str) -> str:
+        if value.startswith("postgresql://"):
+            return value.replace("postgresql://", "postgresql+psycopg://", 1)
+        return value
 
 
 @lru_cache

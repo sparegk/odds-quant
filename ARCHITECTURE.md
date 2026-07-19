@@ -1,6 +1,8 @@
 # Architecture
 
-OddsQuant uses a React/Vite client and a versioned FastAPI API. SQLAlchemy provides a common persistence layer for SQLite development and PostgreSQL production. Alembic migrations, a separate APScheduler worker, and Docker Compose will be completed before Phase 1 is considered runnable.
+OddsQuant uses a planned React/Vite client and a versioned FastAPI API. SQLAlchemy provides a common persistence layer for SQLite development and PostgreSQL production. Alembic owns schema changes; Docker Compose runs PostgreSQL, the API, and a separate APScheduler worker.
+
+External adapters register through the process-local collector registry. The worker converts their validated normalized DTOs into the same atomic import path used by CSV uploads and records each scheduled attempt in `provider_jobs`. No external adapter is enabled by default. Development may seed labelled synthetic odds; production blocks demo seeding.
 
 The predictive data flow is: provider adapter -> normalized ingestion DTO -> immutable raw snapshot -> timestamped football and odds tables -> point-in-time feature snapshot -> leakage-safe model version -> selection predictions -> explainable signals -> immutable backtest evaluation -> API response.
 

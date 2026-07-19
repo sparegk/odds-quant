@@ -121,6 +121,21 @@ def parse_odds_csv(content: bytes, *, now: datetime | None = None) -> list[OddsI
     return rows
 
 
+def serialize_odds_rows_csv(rows: list[OddsImportRow]) -> bytes:
+    if not rows:
+        raise ValueError("cannot serialize an empty odds batch")
+    stream = io.StringIO(newline="")
+    writer = csv.DictWriter(
+        stream,
+        fieldnames=list(OddsImportRow.model_fields),
+        lineterminator="\n",
+    )
+    writer.writeheader()
+    for row in rows:
+        writer.writerow(row.model_dump(mode="json"))
+    return stream.getvalue().encode("utf-8")
+
+
 def _validate_coherent_snapshots(rows: list[OddsImportRow]) -> list[dict[str, object]]:
     errors: list[dict[str, object]] = []
     event_identity: dict[str, tuple[object, ...]] = {}

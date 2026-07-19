@@ -1,0 +1,58 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-oddsquant}
+      POSTGRES_USER: ${POSTGRES_USER:-oddsquant}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-oddsquant_local_only}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-oddsquant} -d ${POSTGRES_DB:-oddsquant}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    volumes:
+      - oddsquant_postgres:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: ./backend
+    command: >-
+      sh -c "python -m alembic upgrade head &&
+      exec python -m uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    environment:
+      ODDSQUANT_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-oddsquant}:${POSTGRES_PASSWORD:-oddsquant_local_only}@db:5432/${POSTGRES_DB:-oddsquant}
+      ODDSQUANT_ENVIRONMENT: development
+      ODDSQUANT_CORS_ORIGINS: ${ODDSQUANT_CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      ODDSQUANT_ADMIN_API_KEY: ${ODDSQUANT_ADMIN_API_KEY:-}
+      ODDSQUANT_SEED_DEMO: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${ODDSQUANT_API_PORT:-8000}:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  worker:
+    build:
+      context: ./backend
+    command: ["python", "-m", "app.jobs.scheduler"]
+    environment:
+      ODDSQUANT_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-oddsquant}:${POSTGRES_PASSWORD:-oddsquant_local_only}@db:5432/${POSTGRES_DB:-oddsquant}
+      ODDSQUANT_ENVIRONMENT: development
+      ODDSQUANT_SEED_DEMO: "true"
+      ODDSQUANT_PROVIDER_POLL_SECONDS: ${ODDSQUANT_PROVIDER_POLL_SECONDS:-300}
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  oddsquant_postgres:

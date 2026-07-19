@@ -79,7 +79,12 @@ def build_demo_odds_csv(as_of: datetime) -> bytes:
     return stream.getvalue().encode("utf-8")
 
 
-def seed_demo_data(session: Session, *, as_of: datetime | None = None) -> ImportSummary:
+def seed_demo_data(
+    session: Session,
+    *,
+    as_of: datetime | None = None,
+    ingested_at: datetime | None = None,
+) -> ImportSummary:
     anchor = as_of or datetime.now(UTC)
     return import_odds_csv(
         session,
@@ -88,5 +93,5 @@ def seed_demo_data(session: Session, *, as_of: datetime | None = None) -> Import
         provider_slug="demo-seed-v1",
         provider_name="OddsQuant synthetic demonstration provider",
         is_demo=True,
-        now=anchor,
+        now=ingested_at or datetime.now(UTC),
     )

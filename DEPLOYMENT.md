@@ -1,0 +1,64 @@
+# Deployment
+
+OddsQuant currently deploys the backend API, PostgreSQL database, and separate APScheduler worker. The React frontend is not implemented yet. These files have been verified locally where noted; no live deployment is claimed.
+
+## Docker Compose
+
+Requirements: Docker Engine with Compose v2. From the repository root:
+
+```bash
+docker compose up --build
+```
+
+The API applies Alembic migrations, starts at `http://localhost:8000`, and exposes OpenAPI at `http://localhost:8000/docs`. The worker then loads clearly labelled demo data in development and polls the process-local provider registry. No external provider is registered by default and no protected bookmaker endpoint is scraped.
+
+Local Compose defaults are development credentials only. Override them in an uncommitted `.env`:
+
+```text
+POSTGRES_DB=oddsquant
+POSTGRES_USER=oddsquant
+POSTGRES_PASSWORD=replace-with-a-random-local-password
+ODDSQUANT_ADMIN_API_KEY=replace-with-a-random-import-key
+ODDSQUANT_CORS_ORIGINS=http://localhost:5173
+```
+
+Stop services with `docker compose down`. Adding `--volumes` deletes the local PostgreSQL volume and all imported data, so use it only intentionally.
+
+## SQLite Development
+
+SQLite does not need Docker:
+
+```bash
+cd backend
+python -m pip install -e ".[dev]"
+python -m alembic upgrade head
+python -m app.cli seed-demo
+python -m uvicorn app.main:app --reload
+```
+
+Run the scheduler separately with `python -m app.jobs.scheduler`. Production never seeds demo data, even if `ODDSQUANT_SEED_DEMO` is accidentally true.
+
+## Render Blueprint
+
+`render.yaml` defines a Docker web service, paid background worker, paid PostgreSQL instance, migrations through `preDeployCommand`, generated import key, and a CORS value that must be supplied during Blueprint creation. Review current Render pricing before applying the Blueprint; the file deliberately avoids pretending a free worker is available.
+
+1. Connect `sparegk/odds-quant` to Render and create a Blueprint from `render.yaml`.
+2. Set `ODDSQUANT_CORS_ORIGINS` to the exact deployed frontend origin. Do not use `*` with privileged import routes.
+3. Retain the generated `ODDSQUANT_ADMIN_API_KEY` as a secret and provide it only to trusted import clients through `X-Admin-Key`.
+4. Confirm `/health` reports `status=ok` and `database=ready`.
+5. Review migration and worker logs before enabling any licensed provider adapter.
+
+Render's current Blueprint schema documents `runtime: docker`, `dockerCommand`, `preDeployCommand`, worker services, database references, and `checksPass` deploy triggers: <https://render.com/docs/blueprint-spec>.
+
+## Production Controls
+
+- Use PostgreSQL and a unique administrative API key.
+- Restrict CORS to known HTTPS frontend origins.
+- Keep `ODDSQUANT_ENVIRONMENT=production` and `ODDSQUANT_SEED_DEMO=false`.
+- Store licensed-provider credentials only in the platform secret manager.
+- Run one migration operation before rolling out API/worker code.
+- Back up PostgreSQL and rehearse restore procedures before ingesting valuable history.
+- Monitor provider rate limits, collection failures, odds freshness, and database growth.
+- Do not register a provider without documented authorization and terms review.
+
+The GitHub Actions workflow follows GitHub's current Python setup guidance and checks lint, formatting, typing, tests, Alembic lifecycle, and the backend image: <https://docs.github.com/en/actions/tutorials/build-and-test-code/python>.

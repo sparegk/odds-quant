@@ -194,6 +194,8 @@ The repository is in the **Phase 1 data-foundation milestone**. It includes:
 - A clearly labelled, current-date synthetic football seed that is idempotent for the same `as_of` timestamp.
 - Connected `events`, `providers`, `imports`, and `odds/comparison` API routes backed by stored data.
 - Per-bookmaker raw probability, overround, margin, proportional/power de-vig, fair-odds, freshness, and best-price responses.
+- A separate APScheduler worker with an explicit permitted-provider registry and persisted provider-job status.
+- A non-root backend image, PostgreSQL Docker Compose stack, Render Blueprint, and GitHub Actions checks.
 
 The analysis API, arbitrage service, model training workflow, backtester, and frontend are not implemented yet. No real or synthetic performance result is currently claimed.
 
@@ -203,9 +205,11 @@ The analysis API, arbitrage service, model training workflow, backtester, and fr
 backend/
   app/
     api/         Versioned FastAPI routes
+    collectors/  Explicit scheduled-provider registry
     core/        Runtime configuration
     db/          SQLAlchemy models and sessions
     providers/   Data-provider contracts
+    jobs/        APScheduler worker and collection jobs
     quant/       Pure probability and odds calculations
     schemas/     Validated ingestion and API contracts
     services/    Transactional imports and application workflows
@@ -214,6 +218,14 @@ backend/
 ```
 
 Additional backend modules and the `frontend` application will be added during Phase 1.
+
+Run the current PostgreSQL-backed backend stack from the repository root:
+
+```bash
+docker compose up --build
+```
+
+Docker is not required for SQLite development. Full environment, Compose, Render, migration, secret, and production notes are in [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Local Backend Setup
 
@@ -252,6 +264,7 @@ Current stored-data routes include:
 
 - `GET /api/v1/events` and `GET /api/v1/events/{event_id}`
 - `GET /api/v1/providers`
+- `GET /api/v1/jobs`
 - `GET /api/v1/imports` and `GET /api/v1/imports/{job_id}`
 - `POST /api/v1/imports/odds`
 - `GET /api/v1/odds/comparison?event_id={event_id}`
@@ -271,7 +284,7 @@ Copy `.env.example` to `.env` for local configuration. Never commit API keys, to
 
 ## Project Status
 
-OddsQuant has a documented architecture, migrated normalized schema, provider boundary, quantitative foundations, labelled demo seed, atomic CSV-to-database odds pipeline, and connected stored-data API. The next milestone is the model-backed value, underdog, and arbitrage analysis slice.
+OddsQuant has a documented architecture, migrated normalized schema, provider boundary, quantitative foundations, labelled demo seed, atomic CSV-to-database odds pipeline, connected stored-data API, scheduler worker, CI, and prepared container deployment. The next milestone is the model-backed value, underdog, and arbitrage analysis slice.
 
 See [context.md](context.md), [ARCHITECTURE.md](ARCHITECTURE.md), [ROADMAP.md](ROADMAP.md), and [AGENTS.md](AGENTS.md) for detailed decisions and operating rules.
 

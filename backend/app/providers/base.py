@@ -10,7 +10,10 @@ type NormalizedOdds = OddsImportRow
 
 class OddsProvider(Protocol):
     slug: str
+    name: str
+    kind: str
     is_demo: bool
+    terms_url: str | None
 
     def collect_odds(self) -> Iterable[NormalizedOdds]: ...
 

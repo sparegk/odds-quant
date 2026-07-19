@@ -8,8 +8,20 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.db.session import get_db
-from app.schemas.api import EventDetail, EventSummary, MarketComparison, ProviderSummary
-from app.services.catalog import get_event, list_events, list_providers, odds_comparison
+from app.schemas.api import (
+    EventDetail,
+    EventSummary,
+    MarketComparison,
+    ProviderJobView,
+    ProviderSummary,
+)
+from app.services.catalog import (
+    get_event,
+    list_events,
+    list_provider_jobs,
+    list_providers,
+    odds_comparison,
+)
 
 router = APIRouter()
 Database = Annotated[Session, Depends(get_db)]
@@ -44,6 +56,14 @@ def event_detail(event_id: int, database: Database) -> EventDetail:
 @router.get("/providers", response_model=list[ProviderSummary], tags=["data"])
 def providers(database: Database) -> list[ProviderSummary]:
     return list_providers(database)
+
+
+@router.get("/jobs", response_model=list[ProviderJobView], tags=["data"])
+def jobs(
+    database: Database,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> list[ProviderJobView]:
+    return list_provider_jobs(database, limit=limit)
 
 
 @router.get(

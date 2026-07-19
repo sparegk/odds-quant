@@ -43,6 +43,17 @@ class ImportJobView(BaseModel):
     created_at: datetime
 
 
+class ProviderJobView(BaseModel):
+    id: int
+    provider_id: int
+    provider: str
+    job_type: str
+    status: str
+    message: str
+    created_at: datetime
+    finished_at: datetime | None
+
+
 class PriceComparison(BaseModel):
     selection_code: str
     selection_name: str

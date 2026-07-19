@@ -51,6 +51,7 @@ def test_events_providers_and_detail_use_stored_data(
     assert providers_response.status_code == 200
     assert providers_response.json()[0]["kind"] == "demo_seed"
     assert providers_response.json()[0]["snapshot_count"] == 8
+    assert client.get("/api/v1/jobs").json() == []
 
     detail = client.get(f"/api/v1/events/{events[0]['id']}")
     assert detail.status_code == 200

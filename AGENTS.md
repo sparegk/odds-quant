@@ -19,12 +19,17 @@ From `backend`:
 python -m pip install -e ".[dev]"
 python -m alembic upgrade head
 python -m app.cli seed-demo
+python -m app.jobs.scheduler
 python -m pytest
 python -m ruff check .
 python -m ruff format --check .
 python -m mypy app tests
 python -m uvicorn app.main:app --reload
 ```
+
+From the repository root, `docker compose up --build` runs PostgreSQL, migrations, the
+API, and worker. Docker/Render changes must preserve non-root execution, health checks,
+production demo blocking, migration ordering, and secret-manager-only credentials.
 
 Import user-supplied odds with `python -m app.cli import-odds path/to/odds.csv`. CSV
 imports are atomic: never weaken completeness, timestamp, identity, or market-settlement

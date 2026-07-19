@@ -16,6 +16,7 @@ from app.db.models import (
     OddsPrice,
     OddsSnapshot,
     Provider,
+    ProviderJob,
     Selection,
     Team,
 )
@@ -33,6 +34,7 @@ from app.schemas.api import (
     ImportJobView,
     MarketComparison,
     PriceComparison,
+    ProviderJobView,
     ProviderSummary,
     SnapshotComparison,
 )
@@ -162,6 +164,28 @@ def list_import_jobs(session: Session, *, limit: int = 50) -> list[ImportJobView
 def get_import_job(session: Session, job_id: int) -> ImportJobView | None:
     job = session.get(ImportJob, job_id)
     return _import_view(job) if job is not None else None
+
+
+def list_provider_jobs(session: Session, *, limit: int = 50) -> list[ProviderJobView]:
+    rows = session.execute(
+        select(ProviderJob, Provider.name)
+        .join(Provider, Provider.id == ProviderJob.provider_id)
+        .order_by(ProviderJob.created_at.desc(), ProviderJob.id.desc())
+        .limit(limit)
+    )
+    return [
+        ProviderJobView(
+            id=job.id,
+            provider_id=job.provider_id,
+            provider=provider_name,
+            job_type=job.job_type,
+            status=job.status,
+            message=job.message,
+            created_at=_utc(job.created_at),
+            finished_at=_utc(job.finished_at) if job.finished_at is not None else None,
+        )
+        for job, provider_name in rows
+    ]
 
 
 def _import_view(job: ImportJob) -> ImportJobView:

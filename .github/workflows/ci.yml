@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      ODDSQUANT_DATABASE_URL: sqlite:///./ci.db
+      ODDSQUANT_ENVIRONMENT: test
+      ODDSQUANT_SEED_DEMO: "false"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - name: Install backend
+        run: python -m pip install -e ".[dev]"
+      - name: Lint
+        run: python -m ruff check app tests alembic
+      - name: Format
+        run: python -m ruff format --check app tests alembic
+      - name: Type check
+        run: python -m mypy app tests
+      - name: Test
+        run: python -m pytest -q
+      - name: Validate migrations
+        run: |
+          python -m alembic upgrade head
+          python -m alembic check
+          python -m alembic downgrade base
+          python -m alembic upgrade head
+
+  backend-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build backend image
+        run: docker build --tag oddsquant-api:ci backend

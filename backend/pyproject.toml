@@ -25,13 +25,16 @@ dependencies = [
 
 [project.scripts]
 oddsquant = "app.cli:main"
+oddsquant-worker = "app.jobs.scheduler:main"
 
 [project.optional-dependencies]
 dev = [
   "mypy==1.17.1",
+  "pyyaml==6.0.3",
   "pytest==8.4.2",
   "pytest-cov==6.3.0",
   "ruff==0.13.1",
+  "types-pyyaml==6.0.12.20260518",
 ]
 
 [tool.setuptools.packages.find]
