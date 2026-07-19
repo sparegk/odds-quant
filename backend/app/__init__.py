@@ -1,2 +1,1 @@
 """OddsQuant backend package."""
-

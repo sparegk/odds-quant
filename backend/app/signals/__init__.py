@@ -1,2 +1,1 @@
 """Explainable opportunity signal policy."""
-

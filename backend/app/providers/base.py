@@ -37,4 +37,3 @@ SUPPORTED_PROVIDER_KINDS = {
     "manual_entry",
     "demo_seed",
 }
-

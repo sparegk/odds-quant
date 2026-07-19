@@ -1,2 +1,1 @@
 """Versioned HTTP routes."""
-

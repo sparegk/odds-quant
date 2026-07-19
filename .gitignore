@@ -2,6 +2,7 @@
 .venv/
 __pycache__/
 *.py[cod]
+*.egg-info/
 *.db
 *.sqlite*
 .pytest_cache/
@@ -16,4 +17,3 @@ playwright-report/
 test-results/
 .idea/
 .vscode/
-

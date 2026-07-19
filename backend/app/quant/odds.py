@@ -1,6 +1,7 @@
+import math
 from collections.abc import Iterable
 
-from scipy.optimize import brentq
+from scipy.optimize import brentq  # type: ignore[import-untyped]
 
 
 def validate_decimal_odds(decimal_odds: float) -> float:
@@ -38,10 +39,10 @@ def devig_power(decimal_odds: Iterable[float]) -> list[float]:
         return raw
 
     def objective(power: float) -> float:
-        return sum(value**power for value in raw) - 1.0
+        return sum(math.pow(value, power) for value in raw) - 1.0
 
-    exponent = brentq(objective, 0.01, 100.0)
-    probabilities = [value**exponent for value in raw]
+    exponent = float(brentq(objective, 0.01, 100.0))
+    probabilities = [math.pow(value, exponent) for value in raw]
     total = sum(probabilities)
     return [value / total for value in probabilities]
 
@@ -66,4 +67,3 @@ def probability_edge(model_probability: float, market_probability: float) -> flo
 
 def closing_line_value(taken_odds: float, closing_odds: float) -> float:
     return validate_decimal_odds(taken_odds) / validate_decimal_odds(closing_odds) - 1.0
-

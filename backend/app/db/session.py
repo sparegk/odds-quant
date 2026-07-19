@@ -38,4 +38,3 @@ def enable_sqlite_foreign_keys(dbapi_connection: object, _: object) -> None:
 def get_db() -> Generator[Session, None, None]:
     with SessionLocal() as session:
         yield session
-

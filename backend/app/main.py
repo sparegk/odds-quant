@@ -13,7 +13,6 @@ from app.api.router import router
 from app.core.config import get_settings
 from app.db.session import SessionLocal
 
-
 settings = get_settings()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
@@ -69,4 +68,3 @@ def health() -> dict[str, object]:
         "database": database,
         "environment": settings.environment,
     }
-

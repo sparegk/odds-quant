@@ -32,7 +32,9 @@ def classify_signal(value: SignalInput) -> dict[str, object]:
     confidence = confidence_score(value)
     reasons = [f"Model probability differs from market consensus by {edge:+.1%}."]
     risks: list[str] = []
-    inadequate = value.sample_size_per_team < 8 or value.calibration_error > 0.10 or value.age_minutes > 60
+    inadequate = (
+        value.sample_size_per_team < 8 or value.calibration_error > 0.10 or value.age_minutes > 60
+    )
     moved = value.odds_move_ratio >= 0.10 or value.implied_move_points >= 0.05
     if value.age_minutes > 15:
         risks.append("Odds snapshot is aging and may no longer be available.")
@@ -53,5 +55,11 @@ def classify_signal(value: SignalInput) -> dict[str, object]:
         signal = "WATCH"
     else:
         signal = "PASS"
-    return {"signal": signal, "expected_value": ev, "edge": edge, "confidence": confidence, "reasons": reasons, "risks": risks}
-
+    return {
+        "signal": signal,
+        "expected_value": ev,
+        "edge": edge,
+        "confidence": confidence,
+        "reasons": reasons,
+        "risks": risks,
+    }
