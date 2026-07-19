@@ -1,37 +1,198 @@
 # OddsQuant
 
-OddsQuant is an educational full-stack sports-betting analytics project. It is designed to compare bookmaker implied probabilities, vig-free market probabilities, transparent statistical-model probabilities, and cross-bookmaker arbitrage prices without claiming unconditional guaranteed profit or placing bets automatically.
+OddsQuant is a quantitative sports-betting analytics project for football. The goal is to collect timestamped odds, compare bookmaker prices with vig-free market and statistical-model probabilities, identify explainable value or arbitrage candidates, and test whether those methods hold up historically.
 
-## Football Arbitrage
+This is not a betting-tips website or an automated betting system. It is an educational project for studying probability, statistics, data engineering, modelling, backtesting, and full-stack software development.
 
-OddsQuant will include a dedicated football arbitrage scanner. It will take the best available price for every mutually exclusive and collectively exhaustive outcome in the same market, then test:
+## Project Goals
+
+- Track football events and bookmaker odds over time.
+- Compare raw implied, vig-free market, and independent model probabilities.
+- Find the best available price for each selection across bookmakers.
+- Detect cross-bookmaker arbitrage after taxes, fees, and execution constraints.
+- Generate explainable `VALUE`, `WATCH`, `PASS`, and risk signals.
+- Analyze underdogs without treating high odds as evidence of value.
+- Evaluate correlated bet-builder combinations from scoreline probabilities.
+- Backtest every method with chronological, leakage-safe data.
+- Present calibration, uncertainty, freshness, and limitations clearly.
+
+## Main Features
+
+### Odds Data Collection
+
+The system will store recurring, timestamped snapshots for:
+
+- Football events, competitions, teams, and kickoff times.
+- Match-result, totals, both-teams-to-score, double-chance, and supported team-total markets.
+- Bookmakers, selections, decimal prices, opening prices, and closing prices.
+- Provider, import-job, source-quality, and data-freshness metadata.
+
+Odds will come only from licensed APIs, official sources, user-uploaded CSV files, manual entry, or clearly labelled demo data. OddsQuant will not bypass bookmaker protections or assume that a bookmaker has a public API.
+
+### Odds And Probability Analysis
+
+For every complete market, OddsQuant will calculate:
+
+- Raw implied probability using `1 / decimal_odds`.
+- Market overround and bookmaker margin.
+- Proportional and power-method vig-free probabilities.
+- Fair odds and differences between bookmakers.
+- Best available price and price improvement.
+
+Double-chance outcomes overlap, so they will be derived from a valid 1X2 distribution rather than incorrectly de-vigged as three exclusive outcomes.
+
+### Football Probability Model
+
+The first transparent baseline will model home and away goals with Poisson methods and team-strength features. A scoreline probability matrix will derive probabilities for:
+
+- Home win, draw, and away win.
+- Over/under goal lines.
+- Both teams to score.
+- Double chance.
+- Supported team totals and joint outcomes.
+
+Predictions must use only information available before kickoff. Model versions, input cutoffs, uncertainty, sample size, and calibration will be stored so results remain reproducible.
+
+### Value Signal Engine
+
+Each selection will compare the model probability with the vig-free market probability and actual offered odds:
+
+```text
+model_fair_odds = 1 / model_probability
+expected_value = model_probability * decimal_odds - 1
+probability_edge = model_probability - market_fair_probability
+```
+
+Example signals include:
+
+- `VALUE`
+- `WATCH`
+- `PASS`
+- `OVERPRICED_FAVORITE`
+- `INSUFFICIENT_DATA`
+
+A strong signal will be blocked when data is stale, inputs are missing, sample size is inadequate, calibration is weak, odds moved materially, or uncertainty is wider than the estimated edge.
+
+### Football Arbitrage Scanner
+
+The arbitrage scanner will compare the best price for every mutually exclusive and exhaustive outcome in the same football market:
 
 ```text
 inverse_sum = sum(1 / best_decimal_odds_for_outcome)
 ```
 
-When `inverse_sum < 1`, dutching stakes across all outcomes produces the same theoretical gross payout regardless of the result. For total stake budget `B`, outcome `i` receives `B * (1 / odds_i) / inverse_sum`; theoretical gross ROI is `1 / inverse_sum - 1`.
+A gross theoretical arbitrage exists when `inverse_sum < 1`. The scanner will support complete 1X2 markets and compatible two-way markets such as over/under and both teams to score. It will never combine different events, periods, lines, currencies, or settlement rules.
 
-Gross arbitrage is not enough. The scanner will calculate a net outcome payout using explicit bookmaker and jurisdiction settings for stake taxes, winnings/profit taxes, payout withholding, exchange commission, fixed fees, currency conversion, and currency rounding. An opportunity is ranked as net arbitrage only when the minimum net payout across every outcome remains above the total cash outlay. If the applicable tax basis is unknown, the result is labelled `TAX_UNKNOWN` and is not presented as executable profit.
+Gross margin is not enough. Ranking will use the worst-case net payout after:
 
-The scanner will initially cover complete football 1X2 markets and compatible two-way markets such as over/under and both teams to score. Every leg must refer to the same event, market, line, period, currency, and settlement rules. The dashboard will rank opportunities by conservative net ROI, price freshness, bookmaker coverage, settlement compatibility, tax confidence, and estimated executable stake.
+- Stake, winnings, profit, or payout taxes.
+- Exchange commission and fixed fees.
+- Currency conversion and stake rounding.
+- Maximum accepted stakes and total budget.
+- A configurable odds-movement safety haircut.
 
-An arbitrage calculation is not an unconditional profit guarantee. Odds can move before every leg is accepted, bookmakers can reject or limit stakes, tax treatment can change, and void or settlement rules can differ. The product will therefore label results as **theoretical arbitrage opportunities**, show every required leg, tax/fee assumption, and risk, and never automate bet placement.
+Unknown, stale, or conflicting tax rules will produce `TAX_UNKNOWN` or `TAX_STALE`, not an executable profit claim. Every result will show the required bookmaker legs, stakes, total cash outlay, gross payout, taxes and fees, minimum net payout, net profit, freshness, and execution risks.
 
-## Repository Status
+### Underdog Scanner
 
-This repository is in **Phase 0: foundation**. It currently contains:
+The underdog view will rank team outcomes using positive expected value, model-versus-market edge, best odds, confidence, calibration, movement, and freshness. It will also explain false-value risks. A large possible payout is not automatically positive expected value.
 
-- FastAPI configuration and health/status endpoints.
-- SQLAlchemy models for events, markets, timestamped odds, predictions, signals, and backtests.
-- Probability, de-vigging, Poisson scoreline, bet-builder, settlement, and signal-policy primitives.
-- Provider-adapter contracts for licensed APIs, official sources, CSV uploads, manual entry, and labelled demo data.
+### Bet Builder Laboratory
 
-The connected Phase 1 MVP, demo dataset, import UI, model training pipeline, backtester, and dashboard remain under active development. No performance results are claimed.
+Supported combinations will be evaluated by summing matching cells in the model scoreline distribution. Correlated leg probabilities will not be naively multiplied. The laboratory will show marginal probabilities, modelled joint probability, fair combined odds, optional offered odds, expected value, uncertainty, and dependence warnings.
 
-## Backend Setup
+### Backtesting
 
-Requires Python 3.12 or newer.
+Every historical prediction and signal will be stored with the odds and information available at that time. Backtests will use chronological splits and walk-forward evaluation, never random time-dependent splits.
+
+Planned metrics include:
+
+- Bet count, hit rate, ROI, yield, and profit in units.
+- Average expected value and closing-line value.
+- Brier score, log loss, calibration error, and probability buckets.
+- Maximum drawdown and profit factor.
+- Results by league, bookmaker, market, odds range, and favorite/underdog.
+- Comparisons with market probability, favorite, Elo, and basic Poisson benchmarks.
+
+Demo or synthetic results will always be labelled and will never be presented as proof of profitability.
+
+### Bankroll Research
+
+The research simulator will support flat staking, percentage staking, capped fractional Kelly, daily exposure limits, and drawdown simulations. Kelly staking will be disabled by default for low-confidence predictions. This is statistical risk analysis, not financial advice.
+
+### Dashboard
+
+The planned React dashboard will include:
+
+- Overview and data-freshness status.
+- Value opportunities and underdog analysis.
+- Football arbitrage opportunities and stake allocation.
+- Event, market, and bookmaker price comparison.
+- Bet Builder Laboratory.
+- Model calibration and performance.
+- Backtesting and bankroll simulation.
+- CSV imports, providers, jobs, methodology, and disclaimers.
+
+## Planned Tech Stack
+
+- Python 3.12+
+- FastAPI and Pydantic
+- SQLAlchemy and Alembic
+- PostgreSQL in production and SQLite for simple local development
+- pandas, NumPy, SciPy, and scikit-learn
+- APScheduler
+- pytest, Ruff, and mypy
+- React, TypeScript, Vite, and Tailwind CSS
+- Recharts, Vitest, and Testing Library
+- Docker Compose and GitHub Actions
+
+## Build Plan
+
+1. Finalize configuration, database sessions, and the initial Alembic migration.
+2. Add deterministic, clearly labelled football demo data.
+3. Build atomic CSV and manual odds-import workflows.
+4. Store coherent timestamped market snapshots and closing prices.
+5. Complete odds conversion and de-vigging services and tests.
+6. Train and version the leakage-safe Poisson baseline.
+7. Generate explainable value and underdog signals.
+8. Add the tax-aware football arbitrage engine.
+9. Add scoreline-based bet-builder evaluation.
+10. Build walk-forward backtesting and bankroll research.
+11. Connect the React dashboard to versioned API endpoints.
+12. Complete Docker, CI, deployment, documentation, and end-to-end verification.
+
+## Current Implementation
+
+The repository is currently at **Phase 0: foundation**. It includes:
+
+- FastAPI application configuration and CORS handling.
+- `GET /health` and `GET /api/v1/status`.
+- SQLAlchemy models for sports, events, markets, odds, results, model versions, predictions, signals, bet-builder quotes, backtests, imports, and provider jobs.
+- Provider-adapter contracts for legal and explicitly configured data sources.
+- Pure functions for decimal-odds conversion, market overround, proportional and power de-vigging, fair odds, EV, and closing-line value.
+- Poisson scoreline and joint bet-builder probability primitives.
+- Settlement and explainable signal-policy primitives.
+- Initial API tests and project documentation.
+
+The connected Phase 1 data pipeline, demo seed, migrations, arbitrage service, model training workflow, backtester, and frontend are not implemented yet. No real or synthetic performance result is currently claimed.
+
+## Repository Structure
+
+```text
+backend/
+  app/
+    api/         Versioned FastAPI routes
+    core/        Runtime configuration
+    db/          SQLAlchemy models and sessions
+    providers/   Data-provider contracts
+    quant/       Pure probability and odds calculations
+    signals/     Explainable signal policy
+  tests/         Backend tests
+```
+
+Additional backend modules and the `frontend` application will be added during Phase 1.
+
+## Local Backend Setup
 
 ```bash
 cd backend
@@ -40,23 +201,31 @@ python -m pip install -e ".[dev]"
 python -m uvicorn app.main:app --reload
 ```
 
-Open `http://127.0.0.1:8000/docs` or check:
+Open the API documentation at `http://127.0.0.1:8000/docs` or check:
 
 ```bash
 curl http://127.0.0.1:8000/health
 ```
 
-Run the foundation tests with:
+Run the available checks from `backend`:
 
 ```bash
-cd backend
 python -m pytest
 python -m ruff check .
+python -m ruff format --check .
 python -m mypy app
 ```
 
-## Responsible Use
+Copy `.env.example` to `.env` for local configuration. Never commit API keys, tokens, bookmaker credentials, cookies, or proprietary data.
 
-No prediction or displayed arbitrage guarantees profit in practice. Statistical edges can disappear, odds change rapidly, and historical performance does not ensure future performance. Cross-book arbitrage remains exposed to execution, stake-limit, account, void, settlement, commission, currency, tax, and data-latency risk. Users must verify their own applicable tax treatment and comply with local laws, age restrictions, and provider/bookmaker terms. OddsQuant is not affiliated with any bookmaker, does not provide tax advice, and does not place bets.
+## Project Status
 
-See [context.md](context.md), [ARCHITECTURE.md](ARCHITECTURE.md), and [ROADMAP.md](ROADMAP.md) for the implementation direction.
+OddsQuant has a documented architecture, normalized persistence model, provider boundary, quantitative foundations, and a minimal FastAPI service. The next milestone is a runnable vertical slice with Alembic migrations, labelled demo data, CSV import, stored odds, and the first connected analysis endpoint.
+
+See [context.md](context.md), [ARCHITECTURE.md](ARCHITECTURE.md), [ROADMAP.md](ROADMAP.md), and [AGENTS.md](AGENTS.md) for detailed decisions and operating rules.
+
+## Disclaimer
+
+OddsQuant is an educational analytics project. It is not affiliated with, endorsed by, or sponsored by any bookmaker. It does not place bets and does not provide financial, gambling, legal, or tax advice.
+
+No prediction or displayed arbitrage guarantees profit in practice. Odds can change before all legs are accepted; stakes may be limited or rejected; and void, settlement, commission, currency, and tax rules can remove an apparent edge. Users must verify current prices and rules, follow local laws and age restrictions, set strict financial limits, and avoid chasing losses.
