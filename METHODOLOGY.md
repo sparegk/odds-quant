@@ -23,7 +23,13 @@ A scoreline matrix derives probabilities for match result, totals, both teams to
 
 Every stored prediction must identify its model version, prediction time, input cutoff, training interval, feature version, sample size, uncertainty interval, and evidence class. Missing or post-cutoff evidence cannot be silently substituted.
 
-The current selection intervals are Wilson sampling intervals based on the training-match count. They communicate limited sample reliability but do not capture all parameter, lineup, tactical, or regime uncertainty. The model therefore remains `unvalidated` until chronological held-out calibration exists.
+The current selection intervals are Wilson sampling intervals based on the training-match count. They communicate limited sample reliability but do not capture all parameter, lineup, tactical, or regime uncertainty.
+
+Evaluation replays events chronologically with an expanding window. For every event, the model is refitted from final results whose kickoff, settlement, and original observation timestamps all precede the prediction cutoff. Each replay row stores the result version, training fingerprint, prediction timestamp, full 1X2 vector, outcome, and proper scores.
+
+Multiclass Brier score is the sum of squared error across HOME, DRAW, and AWAY, on the documented 02 scale. Log loss is the negative logarithm of the probability assigned to the realized outcome. Calibration uses fixed one-vs-rest probability buckets for all three outcomes, and ECE is weighted across every stored binary outcome forecast. These are proper probability scores consistent with the [scikit-learn model-evaluation guidance](https://scikit-learn.org/stable/modules/model_evaluation.html).
+
+Promotion requires at least 200 non-demo observations, at least 90% replay coverage, ECE no greater than 0.08, and both Brier score and log loss better than a uniform 1X2 benchmark. These are an explicit initial policy, not a claim that the thresholds are universally optimal. Demo-contaminated runs are always `demo_only`; insufficient or failed runs cannot unlock value signals.
 
 ## Value And Confidence
 

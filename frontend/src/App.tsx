@@ -22,7 +22,7 @@ import { API_BASE_URL, loadComparison, loadDashboard } from './api/client'
 import { FreshnessBadge } from './components/FreshnessBadge'
 import { QuantPriceTable } from './components/QuantPriceTable'
 import { formatDateTime, humanizeCode } from './lib/format'
-import type { DashboardData, EventSummary, MarketComparison } from './types'
+import type { DashboardData, EvaluationRun, EventSummary, MarketComparison } from './types'
 
 type ViewKey =
   | 'overview'
@@ -262,7 +262,7 @@ function ActiveView(props: ActiveViewProps) {
     case 'models':
       return <ModelPerformance dashboard={props.dashboard} />
     case 'backtests':
-      return <UnavailableModule title="Backtesting" requirement="Timestamped historical predictions, odds snapshots, and settled results" />
+      return <EvaluationPerformance evaluations={props.dashboard.evaluations} />
     case 'bankroll':
       return <UnavailableModule title="Bankroll research" requirement="Validated signal history and uncertainty-aware return assumptions" />
   }
@@ -275,6 +275,7 @@ function Overview({ dashboard, onSelectEvent }: { dashboard: DashboardData; onSe
     .filter((value): value is string => value !== null)
     .sort()
     .at(-1)
+  const latestEvaluation = dashboard.evaluations[0]
 
   return (
     <div className="space-y-6">
@@ -313,7 +314,15 @@ function Overview({ dashboard, onSelectEvent }: { dashboard: DashboardData; onSe
               ready={dashboard.models.length > 0}
               detail={dashboard.models[0]?.version ?? "No trained version"}
             />
-            <ReadinessRow label="Backtest evidence" ready={false} detail="No completed run" />
+            <ReadinessRow
+              label="Calibration evidence"
+              ready={latestEvaluation?.evaluation_status === 'calibrated'}
+              detail={
+                latestEvaluation
+                  ? `${humanizeCode(latestEvaluation.evaluation_status)} / ${metricValue(latestEvaluation.metrics, 'evaluated_events') ?? 0} matches`
+                  : 'No completed run'
+              }
+            />
           </div>
           <div className="mt-4 border-l-4 border-amber-400 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
             Market comparisons are active. Value, underdog, and staking outputs remain blocked until independent predictions and calibration evidence exist.
@@ -356,6 +365,122 @@ function ModelPerformance({ dashboard }: { dashboard: DashboardData }) {
       </div>
     </div>
   )
+}
+
+function EvaluationPerformance({ evaluations }: { evaluations: EvaluationRun[] }) {
+  const latest = evaluations[0]
+  if (!latest) {
+    return (
+      <EmptyState
+        title="No chronological evaluations"
+        detail="Run evaluate-model for a trained version after importing timestamped historical results."
+      />
+    )
+  }
+  const brier = metricValue(latest.metrics, 'brier_score')
+  const logLoss = metricValue(latest.metrics, 'log_loss')
+  const calibrationError = metricValue(latest.metrics, 'expected_calibration_error')
+  const evaluated = metricValue(latest.metrics, 'evaluated_events')
+  const candidate = metricValue(latest.metrics, 'candidate_events')
+  const uniformBrier = metricValue(latest.benchmarks.uniform ?? {}, 'brier_score')
+  const marketBrier = metricValue(latest.benchmarks.market_consensus ?? {}, 'brier_score')
+
+  return (
+    <div className="space-y-7">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <SectionHeading eyebrow="Expanding-window replay" title="Chronological calibration" />
+        <span className={`rounded-[4px] border px-2.5 py-1 text-xs font-bold ${evaluationStatusClass(latest.evaluation_status)}`}>
+          {humanizeCode(latest.evaluation_status)}
+        </span>
+      </div>
+
+      <section className="grid grid-cols-2 border border-zinc-200 bg-white lg:grid-cols-4">
+        <Metric label="Evaluated matches" value={`${evaluated ?? 0} / ${candidate ?? 0}`} />
+        <Metric label="1X2 Brier" value={formatScore(brier)} />
+        <Metric label="Log loss" value={formatScore(logLoss)} />
+        <Metric label="Calibration error" value={calibrationError === null ? '' : `${(calibrationError * 100).toFixed(1)}%`} />
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(300px,0.6fr)]">
+        <div>
+          <SectionHeading eyebrow="Reliability" title="Probability buckets" />
+          <div className="overflow-x-auto border-y border-zinc-200 bg-white">
+            <table className="w-full min-w-[680px] text-left text-sm">
+              <thead className="bg-zinc-50 text-xs uppercase text-zinc-500">
+                <tr><th className="px-4 py-3">Outcome</th><th className="px-4 py-3">Probability band</th><th className="px-4 py-3 text-right">Count</th><th className="px-4 py-3 text-right">Mean forecast</th><th className="px-4 py-3 text-right">Observed</th><th className="px-4 py-3 text-right">Gap</th></tr>
+              </thead>
+              <tbody>
+                {latest.calibration.map((bucket) => (
+                  <tr key={`${bucket.selection_code}-${bucket.bucket_index}`} className="border-t border-zinc-100">
+                    <td className="px-4 py-3 font-semibold">{humanizeCode(bucket.selection_code)}</td>
+                    <td className="px-4 py-3 font-mono text-xs">{(bucket.lower_bound * 100).toFixed(0)}{(bucket.upper_bound * 100).toFixed(0)}%</td>
+                    <td className="px-4 py-3 text-right font-mono">{bucket.count}</td>
+                    <td className="px-4 py-3 text-right font-mono">{(bucket.mean_predicted * 100).toFixed(1)}%</td>
+                    <td className="px-4 py-3 text-right font-mono">{(bucket.observed_frequency * 100).toFixed(1)}%</td>
+                    <td className="px-4 py-3 text-right font-mono">{(bucket.absolute_error * 100).toFixed(1)} pp</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <SectionHeading eyebrow="Benchmarks" title="Proper-score comparison" />
+          <div className="border-y border-zinc-200 bg-white p-5">
+            <ReadinessRow label="Poisson Brier" ready detail={formatScore(brier)} />
+            <ReadinessRow label="Uniform 1X2" ready={brier !== null && uniformBrier !== null && brier < uniformBrier} detail={formatScore(uniformBrier)} />
+            <ReadinessRow label="Market consensus" ready={marketBrier !== null} detail={marketBrier === null ? 'No compatible historical odds' : formatScore(marketBrier)} />
+            <ReadinessRow label="Evaluation fingerprint" ready detail={latest.fingerprint.slice(0, 16)} />
+          </div>
+          <p className="mt-3 text-xs leading-5 text-zinc-500">
+            Lower Brier and log loss are better. Buckets are one-vs-rest across HOME, DRAW, and AWAY forecasts.
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <SectionHeading eyebrow="Registry" title="Completed evaluation runs" />
+        <div className="overflow-x-auto border-y border-zinc-200 bg-white">
+          <table className="w-full min-w-[760px] text-left text-sm">
+            <thead className="bg-zinc-50 text-xs uppercase text-zinc-500"><tr><th className="px-4 py-3">Model</th><th className="px-4 py-3">Window end</th><th className="px-4 py-3">Evidence</th><th className="px-4 py-3 text-right">Brier</th><th className="px-4 py-3">Classification</th></tr></thead>
+            <tbody>
+              {evaluations.map((run) => (
+                <tr key={run.id} className="border-t border-zinc-100">
+                  <td className="px-4 py-3 font-mono text-xs">{run.model_version}</td>
+                  <td className="px-4 py-3">{formatDateTime(run.evaluation_end)}</td>
+                  <td className="px-4 py-3">{run.is_demo ? 'DEMO ONLY' : 'EXTERNAL HISTORY'}</td>
+                  <td className="px-4 py-3 text-right font-mono">{formatScore(metricValue(run.metrics, 'brier_score'))}</td>
+                  <td className="px-4 py-3">{humanizeCode(run.evaluation_status)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {latest.is_demo ? (
+        <div className="border-l-4 border-amber-400 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
+          This run verifies the software path only. Demo results cannot validate the model or unlock value signals.
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function metricValue(metrics: Record<string, unknown>, key: string): number | null {
+  const value = metrics[key]
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+function formatScore(value: number | null): string {
+  return value === null ? '' : value.toFixed(4)
+}
+
+function evaluationStatusClass(status: string): string {
+  if (status === 'calibrated') return 'border-emerald-200 bg-emerald-50 text-emerald-800'
+  if (status === 'calibration_failed') return 'border-rose-200 bg-rose-50 text-rose-800'
+  return 'border-amber-200 bg-amber-50 text-amber-800'
 }
 
 function EventSelector({ events, selectedEventId, onSelectEvent }: Pick<ActiveViewProps, 'selectedEventId' | 'onSelectEvent'> & { events: EventSummary[] }) {

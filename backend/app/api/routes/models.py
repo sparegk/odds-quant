@@ -8,12 +8,20 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import require_admin_key
 from app.db.session import get_db
 from app.schemas.models import (
+    EvaluateModelRequest,
+    EvaluationRunView,
     ModelOutputView,
     ModelVersionView,
     PredictEventRequest,
     TrainPoissonRequest,
 )
 from app.services.catalog import get_event
+from app.services.evaluation import (
+    EvaluationError,
+    evaluate_model,
+    get_evaluation,
+    list_evaluations,
+)
 from app.services.modeling import (
     ModelingError,
     get_model,
@@ -55,6 +63,44 @@ def model_detail(model_id: int, database: Database) -> ModelVersionView:
     if model is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Model not found")
     return model
+
+
+@router.post(
+    "/models/{model_id}/evaluate",
+    response_model=EvaluationRunView,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_admin_key)],
+    tags=["models"],
+)
+def create_evaluation(
+    model_id: int,
+    request: EvaluateModelRequest,
+    database: Database,
+) -> EvaluationRunView:
+    try:
+        return evaluate_model(database, model_id, request)
+    except EvaluationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.get("/evaluations", response_model=list[EvaluationRunView], tags=["models"])
+def evaluations(database: Database, model_id: int | None = None) -> list[EvaluationRunView]:
+    return list_evaluations(database, model_id=model_id)
+
+
+@router.get(
+    "/evaluations/{run_id}",
+    response_model=EvaluationRunView,
+    tags=["models"],
+)
+def evaluation_detail(run_id: int, database: Database) -> EvaluationRunView:
+    run = get_evaluation(database, run_id)
+    if run is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evaluation not found")
+    return run
 
 
 @router.post(

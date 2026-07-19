@@ -206,7 +206,9 @@ The repository is in the **Phase 1 model-baseline milestone**. It includes:
 - Stored score matrices, expected goals, selection probabilities, uncertainty intervals, data fingerprints, and immutable prediction timestamps.
 - Model registry, training, prediction, and event-prediction API routes plus CLI equivalents.
 
-The model is deliberately marked `unvalidated`: no chronological held-out calibration, value-signal service, arbitrage service, or backtester is implemented yet. No real or synthetic performance result is currently claimed.
+The backend now supports expanding-window chronological evaluation with immutable per-match training fingerprints, 1X2 Brier score, log loss, one-vs-rest calibration buckets, coverage accounting, uniform and optional market benchmarks, and an explicit promotion policy.
+
+Models remain `unvalidated` until a non-demo evaluation passes the fixed evidence policy. The included synthetic history can exercise evaluation code but cannot validate a model. Value-signal and arbitrage services are not implemented yet.
 
 ## Repository Structure
 
@@ -293,6 +295,7 @@ Train and apply the baseline after results and target-event odds exist:
 ```bash
 python -m app.cli train-poisson 1 2026-03-01T00:00:00+00:00 2026-07-19T10:00:00+00:00
 python -m app.cli predict-event 1 33 --predicted-at 2026-07-19T10:00:00+00:00
+python -m app.cli evaluate-model 1 2026-05-01T00:00:00+00:00 2026-07-19T10:00:00+00:00
 ```
 
 Use IDs returned by your own database. Training rejects future cutoffs and insufficient samples. Prediction rejects post-kickoff timestamps, competition mismatches, training windows later than `inputs_as_of`, and teams without the configured venue-specific history.
@@ -315,6 +318,8 @@ Current stored-data routes include:
 - `GET /api/v1/models` and `GET /api/v1/models/{model_id}`
 - `POST /api/v1/models/train`
 - `POST /api/v1/models/{model_id}/predict`
+- `POST /api/v1/models/{model_id}/evaluate`
+- `GET /api/v1/evaluations` and `GET /api/v1/evaluations/{run_id}`
 - `GET /api/v1/events/{event_id}/predictions`
 
 Odds comparison and model prediction remain separate records. The API does not report expected value or an opportunity until the next signal layer joins a fresh compatible price to an independently trained, calibrated prediction.
@@ -332,7 +337,7 @@ Copy `.env.example` to `.env` for local configuration. Never commit API keys, to
 
 ## Project Status
 
-OddsQuant now has a migrated point-in-time data layer, atomic odds and result ingestion, a leakage-safe versioned Poisson baseline, stored scoreline predictions, a connected model registry dashboard, provider scheduling, CI, and prepared full-stack deployment. The next milestone is chronological model evaluation followed by value, underdog, and tax-aware arbitrage services.
+OddsQuant now has a migrated point-in-time data layer, atomic odds and result ingestion, a leakage-safe versioned Poisson baseline, stored scoreline predictions, chronological calibration infrastructure, a connected evaluation dashboard, provider scheduling, CI, and prepared full-stack deployment. The next milestone is running the policy on adequate permitted history, followed by explainable value, underdog, and tax-aware arbitrage services.
 
 See [context.md](context.md), [ARCHITECTURE.md](ARCHITECTURE.md), [METHODOLOGY.md](METHODOLOGY.md), [ROADMAP.md](ROADMAP.md), and [AGENTS.md](AGENTS.md) for detailed decisions and operating rules.
 

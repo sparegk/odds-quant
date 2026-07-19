@@ -8,8 +8,9 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from app.db.session import SessionLocal
-from app.schemas.models import PredictEventRequest, TrainPoissonRequest
+from app.schemas.models import EvaluateModelRequest, PredictEventRequest, TrainPoissonRequest
 from app.services.demo_seed import seed_demo_data, seed_demo_results
+from app.services.evaluation import EvaluationError, evaluate_model
 from app.services.modeling import ModelingError, predict_event, train_poisson_model
 from app.services.odds_import import OddsImportError, import_odds_csv
 from app.services.results_import import ResultImportError, import_results_csv
@@ -42,6 +43,15 @@ def _parser() -> argparse.ArgumentParser:
     predict.add_argument("event_id", type=int)
     predict.add_argument("--predicted-at", type=datetime.fromisoformat)
     predict.add_argument("--inputs-as-of", type=datetime.fromisoformat)
+    evaluate = commands.add_parser(
+        "evaluate-model", help="run an expanding-window chronological evaluation"
+    )
+    evaluate.add_argument("model_id", type=int)
+    evaluate.add_argument("evaluation_start", type=datetime.fromisoformat)
+    evaluate.add_argument("evaluation_end", type=datetime.fromisoformat)
+    evaluate.add_argument("--prediction-lead-minutes", type=int, default=60)
+    evaluate.add_argument("--minimum-training-matches", type=int, default=20)
+    evaluate.add_argument("--calibration-bins", type=int, default=10)
     return parser
 
 
@@ -80,7 +90,7 @@ def main() -> int:
                         shrinkage_matches=args.shrinkage_matches,
                     ),
                 )
-            else:
+            elif args.command == "predict-event":
                 result = predict_event(
                     session,
                     args.model_id,
@@ -90,10 +100,22 @@ def main() -> int:
                         inputs_as_of=args.inputs_as_of,
                     ),
                 )
+            else:
+                result = evaluate_model(
+                    session,
+                    args.model_id,
+                    EvaluateModelRequest(
+                        evaluation_start=args.evaluation_start,
+                        evaluation_end=args.evaluation_end,
+                        prediction_lead_minutes=args.prediction_lead_minutes,
+                        minimum_training_matches=args.minimum_training_matches,
+                        calibration_bins=args.calibration_bins,
+                    ),
+                )
     except (OddsImportError, ResultImportError) as exc:
         print(json.dumps({"status": "rejected", "job_id": exc.job_id, "errors": exc.errors}))
         return 2
-    except ModelingError as exc:
+    except (ModelingError, EvaluationError) as exc:
         print(json.dumps({"status": "rejected", "error": str(exc)}))
         return 2
     print(result.model_dump_json())

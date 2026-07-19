@@ -174,6 +174,23 @@ def test_results_training_and_prediction_api_are_connected(
     assert training.status_code == 201
     assert training.json()["evaluation_status"] == "unvalidated"
 
+    evaluation = client.post(
+        f"/api/v1/models/{training.json()['id']}/evaluate",
+        json={
+            "evaluation_start": (as_of - timedelta(days=50)).isoformat(),
+            "evaluation_end": as_of.isoformat(),
+            "prediction_lead_minutes": 60,
+            "minimum_training_matches": 20,
+            "calibration_bins": 5,
+        },
+    )
+    assert evaluation.status_code == 201
+    assert evaluation.json()["evaluation_status"] == "insufficient_evidence"
+    assert evaluation.json()["metrics"]["evaluated_events"] == 8
+    evaluations = client.get("/api/v1/evaluations")
+    assert evaluations.status_code == 200
+    assert evaluations.json()[0]["id"] == evaluation.json()["id"]
+
     prediction = client.post(
         f"/api/v1/models/{training.json()['id']}/predict",
         json={

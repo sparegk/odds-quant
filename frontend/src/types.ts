@@ -70,6 +70,35 @@ export interface ModelVersion {
   created_at: string
 }
 
+export interface CalibrationBucket {
+  selection_code: string
+  bucket_index: number
+  lower_bound: number
+  upper_bound: number
+  count: number
+  mean_predicted: number
+  observed_frequency: number
+  absolute_error: number
+}
+
+export interface EvaluationRun {
+  id: number
+  model_version_id: number
+  model_version: string
+  status: string
+  evaluation_start: string
+  evaluation_end: string
+  fingerprint: string
+  config: Record<string, unknown>
+  policy: Record<string, unknown>
+  evaluation_status: string
+  is_demo: boolean
+  metrics: Record<string, unknown>
+  benchmarks: Record<string, Record<string, unknown>>
+  calibration: CalibrationBucket[]
+  created_at: string
+}
+
 export interface PriceComparison {
   selection_code: string
   selection_name: string
@@ -125,4 +154,5 @@ export interface DashboardData {
   imports: ImportJob[]
   jobs: ProviderJob[]
   models: ModelVersion[]
+  evaluations: EvaluationRun[]
 }

@@ -627,8 +627,15 @@ class BacktestRun(Base, TimestampMixin):
     train_end: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     validation_end: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     test_end: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    fingerprint: Mapped[str] = mapped_column(String(64), unique=True)
     config: Mapped[dict[str, object]] = mapped_column(JSON)
+    policy: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+    evaluation_status: Mapped[str] = mapped_column(String(30), default="unvalidated")
     is_demo: Mapped[bool] = mapped_column(Boolean, default=False)
+    __table_args__ = (
+        CheckConstraint("validation_end >= train_end"),
+        CheckConstraint("test_end >= validation_end"),
+    )
 
 
 class BacktestResult(Base):
@@ -647,10 +654,23 @@ class BacktestObservation(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     run_id: Mapped[int] = mapped_column(ForeignKey("backtest_runs.id", ondelete="CASCADE"))
     event_id: Mapped[int] = mapped_column(ForeignKey("events.id"))
-    selection_id: Mapped[int] = mapped_column(ForeignKey("selections.id"))
-    odds_snapshot_id: Mapped[int] = mapped_column(ForeignKey("odds_snapshots.id"))
-    prediction_id: Mapped[int] = mapped_column(ForeignKey("model_predictions.id"))
+    selection_id: Mapped[int | None] = mapped_column(ForeignKey("selections.id"))
+    odds_snapshot_id: Mapped[int | None] = mapped_column(ForeignKey("odds_snapshots.id"))
+    prediction_id: Mapped[int | None] = mapped_column(ForeignKey("model_predictions.id"))
+    result_id: Mapped[int | None] = mapped_column(ForeignKey("match_results.id"))
     predicted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    training_cutoff: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    training_sample_size: Mapped[int | None] = mapped_column(Integer)
+    training_fingerprint: Mapped[str | None] = mapped_column(String(64))
+    market_type: Mapped[str | None] = mapped_column(String(40))
+    probabilities: Mapped[dict[str, float] | None] = mapped_column(JSON)
+    actual_outcome: Mapped[str | None] = mapped_column(String(40))
+    brier_score: Mapped[float | None] = mapped_column(Float)
+    log_loss: Mapped[float | None] = mapped_column(Float)
+    market_snapshot_ids: Mapped[list[int]] = mapped_column(JSON, default=list)
+    market_probabilities: Mapped[dict[str, float] | None] = mapped_column(JSON)
+    market_brier_score: Mapped[float | None] = mapped_column(Float)
+    market_log_loss: Mapped[float | None] = mapped_column(Float)
     settled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     settlement: Mapped[str | None] = mapped_column(String(20))
     stake: Mapped[float] = mapped_column(Float, default=1.0)
@@ -659,6 +679,10 @@ class BacktestObservation(Base):
     __table_args__ = (
         UniqueConstraint("run_id", "event_id", "selection_id", "predicted_at"),
         CheckConstraint("stake >= 0"),
+        CheckConstraint("training_sample_size IS NULL OR training_sample_size > 0"),
+        CheckConstraint("training_cutoff IS NULL OR training_cutoff <= predicted_at"),
+        CheckConstraint("brier_score IS NULL OR brier_score >= 0"),
+        CheckConstraint("log_loss IS NULL OR log_loss >= 0"),
     )
 
 

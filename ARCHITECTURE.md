@@ -6,7 +6,7 @@ The frontend consumes only versioned API responses through a typed client. It di
 
 External adapters register through the process-local collector registry. The worker converts their validated normalized DTOs into the same atomic import path used by CSV uploads and records each scheduled attempt in `provider_jobs`. No external adapter is enabled by default. Development may seed labelled synthetic odds; production blocks demo seeding.
 
-The predictive data flow is: permitted source or user CSV -> normalized ingestion DTO -> immutable raw snapshot -> timestamped result and odds tables -> cutoff-filtered training rows -> fingerprinted Poisson model version -> pre-kickoff score matrix and selection predictions. Explainable signals and immutable walk-forward evaluation are the next layer and are not inferred from training-descriptive metrics.
+The predictive data flow is: permitted source or user CSV -> normalized ingestion DTO -> immutable raw snapshot -> timestamped result and odds tables -> cutoff-filtered training rows -> fingerprinted Poisson model version -> pre-kickoff score matrix and selection predictions -> expanding-window replay -> immutable per-event scores and calibration buckets. Explainable signals are the next layer and are not inferred from training-descriptive or demo metrics.
 
 The planned football schema extends the existing foundation with players, coaches, registrations, player appearances, player statistics, availability reports, lineup snapshots and members, formations, tactical snapshots, and matchup feature snapshots. Every mutable fact is append-only or versioned with source, observation, ingestion, effective, and supersession timestamps. Expected and confirmed lineups are separate evidence classes.
 
