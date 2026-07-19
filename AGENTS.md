@@ -30,5 +30,7 @@ python -m uvicorn app.main:app --reload
 - Never scrape protected bookmaker services or assume a public bookmaker API exists.
 - Never commit secrets, credentials, cookies, proprietary raw data, local databases, or model binaries.
 - Keep model, market, line-shopping, and bookmaker-margin effects separate.
+- Keep arbitrage separate from model value: use only complete, mutually exclusive, exhaustive outcomes with identical event, line, period, currency, and settlement rules.
+- Rank arbitrage by worst-case net profit after explicit taxes, fees, commissions, currency costs, stake limits, and rounding; unknown or stale tax rules must block an executable result.
+- Never call an arbitrage opportunity guaranteed before all legs are accepted and honoured under the configured settlement and tax rules.
 - Add deterministic tests for every quantitative behavior change.
-
