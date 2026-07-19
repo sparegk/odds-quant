@@ -1,8 +1,8 @@
 # OddsQuant
 
-OddsQuant is a quantitative sports-betting analytics project for football. The goal is to collect timestamped odds, compare bookmaker prices with vig-free market and statistical-model probabilities, identify explainable value or arbitrage candidates, and test whether those methods hold up historically.
+OddsQuant is a full-stack quantitative sports-betting intelligence platform for football. It is designed to ingest timestamped market and match data, compare bookmaker prices with vig-free market and independently modelled probabilities, surface explainable value and tax-aware arbitrage candidates, and determine whether those methods survive realistic historical evaluation.
 
-This is not a betting-tips website or an automated betting system. It is an educational project for studying probability, statistics, data engineering, modelling, backtesting, and full-stack software development.
+This is not a betting-tips website or an automated betting system. It is a portfolio-grade quantitative engineering project built around practical research workflows: reproducible data ingestion, point-in-time modelling, price comparison, uncertainty-aware signals, execution constraints, and leakage-safe backtesting. The system is intended to be useful for serious market analysis while also demonstrating applied statistics, data engineering, machine learning, backend architecture, and full-stack development.
 
 ## Project Goals
 
@@ -292,6 +292,6 @@ Data-source, freshness, lineup, player, and tactical requirements are documented
 
 ## Disclaimer
 
-OddsQuant is an educational analytics project. It is not affiliated with, endorsed by, or sponsored by any bookmaker. It does not place bets and does not provide financial, gambling, legal, or tax advice.
+OddsQuant is an independent quantitative analytics platform. It is not affiliated with, endorsed by, or sponsored by any bookmaker. It does not place bets and does not provide financial, gambling, legal, or tax advice.
 
 No prediction or displayed arbitrage guarantees profit in practice. Odds can change before all legs are accepted; stakes may be limited or rejected; and void, settlement, commission, currency, and tax rules can remove an apparent edge. Users must verify current prices and rules, follow local laws and age restrictions, set strict financial limits, and avoid chasing losses.

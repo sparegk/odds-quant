@@ -2,7 +2,9 @@
 
 ## Vision
 
-OddsQuant is a portfolio-quality educational analytics platform for a statistics student learning quantitative modelling, data engineering, backtesting, and full-stack development. Football is the first sport, but sport and provider adapters must permit later extension.
+OddsQuant is a portfolio-grade quantitative sports intelligence platform designed for practical football market research and decision support. Its purpose is to turn permitted, timestamped odds and match data into reproducible probability estimates, price comparisons, explainable signals, arbitrage analysis, and leakage-safe historical evaluation. It is also intended to demonstrate professional capability across quantitative modelling, statistics, data engineering, machine learning, backtesting, backend architecture, and full-stack development. Football is the first sport, while sport-specific and provider adapters preserve a path to later expansion.
+
+The target user is a quantitatively minded analyst who wants to inspect how a conclusion was produced, distinguish model edge from line shopping and bookmaker margin, understand uncertainty and execution risk, and reproduce an analysis from its original data and model version. OddsQuant should support credible real-world research without presenting unverified outputs as profitable or automating bet placement.
 
 ## Quantitative Principles
 
