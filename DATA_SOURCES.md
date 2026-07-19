@@ -1,0 +1,93 @@
+# Data Sources And Freshness
+
+## Source Policy
+
+OddsQuant may ingest football data from licensed sports-data APIs, official competition or club sources, user-uploaded CSV files, manual entries, and clearly labelled demo data. It must not scrape protected bookmaker or sports-data services, bypass access controls, or infer that a named bookmaker exposes a public API.
+
+Every record must identify its provider, source type, source key, source update time, ingestion time, effective period, and whether it is real, manually entered, or generated. Raw permitted responses should be retained immutably with a checksum so normalization can be reproduced.
+
+## Football Data Required
+
+### Teams And Matches
+
+- Competition, season, venue, kickoff, status, and verified result.
+- Goals, expected goals where licensed, shots, possession, field tilt, passing, pressing, transitions, set pieces, cards, and substitutions.
+- Home/away splits, opponent strength, rest days, travel, schedule congestion, and competition context.
+- Rolling and exponentially weighted form calculated strictly before the target kickoff.
+
+Metric definitions must be provider-versioned. Similar names from different providers must not be merged until units, event definitions, and coverage are reconciled.
+
+### Players And Availability
+
+- Stable player identity, team registration, position, role, age band, and preferred side where licensed.
+- Appearances, starts, minutes, substitutions, and position-specific per-90 statistics.
+- Attacking, progression, creation, defensive, pressing, aerial, set-piece, and goalkeeper measures appropriate to the player's role.
+- Injury, illness, suspension, registration, rotation, and return-to-play status with observation and effective timestamps.
+- Expected lineup probabilities and confirmed lineup snapshots stored as different evidence classes.
+
+Raw per-90 values require minimum-minute thresholds and shrinkage toward position and competition priors. Recent performance uses configurable rolling windows and exponential decay, with season and competition strength adjustments. A short hot streak must not be treated as a stable player effect.
+
+### Coaches, Lineups, And Tactics
+
+- Coach tenure, recent appointment, formation usage, starting shape, in-possession and out-of-possession roles where available.
+- Pressing intensity, defensive block, line height, width, build-up route, tempo, directness, transition behavior, set-piece strength, and substitution patterns.
+- Timestamped expected and confirmed starting elevens, bench, captain, formation, and role changes.
+
+A coaching change is a regime change with high initial uncertainty, not an automatic improvement. Tactical labels must come from reproducible event data or a documented provider field; unsupported narrative labels are not model inputs.
+
+## Matchup Features
+
+Football matchups are contextual rather than fixed one-on-one contests. Candidate interactions include press versus build-up resistance, pace versus a high defensive line, aerial attack versus aerial defense, set-piece delivery versus set-piece prevention, flank overloads, transition attack versus rest defense, and key creator or finisher availability.
+
+Each interaction must have:
+
+- A precise quantitative definition.
+- Data available before prediction time.
+- Adequate samples for both sides and relevant roles.
+- Opponent and competition adjustment.
+- Shrinkage or regularization.
+- Walk-forward evidence that it improves calibration out of sample.
+
+Player, team, and tactical features can describe the same effect. Feature design and ablation tests must prevent double counting. Direct player-versus-player history is used only with adequate comparable minutes and roles; otherwise the model uses role-versus-system interactions and reports wider uncertainty.
+
+## Freshness Contract
+
+The system distinguishes `source_updated_at`, `observed_at`, `ingested_at`, and `effective_from`. Data age is measured from the provider observation or update time, never merely from the time OddsQuant received it.
+
+- Event metadata is refreshed at least daily when kickoff is distant and more frequently inside 24 hours.
+- Availability reports are refreshed whenever the permitted source changes and at scheduled pre-match checkpoints.
+- Expected lineups remain provisional and carry scenario uncertainty.
+- Confirmed lineups are collected when officially released, normally near kickoff, and trigger a new prediction version.
+- Odds used for ordinary opportunity ranking default to `FRESH` through five minutes, `AGING` through fifteen minutes, and `STALE` afterward.
+- Arbitrage legs require a stricter configurable window and low cross-leg timestamp skew; stale legs are never ranked as executable.
+- Closing odds are the last valid snapshot strictly before kickoff. Post-kickoff data can never be relabelled as closing data.
+- Results become training data only after final status and reconciliation. Corrections create a new version rather than silently rewriting lineage.
+
+Freshness thresholds are configurable per provider and competition because update schedules differ, but any override must be visible and tested. A provider's slower rate limit may reduce coverage; it must not be hidden by pretending cached data is current.
+
+## Adaptive Collection
+
+Collectors should poll more often as kickoff approaches while staying within provider terms and documented rate limits. They use conditional requests where supported, exponential backoff, jitter, retry budgets, and job-level observability. Repeated payload hashes, out-of-order timestamps, clock skew, partial markets, and implausible jumps are flagged.
+
+No collector should optimize frequency at the expense of legality or validity. If the licensed source cannot provide sufficiently fresh data for a use case, the UI reports that limitation and disables strong signals or arbitrage ranking.
+
+## Modelling And Leakage Rules
+
+Every feature row carries an `as_of` cutoff. A prediction may use only records whose source evidence was available at or before its prediction timestamp. Historical backtests cannot use confirmed lineups, injury outcomes, coach decisions, or corrected statistics unless their historical publication time is known and precedes the simulated prediction.
+
+The first model remains a team-level Poisson baseline. Player, coach, lineup, and matchup adjustments are added only after the underlying data passes coverage and timestamp audits. They improve match-level markets first. Player props remain out of scope until player-level targets, settlement rules, availability history, and calibration are independently validated.
+
+## Quality Gates
+
+A record or prediction is rejected, quarantined, or downgraded when:
+
+- Event, team, player, market, line, or period identity is ambiguous.
+- Required outcomes or minutes are missing.
+- Provider timestamps are absent, out of order, or implausibly skewed.
+- A lineup is presented as confirmed without official confirmation.
+- Player availability conflicts across sources without a resolution policy.
+- Metric definitions changed without a provider schema version.
+- Information was published after the model cutoff.
+- The prediction is overly sensitive to unresolved player or tactical scenarios.
+
+The dashboard must display source, age, lineup status, missingness, and the main data-quality limitations next to each model or opportunity.

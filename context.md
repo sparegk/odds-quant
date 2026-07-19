@@ -12,6 +12,18 @@ The first model is an interpretable Poisson goals baseline. Its scoreline distri
 
 Signals distinguish model edge, best-price improvement, and margin. Stale data, small samples, weak calibration, missing inputs, material price movement, or uncertainty wider than the estimated edge must prevent a strong `VALUE` classification.
 
+## Recent Football Intelligence
+
+Team form alone is insufficient for maximum practical accuracy. OddsQuant will collect timestamped team, player, coach, lineup, formation, availability, and tactical evidence from permitted sources. Match-level models can then account for which players are likely to play, their current roles and minutes, how a coach deploys them, and whether one side's documented style creates a measurable matchup advantage.
+
+Player data includes stable identity, registration, position and role, starts, minutes, substitutions, recent and long-run position-specific statistics, injury or suspension status, and expected versus confirmed lineup evidence. Per-90 statistics require minimum minutes, recency weighting, opponent and competition adjustment, and shrinkage toward appropriate priors.
+
+Coach and tactical data includes tenure, formation usage, pressing, defensive block and line height, width, build-up, directness, transitions, set pieces, and substitution patterns where these are supported by reproducible event data. A coach change creates a high-uncertainty regime; it is not automatically a positive or negative signal.
+
+Matchup features represent interactions such as press versus build-up resistance, pace versus a high line, aerial attack versus aerial defense, set pieces, flank overloads, and transition attack versus rest defense. A single player can materially change a matchup, but football roles are dynamic. Direct player-versus-player history is used only with adequate comparable minutes; otherwise role-versus-system features are preferred.
+
+These adjustments are added after the team-level Poisson baseline and must improve out-of-sample calibration in chronological ablation tests. The model must avoid double counting player effects already embedded in team form. It produces separate expected-lineup scenarios and confirmed-lineup predictions, and widens uncertainty or blocks strong signals when player availability or tactical roles are unresolved.
+
 ## Cross-Bookmaker Arbitrage
 
 Arbitrage is separate from statistical value and does not require a model probability. For a complete set of mutually exclusive outcomes, OddsQuant selects the best decimal price for each outcome across bookmakers and calculates `inverse_sum = sum(1 / odds_i)`. A gross theoretical arbitrage exists only when the inverse sum is below one.
@@ -52,8 +64,10 @@ The phrase "guaranteed profit" applies only to the mathematical payoff after eve
 
 Allowed inputs are licensed APIs, official sources, user CSVs, manual entries, and clearly labelled demo data. All observations are timestamped and linked to their provider. Historical evaluation uses chronological splits and walk-forward prediction with inputs strictly earlier than kickoff.
 
+Historical player, injury, lineup, and coach features require their original publication timestamps. A backtest cannot treat the final starting lineup or later-confirmed injury outcome as known at an earlier prediction time. Full source, freshness, feature, and quality rules are defined in `DATA_SOURCES.md`.
+
 The first complete backtester will report predictive calibration and betting-strategy metrics, including Brier score, log loss, ECE, ROI, yield, profit in units, CLV, drawdown, and grouped performance. Synthetic results demonstrate software behavior only.
 
 ## Current Status
 
-Phase 0 establishes project configuration, normalized persistence models, provider contracts, pure quantitative functions, a health API, and initial tests. Phase 1 will add migrations, deterministic demo seeding, CSV ingestion, model training, stored signals, a tax-aware football arbitrage scanner, backtesting, bankroll simulation, and the connected React dashboard.
+Phase 0 establishes project configuration, normalized persistence models, provider contracts, pure quantitative functions, a health API, and initial tests. Phase 1 will add migrations, deterministic demo seeding, team/player/lineup data contracts, CSV ingestion, model training, stored signals, a tax-aware football arbitrage scanner, backtesting, bankroll simulation, and the connected React dashboard.

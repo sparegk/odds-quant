@@ -18,7 +18,7 @@ This is not a betting-tips website or an automated betting system. It is an educ
 
 ## Main Features
 
-### Odds Data Collection
+### Football And Odds Data Collection
 
 The system will store recurring, timestamped snapshots for:
 
@@ -26,8 +26,14 @@ The system will store recurring, timestamped snapshots for:
 - Match-result, totals, both-teams-to-score, double-chance, and supported team-total markets.
 - Bookmakers, selections, decimal prices, opening prices, and closing prices.
 - Provider, import-job, source-quality, and data-freshness metadata.
+- Team form, opponent-adjusted strength, home/away splits, rest, travel, and schedule congestion.
+- Player rosters, positions, minutes, recent performance, injuries, suspensions, and availability.
+- Timestamped expected and confirmed lineups, formations, coaches, and tactical roles.
+- Matchup evidence such as pressing versus build-up, aerial strength, set pieces, flank usage, defensive line, and transition style.
 
 Odds will come only from licensed APIs, official sources, user-uploaded CSV files, manual entry, or clearly labelled demo data. OddsQuant will not bypass bookmaker protections or assume that a bookmaker has a public API.
+
+Every football observation will retain its source, provider update time, collection time, effective period, and reliability status. Recent data is not automatically valid: inconsistent event identities, missing minutes, incompatible metric definitions, unconfirmed availability, or information published after the prediction cutoff must be rejected or downgraded.
 
 ### Odds And Probability Analysis
 
@@ -43,7 +49,7 @@ Double-chance outcomes overlap, so they will be derived from a valid 1X2 distrib
 
 ### Football Probability Model
 
-The first transparent baseline will model home and away goals with Poisson methods and team-strength features. A scoreline probability matrix will derive probabilities for:
+The first transparent baseline will model home and away goals with Poisson methods and team-strength features. It will establish a leakage-safe benchmark before player and tactical adjustments are added. A scoreline probability matrix will derive probabilities for:
 
 - Home win, draw, and away win.
 - Over/under goal lines.
@@ -52,6 +58,10 @@ The first transparent baseline will model home and away goals with Poisson metho
 - Supported team totals and joint outcomes.
 
 Predictions must use only information available before kickoff. Model versions, input cutoffs, uncertainty, sample size, and calibration will be stored so results remain reproducible.
+
+Later match-level models will adjust the baseline using player availability, expected or confirmed lineups, coach and formation changes, and validated tactical interactions. They will use recency weighting, opponent adjustment, position-specific metrics, minimum-minute thresholds, and shrinkage so a small number of matches cannot dominate a prediction. Expected-lineup scenarios and confirmed-lineup predictions will remain separate.
+
+Player-versus-player and tactical matchup features will be learned and backtested rather than asserted from narrative alone. For example, the system may test whether a high press disrupts a particular build-up structure or whether aerial and set-piece strengths exploit a documented weakness. It must avoid double-counting effects already present in team form and widen uncertainty when lineup or role information is incomplete.
 
 ### Value Signal Engine
 
@@ -72,6 +82,8 @@ Example signals include:
 - `INSUFFICIENT_DATA`
 
 A strong signal will be blocked when data is stale, inputs are missing, sample size is inadequate, calibration is weak, odds moved materially, or uncertainty is wider than the estimated edge.
+
+Signals will also be blocked or downgraded when important player availability is unresolved, only an expected lineup is available, a recent coaching change has too little evidence, or the edge disappears under reasonable lineup scenarios.
 
 ### Football Arbitrage Scanner
 
@@ -130,6 +142,7 @@ The planned React dashboard will include:
 - Event, market, and bookmaker price comparison.
 - Bet Builder Laboratory.
 - Model calibration and performance.
+- Lineup status, player availability, tactical context, and matchup sensitivity.
 - Backtesting and bankroll simulation.
 - CSV imports, providers, jobs, methodology, and disclaimers.
 
@@ -150,16 +163,18 @@ The planned React dashboard will include:
 
 1. Finalize configuration, database sessions, and the initial Alembic migration.
 2. Add deterministic, clearly labelled football demo data.
-3. Build atomic CSV and manual odds-import workflows.
-4. Store coherent timestamped market snapshots and closing prices.
-5. Complete odds conversion and de-vigging services and tests.
-6. Train and version the leakage-safe Poisson baseline.
-7. Generate explainable value and underdog signals.
-8. Add the tax-aware football arbitrage engine.
-9. Add scoreline-based bet-builder evaluation.
-10. Build walk-forward backtesting and bankroll research.
-11. Connect the React dashboard to versioned API endpoints.
-12. Complete Docker, CI, deployment, documentation, and end-to-end verification.
+3. Add normalized team, player, coach, roster, appearance, availability, lineup, and tactical data contracts.
+4. Build atomic CSV and manual import workflows for football data and odds.
+5. Store coherent timestamped market snapshots and closing prices.
+6. Complete odds conversion and de-vigging services and tests.
+7. Train and version the leakage-safe Poisson baseline.
+8. Add lineup, player-strength, coach, and validated tactical-matchup adjustments.
+9. Generate explainable value and underdog signals.
+10. Add the tax-aware football arbitrage engine.
+11. Add scoreline-based bet-builder evaluation.
+12. Build walk-forward backtesting and bankroll research.
+13. Connect the React dashboard to versioned API endpoints.
+14. Complete Docker, CI, deployment, documentation, and end-to-end verification.
 
 ## Current Implementation
 
@@ -223,6 +238,8 @@ Copy `.env.example` to `.env` for local configuration. Never commit API keys, to
 OddsQuant has a documented architecture, normalized persistence model, provider boundary, quantitative foundations, and a minimal FastAPI service. The next milestone is a runnable vertical slice with Alembic migrations, labelled demo data, CSV import, stored odds, and the first connected analysis endpoint.
 
 See [context.md](context.md), [ARCHITECTURE.md](ARCHITECTURE.md), [ROADMAP.md](ROADMAP.md), and [AGENTS.md](AGENTS.md) for detailed decisions and operating rules.
+
+Data-source, freshness, lineup, player, and tactical requirements are documented in [DATA_SOURCES.md](DATA_SOURCES.md).
 
 ## Disclaimer
 
