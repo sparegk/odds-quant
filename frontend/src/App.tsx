@@ -22,7 +22,7 @@ import { API_BASE_URL, loadComparison, loadDashboard } from './api/client'
 import { FreshnessBadge } from './components/FreshnessBadge'
 import { QuantPriceTable } from './components/QuantPriceTable'
 import { formatDateTime, humanizeCode } from './lib/format'
-import type { DashboardData, EvaluationRun, EventSummary, MarketComparison } from './types'
+import type { DashboardData, EvaluationRun, EventSummary, MarketComparison, ValueSignal } from './types'
 
 type ViewKey =
   | 'overview'
@@ -254,9 +254,9 @@ function ActiveView(props: ActiveViewProps) {
     case 'methodology':
       return <Methodology />
     case 'opportunities':
-      return <UnavailableModule title="Value opportunities" requirement="A trained and calibrated model version with stored predictions" />
+      return <SignalResearch dashboard={props.dashboard} mode="value" />
     case 'underdogs':
-      return <UnavailableModule title="Underdog scanner" requirement="Model calibration by probability bucket and fresh market prices" />
+      return <SignalResearch dashboard={props.dashboard} mode="underdog" />
     case 'builder':
       return <UnavailableModule title="Bet Builder Laboratory" requirement="A stored scoreline distribution for the selected event" />
     case 'models':
@@ -466,6 +466,95 @@ function EvaluationPerformance({ evaluations }: { evaluations: EvaluationRun[] }
       ) : null}
     </div>
   )
+}
+
+function SignalResearch({ dashboard, mode }: { dashboard: DashboardData; mode: 'value' | 'underdog' }) {
+  const signals = mode === 'underdog' ? dashboard.underdogs : dashboard.signals
+  const title = mode === 'underdog' ? 'Positive-EV team underdogs' : 'Explainable price signals'
+  const valueCount = signals.filter((signal) => signal.signal_type === 'VALUE').length
+  const watchCount = signals.filter((signal) => signal.signal_type === 'WATCH').length
+  const averageEdge = signals.length
+    ? signals.reduce((sum, signal) => sum + signal.probability_edge, 0) / signals.length
+    : null
+
+  if (!signals.length) {
+    return (
+      <div className="space-y-5">
+        <EmptyState
+          title={mode === 'underdog' ? 'No qualified underdogs' : 'No stored value signals'}
+          detail="Signals appear only after a non-demo model passes chronological calibration and its prediction is joined to complete compatible pre-kickoff odds."
+        />
+        <div className="border-l-4 border-amber-400 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
+          Long odds and demo prices are never treated as value. Generate signals through the protected API after valid evidence exists.
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-7">
+      <SectionHeading eyebrow={mode === 'underdog' ? 'Team outcomes only' : 'Calibrated model versus market'} title={title} />
+      <section className="grid grid-cols-2 border border-zinc-200 bg-white md:grid-cols-4">
+        <Metric label="Stored signals" value={signals.length.toString()} />
+        <Metric label="Value" value={valueCount.toString()} />
+        <Metric label="Watch" value={watchCount.toString()} />
+        <Metric label="Average edge" value={averageEdge === null ? '' : `${(averageEdge * 100).toFixed(1)} pp`} />
+      </section>
+
+      <div className="overflow-x-auto border-y border-zinc-200 bg-white">
+        <table className="w-full min-w-[1120px] text-left text-sm">
+          <thead className="bg-zinc-50 text-xs uppercase text-zinc-500">
+            <tr><th className="px-4 py-3">Event / selection</th><th className="px-4 py-3">Classification</th><th className="px-4 py-3">Best price</th><th className="px-4 py-3 text-right">Model</th><th className="px-4 py-3 text-right">Market</th><th className="px-4 py-3 text-right">Edge</th><th className="px-4 py-3 text-right">EV</th><th className="px-4 py-3 text-right">Lower EV</th><th className="px-4 py-3 text-right">Confidence</th><th className="px-4 py-3">Evidence</th></tr>
+          </thead>
+          <tbody>
+            {signals.map((signal) => (
+              <SignalRow key={signal.id} dashboard={dashboard} signal={signal} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="border-l-4 border-sky-500 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950">
+        Model edge, line-shopping price improvement, and bookmaker margin are separate quantities. A VALUE label is conditional on the stored price, calibration run, uncertainty bound, freshness, and movement checks.
+      </div>
+    </div>
+  )
+}
+
+function SignalRow({ dashboard, signal }: { dashboard: DashboardData; signal: ValueSignal }) {
+  const event = dashboard.events.find((candidate) => candidate.id === signal.event_id)
+  return (
+    <tr className="border-t border-zinc-100 align-top">
+      <td className="px-4 py-3">
+        <p className="font-semibold">{event ? `${event.home_team} vs ${event.away_team}` : `Event ${signal.event_id}`}</p>
+        <p className="mt-1 text-xs text-zinc-500">{signal.selection_name} / {humanizeCode(signal.market_type)}</p>
+      </td>
+      <td className="px-4 py-3"><span className={`rounded-[4px] border px-2 py-1 text-xs font-bold ${signalStatusClass(signal.signal_type)}`}>{humanizeCode(signal.signal_type)}</span></td>
+      <td className="px-4 py-3"><p className="font-mono font-semibold">{signal.offered_odds.toFixed(2)}</p><p className="mt-1 text-xs text-zinc-500">{signal.bookmaker}</p></td>
+      <td className="px-4 py-3 text-right font-mono">{(signal.model_probability * 100).toFixed(1)}%</td>
+      <td className="px-4 py-3 text-right font-mono">{(signal.market_fair_probability * 100).toFixed(1)}%</td>
+      <td className="px-4 py-3 text-right font-mono">{formatSignedPercent(signal.probability_edge)}</td>
+      <td className="px-4 py-3 text-right font-mono">{formatSignedPercent(signal.expected_value)}</td>
+      <td className="px-4 py-3 text-right font-mono">{formatSignedPercent(signal.lower_expected_value)}</td>
+      <td className="px-4 py-3 text-right font-mono">{(signal.confidence * 100).toFixed(0)}%</td>
+      <td className="max-w-xs px-4 py-3 text-xs leading-5 text-zinc-600">
+        <p>{signal.reasons[0] ?? 'Stored quantitative classification.'}</p>
+        <p className="mt-1 text-zinc-400">Eval #{signal.evaluation_run_id} / {signal.bookmaker_count} books / {signal.odds_age_minutes.toFixed(0)}m old</p>
+        {signal.risks[0] ? <p className="mt-1 text-amber-700">{signal.risks[0]}</p> : null}
+      </td>
+    </tr>
+  )
+}
+
+function formatSignedPercent(value: number): string {
+  return `${value >= 0 ? '+' : ''}${(value * 100).toFixed(1)}%`
+}
+
+function signalStatusClass(status: string): string {
+  if (status === 'VALUE') return 'border-emerald-200 bg-emerald-50 text-emerald-800'
+  if (status === 'PASS') return 'border-zinc-200 bg-zinc-50 text-zinc-700'
+  if (status === 'INSUFFICIENT_DATA') return 'border-amber-200 bg-amber-50 text-amber-800'
+  return 'border-sky-200 bg-sky-50 text-sky-800'
 }
 
 function metricValue(metrics: Record<string, unknown>, key: string): number | null {

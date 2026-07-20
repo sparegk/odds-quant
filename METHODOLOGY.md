@@ -43,6 +43,8 @@ probability_edge = p - market_fair_probability
 
 Signal strength also depends on uncertainty, calibration, sample size, price movement, freshness, input completeness, and model regime. An estimated edge smaller than its uncertainty cannot produce a strong `VALUE` signal.
 
+Signal generation is point-in-time and provenance-bound. It requires a non-demo `calibrated` evaluation whose test window ends no later than the prediction input cutoff. For each exact market definition, it uses the latest complete non-demo snapshot per bookmaker, excludes stale bookmakers from consensus whenever fresh snapshots exist, averages proportional de-vig probabilities for market consensus, and selects the best offered price separately. Expected value is `model_probability * offered_odds - 1`; a strong signal also requires the same calculation to remain positive at the stored lower probability bound. Material price movement, stale odds, weak calibration, or inadequate venue history downgrades or blocks the classification.
+
 ## Arbitrage
 
 For a verified exhaustive partition with best compatible prices `o_i`, gross theoretical arbitrage requires `sum(1 / o_i) < 1`. OddsQuant does not combine overlapping selections, mismatched lines, different periods, inconsistent currencies, or incompatible settlement rules.

@@ -99,6 +99,43 @@ export interface EvaluationRun {
   created_at: string
 }
 
+export interface ValueSignal {
+  id: number
+  event_id: number
+  output_id: number
+  model_version_id: number
+  model_version: string
+  evaluation_run_id: number
+  prediction_id: number
+  market_id: number
+  market_type: string
+  line: number | null
+  selection_id: number
+  selection_code: string
+  selection_name: string
+  bookmaker_id: number
+  bookmaker: string
+  odds_snapshot_id: number
+  signal_type: string
+  offered_odds: number
+  raw_implied_probability: number
+  market_fair_probability: number
+  model_probability: number
+  lower_probability: number
+  expected_value: number
+  lower_expected_value: number
+  probability_edge: number
+  confidence: number
+  calibration_error: number
+  odds_age_minutes: number
+  bookmaker_count: number
+  odds_move_ratio: number
+  implied_move_points: number
+  generated_at: string
+  reasons: string[]
+  risks: string[]
+}
+
 export interface PriceComparison {
   selection_code: string
   selection_name: string
@@ -155,4 +192,6 @@ export interface DashboardData {
   jobs: ProviderJob[]
   models: ModelVersion[]
   evaluations: EvaluationRun[]
+  signals: ValueSignal[]
+  underdogs: ValueSignal[]
 }

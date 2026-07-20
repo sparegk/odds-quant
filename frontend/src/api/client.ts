@@ -8,6 +8,7 @@ import type {
   ProjectStatus,
   ProviderJob,
   ProviderSummary,
+  ValueSignal,
 } from '../types'
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ?? 'http://127.0.0.1:8000'
@@ -32,7 +33,7 @@ async function request<T>(path: string): Promise<T> {
 }
 
 export async function loadDashboard(): Promise<DashboardData> {
-  const [status, events, providers, imports, jobs, models, evaluations] = await Promise.all([
+  const [status, events, providers, imports, jobs, models, evaluations, signals, underdogs] = await Promise.all([
     request<ProjectStatus>('/api/v1/status'),
     request<EventSummary[]>('/api/v1/events?include_past=true'),
     request<ProviderSummary[]>('/api/v1/providers'),
@@ -40,8 +41,10 @@ export async function loadDashboard(): Promise<DashboardData> {
     request<ProviderJob[]>('/api/v1/jobs'),
     request<ModelVersion[]>('/api/v1/models'),
     request<EvaluationRun[]>('/api/v1/evaluations'),
+    request<ValueSignal[]>('/api/v1/signals'),
+    request<ValueSignal[]>('/api/v1/signals/underdogs'),
   ])
-  return { status, events, providers, imports, jobs, models, evaluations }
+  return { status, events, providers, imports, jobs, models, evaluations, signals, underdogs }
 }
 
 export function loadComparison(eventId: number): Promise<MarketComparison[]> {

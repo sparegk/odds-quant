@@ -9,11 +9,13 @@ from pydantic import BaseModel
 
 from app.db.session import SessionLocal
 from app.schemas.models import EvaluateModelRequest, PredictEventRequest, TrainPoissonRequest
+from app.schemas.signals import GenerateSignalsRequest
 from app.services.demo_seed import seed_demo_data, seed_demo_results
 from app.services.evaluation import EvaluationError, evaluate_model
 from app.services.modeling import ModelingError, predict_event, train_poisson_model
 from app.services.odds_import import OddsImportError, import_odds_csv
 from app.services.results_import import ResultImportError, import_results_csv
+from app.services.signals import SignalGenerationError, generate_value_signals
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -52,6 +54,11 @@ def _parser() -> argparse.ArgumentParser:
     evaluate.add_argument("--prediction-lead-minutes", type=int, default=60)
     evaluate.add_argument("--minimum-training-matches", type=int, default=20)
     evaluate.add_argument("--calibration-bins", type=int, default=10)
+    signals = commands.add_parser(
+        "generate-signals", help="join a calibrated prediction to compatible fresh odds"
+    )
+    signals.add_argument("output_id", type=int)
+    signals.add_argument("--generated-at", type=datetime.fromisoformat)
     return parser
 
 
@@ -100,7 +107,7 @@ def main() -> int:
                         inputs_as_of=args.inputs_as_of,
                     ),
                 )
-            else:
+            elif args.command == "evaluate-model":
                 result = evaluate_model(
                     session,
                     args.model_id,
@@ -112,10 +119,18 @@ def main() -> int:
                         calibration_bins=args.calibration_bins,
                     ),
                 )
+            else:
+                result = generate_value_signals(
+                    session,
+                    GenerateSignalsRequest(
+                        output_id=args.output_id,
+                        generated_at=args.generated_at,
+                    ),
+                )
     except (OddsImportError, ResultImportError) as exc:
         print(json.dumps({"status": "rejected", "job_id": exc.job_id, "errors": exc.errors}))
         return 2
-    except (ModelingError, EvaluationError) as exc:
+    except (ModelingError, EvaluationError, SignalGenerationError) as exc:
         print(json.dumps({"status": "rejected", "error": str(exc)}))
         return 2
     print(result.model_dump_json())

@@ -16,6 +16,28 @@ class SignalInput:
     odds_move_ratio: float = 0.0
     implied_move_points: float = 0.0
 
+    def __post_init__(self) -> None:
+        if not 1 < self.offered_odds < 1001:
+            raise ValueError("offered_odds must be greater than 1 and below 1001")
+        for name, probability in (
+            ("market_probability", self.market_probability),
+            ("model_probability", self.model_probability),
+            ("lower_probability", self.lower_probability),
+        ):
+            if not 0 <= probability <= 1:
+                raise ValueError(f"{name} must be in [0, 1]")
+        if self.lower_probability > self.model_probability:
+            raise ValueError("lower_probability cannot exceed model_probability")
+        if self.sample_size_per_team < 0 or self.bookmaker_count < 0:
+            raise ValueError("sample and bookmaker counts cannot be negative")
+        if (
+            self.calibration_error < 0
+            or self.age_minutes < 0
+            or self.odds_move_ratio < 0
+            or self.implied_move_points < 0
+        ):
+            raise ValueError("reliability and movement inputs cannot be negative")
+
 
 def confidence_score(value: SignalInput) -> float:
     sample = min(value.sample_size_per_team / 20.0, 1.0)
@@ -33,7 +55,10 @@ def classify_signal(value: SignalInput) -> dict[str, object]:
     reasons = [f"Model probability differs from market consensus by {edge:+.1%}."]
     risks: list[str] = []
     inadequate = (
-        value.sample_size_per_team < 8 or value.calibration_error > 0.10 or value.age_minutes > 60
+        value.sample_size_per_team < 8
+        or value.calibration_error > 0.10
+        or value.age_minutes > 60
+        or value.bookmaker_count < 1
     )
     moved = value.odds_move_ratio >= 0.10 or value.implied_move_points >= 0.05
     if value.age_minutes > 15:
@@ -58,6 +83,7 @@ def classify_signal(value: SignalInput) -> dict[str, object]:
     return {
         "signal": signal,
         "expected_value": ev,
+        "lower_expected_value": lower_ev,
         "edge": edge,
         "confidence": confidence,
         "reasons": reasons,

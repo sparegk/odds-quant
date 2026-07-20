@@ -550,17 +550,36 @@ class ValueSignal(Base):
     bookmaker_id: Mapped[int] = mapped_column(ForeignKey("bookmakers.id"))
     odds_snapshot_id: Mapped[int] = mapped_column(ForeignKey("odds_snapshots.id"))
     prediction_id: Mapped[int] = mapped_column(ForeignKey("model_predictions.id"))
+    evaluation_run_id: Mapped[int] = mapped_column(ForeignKey("backtest_runs.id"))
     signal_type: Mapped[str] = mapped_column(String(40))
     offered_odds: Mapped[float] = mapped_column(Float)
     raw_implied_probability: Mapped[float] = mapped_column(Float)
     market_fair_probability: Mapped[float] = mapped_column(Float)
     model_probability: Mapped[float] = mapped_column(Float)
     expected_value: Mapped[float] = mapped_column(Float)
+    lower_expected_value: Mapped[float] = mapped_column(Float)
     probability_edge: Mapped[float] = mapped_column(Float)
     confidence: Mapped[float] = mapped_column(Float)
+    calibration_error: Mapped[float] = mapped_column(Float)
+    odds_age_minutes: Mapped[float] = mapped_column(Float)
+    bookmaker_count: Mapped[int] = mapped_column(Integer)
+    odds_move_ratio: Mapped[float] = mapped_column(Float, default=0)
+    implied_move_points: Mapped[float] = mapped_column(Float, default=0)
     generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     reasons: Mapped[list[str]] = mapped_column(JSON)
     risks: Mapped[list[str]] = mapped_column(JSON)
+    __table_args__ = (
+        UniqueConstraint("odds_snapshot_id", "prediction_id", "generated_at"),
+        CheckConstraint("offered_odds > 1"),
+        CheckConstraint(
+            "raw_implied_probability > 0 AND raw_implied_probability < 1 "
+            "AND market_fair_probability > 0 AND market_fair_probability < 1 "
+            "AND model_probability >= 0 AND model_probability <= 1 "
+            "AND confidence >= 0 AND confidence <= 1"
+        ),
+        CheckConstraint("calibration_error >= 0 AND odds_age_minutes >= 0"),
+        CheckConstraint("bookmaker_count > 0"),
+    )
 
 
 class ArbitrageOpportunity(Base):
