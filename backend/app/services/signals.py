@@ -426,6 +426,8 @@ def _signal_view(session: Session, signal: ValueSignal) -> ValueSignalView:
     model = session.get(ModelVersion, output.model_version_id)
     if model is None:
         raise SignalGenerationError("stored signal model provenance is incomplete")
+    if signal.evaluation_run_id is None:
+        raise SignalGenerationError("stored signal evaluation provenance is incomplete")
     return ValueSignalView(
         id=signal.id,
         event_id=signal.event_id,

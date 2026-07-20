@@ -526,6 +526,8 @@ def _run_view(session: Session, run: BacktestRun) -> EvaluationRunView:
     model = session.get(ModelVersion, run.model_version_id)
     if model is None:
         raise EvaluationError("evaluation references a missing model version")
+    if run.fingerprint is None:
+        raise EvaluationError("evaluation is missing its reproducibility fingerprint")
     results = session.scalars(
         select(BacktestResult).where(BacktestResult.run_id == run.id).order_by(BacktestResult.id)
     ).all()
