@@ -588,6 +588,7 @@ class ArbitrageOpportunity(Base):
     event_id: Mapped[int] = mapped_column(ForeignKey("events.id"))
     market_id: Mapped[int] = mapped_column(ForeignKey("markets.id"))
     calculated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    fingerprint: Mapped[str | None] = mapped_column(String(64), unique=True)
     status: Mapped[str] = mapped_column(String(40))
     inverse_sum: Mapped[float] = mapped_column(Float)
     total_cash_outlay: Mapped[Decimal] = mapped_column(Numeric(14, 4))
@@ -595,11 +596,15 @@ class ArbitrageOpportunity(Base):
     net_profit: Mapped[Decimal] = mapped_column(Numeric(14, 4))
     net_roi: Mapped[float] = mapped_column(Float)
     tax_status: Mapped[str] = mapped_column(String(30))
+    constraint_status: Mapped[str] = mapped_column(String(30))
+    freshness_status: Mapped[str] = mapped_column(String(30))
     currency: Mapped[str] = mapped_column(String(3))
+    budget: Mapped[Decimal] = mapped_column(Numeric(14, 4))
     risks: Mapped[list[str]] = mapped_column(JSON, default=list)
     __table_args__ = (
         CheckConstraint("inverse_sum > 0"),
         CheckConstraint("total_cash_outlay > 0"),
+        CheckConstraint("budget > 0"),
     )
 
 
@@ -613,15 +618,22 @@ class ArbitrageLeg(Base):
     bookmaker_id: Mapped[int] = mapped_column(ForeignKey("bookmakers.id"))
     odds_snapshot_id: Mapped[int] = mapped_column(ForeignKey("odds_snapshots.id"))
     tax_profile_id: Mapped[int | None] = mapped_column(ForeignKey("tax_profiles.id"))
+    bookmaker_constraint_id: Mapped[int | None] = mapped_column(
+        ForeignKey("bookmaker_constraints.id")
+    )
     decimal_odds: Mapped[Decimal] = mapped_column(Numeric(12, 5))
     stake: Mapped[Decimal] = mapped_column(Numeric(14, 4))
+    cash_outlay: Mapped[Decimal] = mapped_column(Numeric(14, 4))
     gross_payout: Mapped[Decimal] = mapped_column(Numeric(14, 4))
+    win_deductions: Mapped[Decimal] = mapped_column(Numeric(14, 4))
     taxes_and_fees: Mapped[Decimal] = mapped_column(Numeric(14, 4))
     net_payout: Mapped[Decimal] = mapped_column(Numeric(14, 4))
     __table_args__ = (
         UniqueConstraint("opportunity_id", "selection_id"),
         CheckConstraint("decimal_odds > 1"),
         CheckConstraint("stake > 0"),
+        CheckConstraint("cash_outlay >= stake"),
+        CheckConstraint("win_deductions >= 0"),
         CheckConstraint("taxes_and_fees >= 0"),
     )
 

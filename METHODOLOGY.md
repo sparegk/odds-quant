@@ -49,7 +49,7 @@ Signal generation is point-in-time and provenance-bound. It requires a non-demo 
 
 For a verified exhaustive partition with best compatible prices `o_i`, gross theoretical arbitrage requires `sum(1 / o_i) < 1`. OddsQuant does not combine overlapping selections, mismatched lines, different periods, inconsistent currencies, or incompatible settlement rules.
 
-The practical calculation applies taxes, fees, commissions, currency costs, minimum and maximum stakes, stake increments, conservative price haircuts, and rounded dutching. Unknown or stale tax rules block an executable ranking. Profit is not described as guaranteed before every required leg is accepted and honoured under the assumed rules.
+The practical calculation applies configured stake taxes, winnings taxes, payout withholding, commissions, fixed fees, minimum and maximum stakes, stake increments, a total budget, and rounded dutching. Tax and constraint currencies must match the market; currency conversion costs and price haircuts are not inferred. Unknown or stale tax rules or stake limits, stale odds, demo provenance, and non-positive worst-case net profit block an executable classification. Profit is not described as guaranteed before every required leg is accepted and honoured under the assumed rules.
 
 ## Bet Builder Dependence
 

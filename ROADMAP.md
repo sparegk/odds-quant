@@ -11,13 +11,13 @@ Completed slices: Alembic schema lifecycle, labelled demo odds and results, atom
 - Alembic migration and deterministic labelled demo dataset.
 - Timestamped team, player, coach, roster, appearance, availability, lineup, formation, tactical, and matchup data contracts.
 - Atomic CSV odds import and manual coherent-market entry.
-- Tax-aware football arbitrage engine for complete 1X2, over/under, and BTTS markets, including best-price selection, per-leg taxes/fees, rounded stake optimization, conservative net-profit ranking, and execution-risk warnings.
+- Completed: tax-aware football arbitrage engine for complete 1X2, over/under, and BTTS markets, including best-price selection, per-leg taxes/fees, rounded stake optimization, provenance fingerprints, conservative net-profit ranking, and execution-risk warnings.
 - Completed: leakage-safe Poisson training, sampling intervals, immutable versions, and scoreline-derived predictions.
 - Completed: expanding-window chronological evaluation, immutable replay evidence, Brier/log-loss/ECE metrics, calibration buckets, uniform and optional market benchmarks, and a non-demo promotion policy.
 - Completed: gated explainable value signals, best-price selection, compatible market consensus, lower-bound EV, freshness and movement checks, immutable calibration provenance, and positive-EV team-underdog ranking.
-- Remaining: adequate permitted evaluation history, richer model benchmarks, independently validated confidence thresholds, and tax-aware arbitrage.
+- Remaining: adequate permitted evaluation history, richer model benchmarks, and independently validated confidence thresholds.
 - Recency-weighted player and lineup strength, coach-regime handling, tactical matchup features, scenario sensitivity, and walk-forward ablation tests.
-- Opportunity, underdog, arbitrage, odds comparison, event, and bet-builder APIs and dashboard pages.
+- Completed: arbitrage calculation and opportunity-listing APIs. Remaining: opportunity, underdog, arbitrage, and bet-builder dashboard pages plus unfinished bet-builder APIs.
 - Walk-forward backtesting and bankroll simulation.
 - Connected React dashboard, Docker Compose, CI, and deployment configuration.
 

@@ -87,23 +87,22 @@ Signals will also be blocked or downgraded when important player availability is
 
 ### Football Arbitrage Scanner
 
-The arbitrage scanner will compare the best price for every mutually exclusive and exhaustive outcome in the same football market:
+The arbitrage scanner compares the best price for every mutually exclusive and exhaustive outcome in the same football market:
 
 ```text
 inverse_sum = sum(1 / best_decimal_odds_for_outcome)
 ```
 
-A gross theoretical arbitrage exists when `inverse_sum < 1`. The scanner will support complete 1X2 markets and compatible two-way markets such as over/under and both teams to score. It will never combine different events, periods, lines, currencies, or settlement rules.
+A gross theoretical arbitrage exists when `inverse_sum < 1`. The scanner supports complete 1X2 markets and compatible two-way markets such as over/under and both teams to score. It never combines different events, periods, lines, currencies, or settlement rules.
 
-Gross margin is not enough. Ranking will use the worst-case net payout after:
+Gross margin is not enough. Ranking uses the worst-case net payout after:
 
 - Stake, winnings, profit, or payout taxes.
 - Exchange commission and fixed fees.
-- Currency conversion and stake rounding.
+- Currency compatibility and stake rounding.
 - Maximum accepted stakes and total budget.
-- A configurable odds-movement safety haircut.
 
-Unknown, stale, or conflicting tax rules will produce `TAX_UNKNOWN` or `TAX_STALE`, not an executable profit claim. Every result will show the required bookmaker legs, stakes, total cash outlay, gross payout, taxes and fees, minimum net payout, net profit, freshness, and execution risks.
+Unknown or stale tax rules, unknown or stale stake limits, stale prices, demo provenance, or non-positive worst-case profit produce a blocked result, not an executable profit claim. Every stored result includes an input fingerprint and the required bookmaker legs, source snapshot, tax and constraint provenance, stakes, total cash outlay, gross payout, deductions, minimum net payout, net profit, freshness, and execution risks. Currency conversion and odds-movement haircuts are not inferred; incompatible currencies are rejected and current prices must be rechecked before execution.
 
 ### Underdog Scanner
 
@@ -208,7 +207,7 @@ The repository is in the **Phase 1 model-baseline milestone**. It includes:
 
 The backend now supports expanding-window chronological evaluation with immutable per-match training fingerprints, 1X2 Brier score, log loss, one-vs-rest calibration buckets, coverage accounting, uniform and optional market benchmarks, and an explicit promotion policy.
 
-Models remain `unvalidated` until a non-demo evaluation passes the fixed evidence policy. The included synthetic history can exercise evaluation code but cannot validate a model. The value-signal service is implemented but fails closed unless a qualifying calibration run predates the prediction cutoff; the arbitrage service is not implemented yet.
+Models remain `unvalidated` until a non-demo evaluation passes the fixed evidence policy. The included synthetic history can exercise evaluation code but cannot validate a model. The value-signal service fails closed unless a qualifying calibration run predates the prediction cutoff. The arbitrage service independently fails closed unless prices, tax rules, and stake constraints are current and non-demo, every market outcome is present, and rounded worst-case net profit is positive.
 
 ## Repository Structure
 
@@ -234,7 +233,7 @@ frontend/
   public/        Frontend assets
 ```
 
-Additional model, signal, arbitrage, and backtesting modules will be added during Phase 1.
+Additional player, tactical, bankroll, and backtesting modules will be added during Phase 1.
 
 Run the current PostgreSQL-backed backend stack from the repository root:
 
@@ -323,9 +322,11 @@ Current stored-data routes include:
 - `GET /api/v1/evaluations` and `GET /api/v1/evaluations/{run_id}`
 - `POST /api/v1/signals/generate`
 - `GET /api/v1/signals` and `GET /api/v1/signals/underdogs`
+- `POST /api/v1/arbitrage/calculate`
+- `GET /api/v1/arbitrage/opportunities?event_id={event_id}`
 - `GET /api/v1/events/{event_id}/predictions`
 
-Odds comparison, model prediction, calibration, and value signals remain separate records. Signal generation requires a non-demo calibrated evaluation completed before the prediction input cutoff, selects the best compatible fresh price, derives consensus only from complete compatible bookmaker snapshots, and persists every classification with its uncertainty, movement, freshness, and evaluation provenance.
+Odds comparison, model prediction, calibration, value signals, and arbitrage remain separate records. Signal generation requires a non-demo calibrated evaluation completed before the prediction input cutoff, selects the best compatible fresh price, derives consensus only from complete compatible bookmaker snapshots, and persists every classification with its uncertainty, movement, freshness, and evaluation provenance. Arbitrage calculation is an administrative write operation; in protected environments it requires `X-Admin-Key`. Listing is read-only. A result marked `executable` is still only a pre-acceptance calculation, never a guarantee that every leg will be accepted and honoured.
 
 Run the available checks from `backend`:
 
@@ -340,7 +341,7 @@ Copy `.env.example` to `.env` for local configuration. Never commit API keys, to
 
 ## Project Status
 
-OddsQuant now has a migrated point-in-time data layer, atomic odds and result ingestion, a leakage-safe versioned Poisson baseline, stored scoreline predictions, chronological calibration infrastructure, gated explainable value and underdog signals, connected research dashboards, provider scheduling, CI, and prepared full-stack deployment. The next milestone is adequate permitted history and the independent tax-aware arbitrage service.
+OddsQuant now has a migrated point-in-time data layer, atomic odds and result ingestion, a leakage-safe versioned Poisson baseline, stored scoreline predictions, chronological calibration infrastructure, gated explainable value and underdog signals, an independent tax-aware arbitrage service, connected research dashboards, provider scheduling, CI, and prepared full-stack deployment. The next milestone is adequate permitted history plus independently validated player, tactical, and bankroll extensions.
 
 See [context.md](context.md), [ARCHITECTURE.md](ARCHITECTURE.md), [METHODOLOGY.md](METHODOLOGY.md), [ROADMAP.md](ROADMAP.md), and [AGENTS.md](AGENTS.md) for detailed decisions and operating rules.
 
