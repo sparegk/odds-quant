@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
+import statistics
 from datetime import UTC, datetime
 from typing import cast
 
@@ -191,7 +193,7 @@ def run_signal_backtest(
 
     evaluation_status = "demo_only" if is_demo else "research_only"
     policy: dict[str, object] = {
-        "version": "stored-value-signal-replay-v1",
+        "version": "stored-value-signal-replay-v2",
         "decision": evaluation_status,
         "one_latest_signal_per_event_selection": True,
         "unit_stake": True,
@@ -200,6 +202,7 @@ def run_signal_backtest(
     }
     config: dict[str, object] = {
         "evaluation_kind": "stored_value_signal_returns",
+        "metrics_version": "recommendation-returns-v2",
         "evaluation_start": start.isoformat(),
         "evaluation_end": end.isoformat(),
         "result_known_at": reference.isoformat(),
@@ -223,6 +226,8 @@ def run_signal_backtest(
     session.flush()
     profits: list[float] = []
     expected_values: list[float] = []
+    offered_odds: list[float] = []
+    model_probabilities: list[float] = []
     for signal, event, selection, market, prediction, output, snapshot, _, _, result in eligible:
         line = float(market.line) if market.line is not None else None
         settlement = settle(
@@ -235,6 +240,8 @@ def run_signal_backtest(
         profit = profit_units(settlement, signal.offered_odds)
         profits.append(profit)
         expected_values.append(signal.expected_value)
+        offered_odds.append(signal.offered_odds)
+        model_probabilities.append(signal.model_probability)
         session.add(
             BacktestObservation(
                 run_id=run.id,
@@ -268,7 +275,12 @@ def run_signal_backtest(
                 closing_line_value=None,
             )
         )
-    metrics = _return_metrics(profits, expected_values)
+    metrics = _return_metrics(
+        profits,
+        expected_values,
+        offered_odds,
+        model_probabilities,
+    )
     session.add(
         BacktestResult(
             run_id=run.id,
@@ -445,7 +457,16 @@ def _backtest_view(session: Session, run: BacktestRun) -> SignalBacktestView:
     )
 
 
-def _return_metrics(profits: list[float], expected_values: list[float]) -> dict[str, object]:
+def _return_metrics(
+    profits: list[float],
+    expected_values: list[float],
+    offered_odds: list[float],
+    model_probabilities: list[float],
+) -> dict[str, object]:
+    if not (len(profits) == len(expected_values) == len(offered_odds) == len(model_probabilities)):
+        raise BacktestingError("recommendation return inputs have inconsistent lengths")
+    if not profits:
+        raise BacktestingError("recommendation return metrics require observations")
     wins = sum(value > 0 for value in profits)
     losses = sum(value < 0 for value in profits)
     pushes = len(profits) - wins - losses
@@ -455,21 +476,57 @@ def _return_metrics(profits: list[float], expected_values: list[float]) -> dict[
     equity = 0.0
     peak = 0.0
     max_drawdown = 0.0
+    maximum_losing_streak = 0
+    losing_streak = 0
     for value in profits:
         equity += value
         peak = max(peak, equity)
         max_drawdown = max(max_drawdown, peak - equity)
+        if value < 0:
+            losing_streak += 1
+            maximum_losing_streak = max(maximum_losing_streak, losing_streak)
+        elif value > 0:
+            losing_streak = 0
+    outcomes = [1.0 if value > 0 else 0.0 for value in profits]
+    hit_rate = wins / len(profits)
+    average_model_probability = sum(model_probabilities) / len(model_probabilities)
+    average_break_even_probability = sum(1 / value for value in offered_odds) / len(offered_odds)
+    expected_profit = sum(expected_values)
+    brier_score = sum(
+        (outcome - probability) ** 2
+        for outcome, probability in zip(outcomes, model_probabilities, strict=True)
+    ) / len(profits)
+    log_loss = -sum(
+        outcome * math.log(min(max(probability, 1e-15), 1 - 1e-15))
+        + (1 - outcome) * math.log(min(max(1 - probability, 1e-15), 1 - 1e-15))
+        for outcome, probability in zip(outcomes, model_probabilities, strict=True)
+    ) / len(profits)
     return {
         "bet_count": len(profits),
         "wins": wins,
         "losses": losses,
         "pushes": pushes,
-        "hit_rate": wins / len(profits),
+        "hit_rate": hit_rate,
         "net_profit_units": net_profit,
         "roi": net_profit / len(profits),
         "yield": net_profit / len(profits),
         "average_expected_value": sum(expected_values) / len(expected_values),
+        "expected_profit_units": expected_profit,
+        "average_decimal_odds": sum(offered_odds) / len(offered_odds),
+        "median_decimal_odds": statistics.median(offered_odds),
+        "average_break_even_probability": average_break_even_probability,
+        "average_model_probability": average_model_probability,
+        "hit_rate_minus_break_even": hit_rate - average_break_even_probability,
+        "observed_to_model_hit_ratio": (
+            hit_rate / average_model_probability if average_model_probability > 0 else None
+        ),
+        "realized_to_expected_profit_ratio": (
+            net_profit / expected_profit if expected_profit > 0 else None
+        ),
+        "binary_brier_score": brier_score,
+        "binary_log_loss": log_loss,
         "maximum_drawdown_units": max_drawdown,
+        "maximum_losing_streak": maximum_losing_streak,
         "profit_factor": gross_profit / gross_loss if gross_loss else None,
         "closing_line_value_coverage": 0.0,
     }
@@ -482,6 +539,7 @@ def _backtest_fingerprint(
     rows: list[SettledSignalRow],
 ) -> str:
     payload = {
+        "evaluator_version": "stored-value-signal-replay-v2",
         "model_version_id": model.id,
         "model_data_fingerprint": model.data_fingerprint,
         "request": request.model_dump(mode="json"),

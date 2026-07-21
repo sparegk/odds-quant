@@ -264,6 +264,7 @@ def test_signal_api_generation_listing_and_underdog_view(session: Session) -> No
                 },
             )
             listed = client.get("/api/v1/signals", params={"event_id": event.id})
+            recommendations = client.get("/api/v1/recommendations", params={"event_id": event.id})
             underdogs = client.get("/api/v1/signals/underdogs")
     finally:
         app.dependency_overrides.clear()
@@ -272,5 +273,8 @@ def test_signal_api_generation_listing_and_underdog_view(session: Session) -> No
     assert len(generated.json()["signals"]) == 3
     assert listed.status_code == 200
     assert len(listed.json()) == 3
+    assert recommendations.status_code == 200
+    assert len(recommendations.json()) == 1
+    assert recommendations.json()[0]["signal_type"] == "VALUE"
     assert underdogs.status_code == 200
     assert [signal["selection_code"] for signal in underdogs.json()] == ["AWAY"]

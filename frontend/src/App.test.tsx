@@ -81,7 +81,7 @@ describe('SignalResearch', () => {
   it('shows distinct model, market, edge, EV, provenance, and risk evidence', () => {
     render(<SignalResearch dashboard={dashboard} mode="value" />)
 
-    expect(screen.getByText('Explainable price signals')).toBeInTheDocument()
+    expect(screen.getByText('Immutable value recommendations')).toBeInTheDocument()
     const row = screen.getByText('Northbridge FC vs Harbour Athletic').closest('tr')
     expect(row).not.toBeNull()
     const cells = within(row as HTMLTableRowElement)

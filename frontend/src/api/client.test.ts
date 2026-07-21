@@ -52,7 +52,7 @@ describe('API client', () => {
           automated_betting: false,
         }), { status: 200 }))
       }
-      if (url.endsWith('/api/v1/signals')) {
+      if (url.endsWith('/api/v1/recommendations')) {
         return Promise.resolve(new Response('{}', { status: 503 }))
       }
       return Promise.resolve(new Response('[]', { status: 200 }))

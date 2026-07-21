@@ -524,7 +524,7 @@ export function BacktestResearch({ dashboard }: { dashboard: DashboardData }) {
 
 export function SignalResearch({ dashboard, mode }: { dashboard: DashboardData; mode: 'value' | 'underdog' }) {
   const signals = mode === 'underdog' ? dashboard.underdogs : dashboard.signals
-  const title = mode === 'underdog' ? 'Positive-EV team underdogs' : 'Explainable price signals'
+  const title = mode === 'underdog' ? 'Positive-EV team underdogs' : 'Immutable value recommendations'
   const valueCount = signals.filter((signal) => signal.signal_type === 'VALUE').length
   const watchCount = signals.filter((signal) => signal.signal_type === 'WATCH').length
   const averageEdge = signals.length
@@ -549,7 +549,7 @@ export function SignalResearch({ dashboard, mode }: { dashboard: DashboardData; 
     <div className="space-y-7">
       <SectionHeading eyebrow={mode === 'underdog' ? 'Team outcomes only' : 'Calibrated model versus market'} title={title} />
       <section className="grid grid-cols-2 border border-zinc-200 bg-white md:grid-cols-4">
-        <Metric label="Stored signals" value={signals.length.toString()} />
+        <Metric label={mode === 'underdog' ? 'Stored signals' : 'Recommendations'} value={signals.length.toString()} />
         <Metric label="Value" value={valueCount.toString()} />
         <Metric label="Watch" value={watchCount.toString()} />
         <Metric label="Average edge" value={averageEdge === null ? '' : `${(averageEdge * 100).toFixed(1)} pp`} />

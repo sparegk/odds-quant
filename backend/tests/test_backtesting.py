@@ -31,6 +31,7 @@ from app.schemas.models import PredictEventRequest, TrainPoissonRequest
 from app.schemas.signals import GenerateSignalsRequest
 from app.services.backtesting import (
     BacktestingError,
+    _return_metrics,
     run_signal_backtest,
     simulate_backtest_bankroll,
 )
@@ -186,6 +187,15 @@ def test_signal_backtest_is_idempotent_and_bankroll_uses_settled_units(
     assert run.evaluation_status == "research_only"
     assert run.metrics["bet_count"] == 1
     assert run.metrics["wins"] == 1
+    assert run.metrics["hit_rate"] == 1
+    assert run.metrics["expected_profit_units"] == pytest.approx(run.observations[0].expected_value)
+    assert run.metrics["average_decimal_odds"] == pytest.approx(run.observations[0].decimal_odds)
+    assert run.metrics["binary_brier_score"] == pytest.approx(
+        (1 - run.observations[0].model_probability) ** 2
+    )
+    assert run.metrics["maximum_losing_streak"] == 0
+    assert run.config["metrics_version"] == "recommendation-returns-v2"
+    assert run.policy["version"] == "stored-value-signal-replay-v2"
     assert run.observations[0].settlement == "WIN"
     assert run.observations[0].predicted_at < kickoff_at
     assert run.metrics["closing_line_value_coverage"] == 0
@@ -204,6 +214,34 @@ def test_signal_backtest_is_idempotent_and_bankroll_uses_settled_units(
     assert simulation.bets_placed == 1
     assert len(simulation.simulation_fingerprint) == 64
     assert simulation.is_demo is False
+
+
+def test_recommendation_return_metrics_are_deterministic() -> None:
+    metrics = _return_metrics(
+        profits=[1.0, -1.0, 0.0, -1.0],
+        expected_values=[0.2, 0.2, 0.0, 0.2],
+        offered_odds=[2.0, 3.0, 2.0, 4.0],
+        model_probabilities=[0.6, 0.4, 0.5, 0.3],
+    )
+
+    assert metrics["bet_count"] == 4
+    assert metrics["wins"] == 1
+    assert metrics["losses"] == 2
+    assert metrics["pushes"] == 1
+    assert metrics["net_profit_units"] == -1
+    assert metrics["expected_profit_units"] == pytest.approx(0.6)
+    assert metrics["average_decimal_odds"] == pytest.approx(2.75)
+    assert metrics["median_decimal_odds"] == pytest.approx(2.5)
+    assert metrics["average_break_even_probability"] == pytest.approx(19 / 48)
+    assert metrics["binary_brier_score"] == pytest.approx(0.165)
+    assert metrics["maximum_drawdown_units"] == 2
+    assert metrics["maximum_losing_streak"] == 2
+    assert metrics["profit_factor"] == pytest.approx(0.5)
+
+
+def test_recommendation_return_metrics_reject_inconsistent_inputs() -> None:
+    with pytest.raises(BacktestingError, match="inconsistent lengths"):
+        _return_metrics([1.0], [0.2], [2.0], [])
 
 
 def test_signal_backtest_rejects_post_cutoff_snapshot_ingestion(session: Session) -> None:

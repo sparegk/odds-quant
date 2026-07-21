@@ -53,6 +53,25 @@ def signals(
 
 
 @router.get(
+    "/recommendations",
+    response_model=list[ValueSignalView],
+    tags=["recommendations"],
+)
+def recommendations(
+    database: Database,
+    event_id: int | None = None,
+    limit: Annotated[int, Query(ge=1, le=1000)] = 200,
+) -> list[ValueSignalView]:
+    """Return immutable VALUE decisions, independent of whether the user placed them."""
+    return list_value_signals(
+        database,
+        event_id=event_id,
+        signal_type="VALUE",
+        limit=limit,
+    )
+
+
+@router.get(
     "/signals/underdogs",
     response_model=list[ValueSignalView],
     tags=["signals"],

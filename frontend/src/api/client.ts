@@ -74,7 +74,7 @@ export async function loadDashboard(): Promise<DashboardData> {
     loadResource<ProviderJob[]>('jobs', '/api/v1/jobs', []),
     loadResource<ModelVersion[]>('models', '/api/v1/models', []),
     loadResource<EvaluationRun[]>('evaluations', '/api/v1/evaluations', []),
-    loadResource<ValueSignal[]>('signals', '/api/v1/signals', []),
+    loadResource<ValueSignal[]>('signals', '/api/v1/recommendations', []),
     loadResource<ValueSignal[]>('underdogs', '/api/v1/signals/underdogs', []),
     loadResource<ArbitrageOpportunity[]>('arbitrage', '/api/v1/arbitrage/opportunities', []),
     loadResource<SignalBacktest[]>('backtests', '/api/v1/backtests', []),
