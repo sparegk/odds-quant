@@ -37,6 +37,10 @@ services:
         generateValue: true
       - key: ODDSQUANT_CORS_ORIGINS
         sync: false
+      - key: ODDSQUANT_MATCHDAY_TIMEZONE
+        value: Europe/Athens
+      - key: ODDSQUANT_MATCHDAY_FORM_MATCHES
+        value: "5"
 
   - type: worker
     name: oddsquant-worker

@@ -25,6 +25,12 @@ def test_compose_orders_database_api_and_worker() -> None:
     assert api["depends_on"]["db"]["condition"] == "service_healthy"
     assert worker["depends_on"]["api"]["condition"] == "service_healthy"
     assert "alembic upgrade head" in api["command"]
+    assert api["environment"]["ODDSQUANT_MATCHDAY_TIMEZONE"] == (
+        "${ODDSQUANT_MATCHDAY_TIMEZONE:-Europe/Athens}"
+    )
+    assert api["environment"]["ODDSQUANT_MATCHDAY_FORM_MATCHES"] == (
+        "${ODDSQUANT_MATCHDAY_FORM_MATCHES:-5}"
+    )
     assert worker["environment"]["ODDSQUANT_SEED_DEMO"] == "true"
     assert frontend["depends_on"]["api"]["condition"] == "service_healthy"
     assert frontend["ports"] == ["${ODDSQUANT_FRONTEND_PORT:-5173}:8080"]
@@ -44,6 +50,8 @@ def test_render_is_production_safe_and_migrates_before_deploy() -> None:
     assert web_environment["ODDSQUANT_ENVIRONMENT"]["value"] == "production"
     assert web_environment["ODDSQUANT_SEED_DEMO"]["value"] == "false"
     assert web_environment["ODDSQUANT_ADMIN_API_KEY"]["generateValue"] is True
+    assert web_environment["ODDSQUANT_MATCHDAY_TIMEZONE"]["value"] == "Europe/Athens"
+    assert web_environment["ODDSQUANT_MATCHDAY_FORM_MATCHES"]["value"] == "5"
     assert worker_environment["ODDSQUANT_SEED_DEMO"]["value"] == "false"
     assert frontend["runtime"] == "static"
     assert frontend["buildCommand"] == "npm ci && npm run build"

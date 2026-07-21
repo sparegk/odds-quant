@@ -6,6 +6,17 @@ OddsQuant may ingest football data from licensed sports-data APIs, official comp
 
 Every record must identify its provider, source type, source key, source update time, ingestion time, effective period, and whether it is real, manually entered, or generated. Raw permitted responses should be retained immutably with a checksum so normalization can be reproduced.
 
+## Matchday Provider Split
+
+A production Matchday should not pretend one feed covers every evidence layer. The intended provider split is:
+
+- Fixtures, competition identity, status, and final results from a permitted football-data provider. [football-data.org's official v4 documentation](https://docs.football-data.org/general/v4/coding_client.html) exposes current-day and competition match resources and is suitable for an initial schedule/result adapter after plan, coverage, rate-limit, and terms review.
+- Deeper lineups, sidelined players, formations, events, and player/team statistics from a licensed detailed-data plan. [Sportmonks' official fixture documentation](https://docs.sportmonks.com/v3/endpoints-and-entities/endpoints/fixtures/get-all-fixtures) documents optional lineup, statistics, odds, expected-lineup, and related includes; actual availability depends on the subscribed plan and league coverage.
+- Multi-bookmaker prices from a licensed or expressly permitted odds feed. [The Odds API's official soccer coverage](https://the-odds-api.com/sports-odds-data/) includes the requested major leagues and UEFA competitions, but market and bookmaker coverage is region- and competition-dependent.
+- Official club or competition publications for confirmed lineups and availability corrections when licensing permits storage and the original publication timestamp is retained.
+
+Provider selection is a deployment decision, not a hard-coded endorsement. Before registration, record the exact competitions, countries, bookmakers, historical depth, update latency, redistribution rights, retention terms, rate limits, and stable identity keys. Player-prop availability from an odds feed does not remove the independent target, settlement, and calibration gates.
+
 ## Odds CSV Contract
 
 The implemented `odds-csv-v1` importer accepts UTF-8 files up to 5 MiB and 20,000 rows. Required fields identify the provider event, competition and season, teams, offset-aware kickoff and observation times, bookmaker, market, selection, and decimal price. Optional fields carry the market line, provider update time, period, currency, settlement key, and closing flag.
@@ -82,6 +93,12 @@ Freshness thresholds are configurable per provider and competition because updat
 Collectors should poll more often as kickoff approaches while staying within provider terms and documented rate limits. They use conditional requests where supported, exponential backoff, jitter, retry budgets, and job-level observability. Repeated payload hashes, out-of-order timestamps, clock skew, partial markets, and implausible jumps are flagged.
 
 No collector should optimize frequency at the expense of legality or validity. If the licensed source cannot provide sufficiently fresh data for a use case, the UI reports that limitation and disables strong signals or arbitrage ranking.
+
+## Storage And Retention
+
+The current implementation retains accepted raw and normalized records; it does not run an automatic deletion job. Normalized fixtures, final results, model inputs, odds referenced by predictions or backtests, and all records referenced by a model version, signal, builder quote, arbitrage calculation, or evaluation must not be pruned because they are required for reproducibility.
+
+To control production storage, move immutable raw payloads to compressed object storage and keep their content hash and archive location in the database. Exact duplicate transport payloads, expired operational logs, and unreferenced rejected-upload bodies may use an explicit retention window after audit requirements are reviewed. Post-event odds may be downsampled only through a tested policy that preserves opening, defined pre-kickoff checkpoints, the last valid closing snapshot, and every referenced snapshot. No manual cleanup should delete a record still reachable from research evidence.
 
 ## Modelling And Leakage Rules
 

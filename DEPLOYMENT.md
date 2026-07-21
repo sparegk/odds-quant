@@ -20,6 +20,8 @@ POSTGRES_USER=oddsquant
 POSTGRES_PASSWORD=replace-with-a-random-local-password
 ODDSQUANT_ADMIN_API_KEY=replace-with-a-random-import-key
 ODDSQUANT_CORS_ORIGINS=http://localhost:5173
+ODDSQUANT_MATCHDAY_TIMEZONE=Europe/Athens
+ODDSQUANT_MATCHDAY_FORM_MATCHES=5
 ```
 
 Stop services with `docker compose down`. Adding `--volumes` deletes the local PostgreSQL volume and all imported data, so use it only intentionally.
@@ -43,6 +45,21 @@ Run the scheduler separately with `python -m app.jobs.scheduler`. Production nev
 
 Run the frontend separately with `npm ci` and `npm run dev` from `frontend`. Its public API origin is injected through `VITE_API_BASE_URL` at development or build time.
 
+## Matchday Configuration And Live Data
+
+`ODDSQUANT_MATCHDAY_TIMEZONE` is the API fallback when a client does not send an IANA timezone. The browser sends its resolved timezone, so a day is bounded by local midnights and remains correct across daylight-saving changes. `ODDSQUANT_MATCHDAY_FORM_MATCHES` controls the displayed recent-final sample and accepts 1 through 20; it does not change a trained model's feature window.
+
+The deployed interface is data-source agnostic. It shows real current matches only after permitted adapters or validated imports populate fixtures/results and bookmaker snapshots. No external adapter or credential is included by default. A production rollout should provision separate secret-manager credentials for the selected fixture/statistics and odds providers, verify coverage for every requested competition, and test provider-ID reconciliation before enabling scheduled collection.
+
+Go-live checks for Matchday:
+
+1. Verify the selected day's UTC boundaries in the deployment timezone, including a daylight-saving transition test.
+2. Confirm featured competition names map to the intended Matchday groups.
+3. Reconcile fixture, team, player, bookmaker, market, and settlement identities across providers.
+4. Confirm odds and lineup timestamps originate from the provider rather than the ingestion clock.
+5. Confirm stale, incomplete, demo, or post-kickoff records cannot unlock value, player, builder, or arbitrage states.
+6. Monitor `GET /api/v1/matchdays` and a representative match detail before exposing the frontend.
+
 ## Render Blueprint
 
 `render.yaml` defines a static frontend, Docker API service, paid background worker, paid PostgreSQL instance, migrations through `preDeployCommand`, generated import key, and frontend/API origins that must be supplied during Blueprint creation. Review current Render pricing before applying the Blueprint; the file deliberately avoids pretending a free worker is available.
@@ -65,6 +82,7 @@ Render's current Blueprint schema documents `runtime: docker`, `dockerCommand`, 
 - Run one migration operation before rolling out API/worker code.
 - Back up PostgreSQL and rehearse restore procedures before ingesting valuable history.
 - Monitor provider rate limits, collection failures, odds freshness, and database growth.
+- Archive raw payloads before any retention cleanup and never remove evidence referenced by a model, signal, quote, or backtest.
 - Do not register a provider without documented authorization and terms review.
 
 The GitHub Actions workflow checks backend and frontend linting, formatting/type safety, tests, production builds, Alembic lifecycle, and both container images. Python checks follow GitHub's current setup guidance: <https://docs.github.com/en/actions/tutorials/build-and-test-code/python>.

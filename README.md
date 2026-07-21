@@ -15,6 +15,7 @@ This is not a betting-tips website or an automated betting system. It is a portf
 - Evaluate correlated bet-builder combinations from scoreline probabilities.
 - Backtest every method with chronological, leakage-safe data.
 - Present calibration, uncertainty, freshness, and limitations clearly.
+- Browse a timezone-correct Matchday and drill from a fixture into form, likelihood, qualified value, builder evidence, and selection-specific best prices.
 
 ## Main Features
 
@@ -136,6 +137,7 @@ The research simulator will support flat staking, percentage staking, capped fra
 The React dashboard navigation includes:
 
 - Overview and data-freshness status.
+- Matchday schedule and match-level research for featured leagues, UEFA competitions, top cups, and major events.
 - Value opportunities and underdog analysis.
 - Football arbitrage opportunities and stake allocation.
 - Event, market, and bookmaker price comparison.
@@ -145,7 +147,7 @@ The React dashboard navigation includes:
 - Backtesting and bankroll simulation.
 - CSV imports, providers, jobs, methodology, and disclaimers.
 
-Stored events, odds comparison, provider/import status, freshness, signals, underdogs, arbitrage, bet-builder quotes, calibration, signal backtests, and bankroll research are connected to the API. Each evidence-dependent view shows a fail-closed empty state until its required stored records exist.
+Stored matchdays, event detail, odds comparison, provider/import status, freshness, signals, underdogs, arbitrage, bet-builder quotes, calibration, signal backtests, and bankroll research are connected to the API. Each evidence-dependent view shows a fail-closed empty state until its required stored records exist.
 
 ## Planned Tech Stack
 
@@ -205,6 +207,7 @@ The repository is in the **Phase 1 research-workflow milestone**. It includes:
 - Stored score matrices, expected goals, selection probabilities, uncertainty intervals, data fingerprints, and immutable prediction timestamps.
 - Model registry, training, prediction, and event-prediction API routes plus CLI equivalents.
 - Dedicated value, underdog, and tax-aware arbitrage dashboards with provenance, costs, risk, loading, error, and empty states.
+- A Matchday dashboard with local-date navigation, featured competition filters, fixture drill-down, recent pre-cutoff team form, best bookmaker by selection, and strict player/builder evidence gates.
 - Reproducible 2–4 leg bet-builder quotes derived by summing stored scoreline cells rather than multiplying correlated marginal probabilities.
 - Immutable bet-builder prediction, cutoff, feature, input-fingerprint, uncertainty, and optional manual offered-price provenance.
 - Stored-signal return backtests that enforce pre-kickoff prediction/price availability, settle against results known by the evaluation cutoff, and report unit profit, ROI, yield, hit rate, profit factor, and drawdown.
@@ -313,6 +316,8 @@ curl http://127.0.0.1:8000/health
 
 Current stored-data routes include:
 
+- `GET /api/v1/matchdays?date={YYYY-MM-DD}&timezone={IANA timezone}`
+- `GET /api/v1/matchdays/events/{event_id}`
 - `GET /api/v1/events` and `GET /api/v1/events/{event_id}`
 - `GET /api/v1/providers`
 - `GET /api/v1/jobs`
