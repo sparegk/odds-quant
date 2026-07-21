@@ -74,6 +74,8 @@ function App() {
   const [dashboard, setDashboard] = useState<DashboardData | null>(null)
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null)
   const [markets, setMarkets] = useState<MarketComparison[]>([])
+  const [comparisonLoading, setComparisonLoading] = useState(false)
+  const [comparisonError, setComparisonError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -121,12 +123,25 @@ function App() {
       return
     }
     let active = true
-    void loadComparison(selectedEventId)
+    void Promise.resolve()
+      .then(() => {
+        if (active) {
+          setComparisonLoading(true)
+          setComparisonError(null)
+        }
+        return loadComparison(selectedEventId)
+      })
       .then((result) => {
         if (active) setMarkets(result)
       })
-      .catch(() => {
-        if (active) setMarkets([])
+      .catch((caught: unknown) => {
+        if (active) {
+          setMarkets([])
+          setComparisonError(caught instanceof Error ? caught.message : 'Unable to load odds comparison')
+        }
+      })
+      .finally(() => {
+        if (active) setComparisonLoading(false)
       })
     return () => {
       active = false
@@ -216,13 +231,18 @@ function App() {
         <main className="px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
           {error ? <ConnectionError message={error} onRetry={() => void refresh()} /> : null}
           {!error && dashboard ? (
-            <ActiveView
-              dashboard={dashboard}
-              markets={markets}
-              onSelectEvent={setSelectedEventId}
-              selectedEventId={selectedEventId}
-              view={view}
-            />
+            <>
+              <ResourceErrors errors={dashboard.resource_errors} />
+              <ActiveView
+                comparisonError={comparisonError}
+                comparisonLoading={comparisonLoading}
+                dashboard={dashboard}
+                markets={markets}
+                onSelectEvent={setSelectedEventId}
+                selectedEventId={selectedEventId}
+                view={view}
+              />
+            </>
           ) : null}
           {!error && !dashboard ? <LoadingState /> : null}
         </main>
@@ -239,6 +259,8 @@ interface ActiveViewProps {
   view: ViewKey
   dashboard: DashboardData
   markets: MarketComparison[]
+  comparisonLoading: boolean
+  comparisonError: string | null
   selectedEventId: number | null
   onSelectEvent: (eventId: number) => void
 }
@@ -723,7 +745,9 @@ function EventMarkets(props: ActiveViewProps) {
             </div>
             <span className="self-start rounded-[4px] border border-zinc-300 px-2 py-1 text-xs font-semibold">{event.is_demo ? 'DEMO EVENT' : event.status.toUpperCase()}</span>
           </div>
-          {props.markets.length ? (
+          {props.comparisonLoading ? <InlineLoading text="Loading event markets" /> : null}
+          {!props.comparisonLoading && props.comparisonError ? <InlineError message={props.comparisonError} /> : null}
+          {!props.comparisonLoading && !props.comparisonError && props.markets.length ? (
             props.markets.map((market) => (
               <div key={market.market_id} className="grid gap-4 border-b border-zinc-100 px-5 py-4 last:border-0 md:grid-cols-[1fr_auto]">
                 <div>
@@ -739,9 +763,10 @@ function EventMarkets(props: ActiveViewProps) {
                 </div>
               </div>
             ))
-          ) : (
+          ) : null}
+          {!props.comparisonLoading && !props.comparisonError && !props.markets.length ? (
             <EmptyRow text="No complete market snapshots are available for this event." />
-          )}
+          ) : null}
         </section>
       ) : (
         <EmptyState title="No event selected" detail="Import an event and coherent odds snapshot to inspect its markets." />
@@ -754,7 +779,9 @@ function OddsComparison(props: ActiveViewProps) {
   return (
     <div className="w-full min-w-0 max-w-[calc(100vw-2rem)] space-y-6 overflow-hidden lg:max-w-none">
       <EventSelector events={props.dashboard.events} onSelectEvent={props.onSelectEvent} selectedEventId={props.selectedEventId} />
-      {props.markets.map((market) => (
+      {props.comparisonLoading ? <InlineLoading text="Loading price comparison" /> : null}
+      {!props.comparisonLoading && props.comparisonError ? <InlineError message={props.comparisonError} /> : null}
+      {!props.comparisonLoading && !props.comparisonError ? props.markets.map((market) => (
         <section key={market.market_id} className="min-w-0 space-y-4">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <SectionHeading eyebrow={`${market.period} / ${market.currency}`} title={humanizeCode(market.market_type)} />
@@ -770,8 +797,8 @@ function OddsComparison(props: ActiveViewProps) {
             </div>
           </div>
         </section>
-      ))}
-      {!props.markets.length ? <EmptyState title="No comparable prices" detail="The selected event has no complete bookmaker snapshot as of now." /> : null}
+      )) : null}
+      {!props.comparisonLoading && !props.comparisonError && !props.markets.length ? <EmptyState title="No comparable prices" detail="The selected event has no complete bookmaker snapshot as of now." /> : null}
     </div>
   )
 }
@@ -880,6 +907,30 @@ function LoadingState() {
 
 function ConnectionError({ message, onRetry }: { message: string; onRetry: () => void }) {
   return <div className="border border-rose-200 bg-rose-50 p-5"><div className="flex items-start gap-3"><AlertTriangle aria-hidden="true" className="mt-0.5 text-rose-700" size={20} /><div><h2 className="font-bold text-rose-950">API unavailable</h2><p className="mt-1 text-sm text-rose-800">{message}</p><button className="mt-3 rounded-[5px] bg-rose-800 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-900" onClick={onRetry} type="button">Retry connection</button></div></div></div>
+}
+
+export function ResourceErrors({ errors }: { errors: DashboardData['resource_errors'] }) {
+  const entries = Object.entries(errors)
+  if (!entries.length) return null
+  return (
+    <div className="mb-5 border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950" role="status">
+      <div className="flex items-start gap-3">
+        <AlertTriangle aria-hidden="true" className="mt-0.5 shrink-0" size={19} />
+        <div>
+          <p className="font-bold">Some dashboard resources are unavailable</p>
+          <p className="mt-1 leading-6">Available sections remain usable. Retry after checking: {entries.map(([resource]) => humanizeCode(resource)).join(', ')}.</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function InlineLoading({ text }: { text: string }) {
+  return <div className="flex items-center justify-center gap-2 px-5 py-10 text-sm text-zinc-500"><RefreshCw aria-hidden="true" className="animate-spin" size={17} />{text}</div>
+}
+
+export function InlineError({ message }: { message: string }) {
+  return <div className="m-4 border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900"><strong>Unable to load prices.</strong> {message}</div>
 }
 
 export default App

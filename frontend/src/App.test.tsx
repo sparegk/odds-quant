@@ -2,7 +2,7 @@ import { cleanup, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import type { DashboardData, ValueSignal } from './types'
-import { ArbitrageResearch, SignalResearch } from './App'
+import { ArbitrageResearch, InlineError, InlineLoading, ResourceErrors, SignalResearch } from './App'
 
 afterEach(cleanup)
 
@@ -73,6 +73,7 @@ const dashboard: DashboardData = {
   signals: [valueSignal],
   underdogs: [valueSignal],
   arbitrage: [],
+  resource_errors: {},
 }
 
 describe('SignalResearch', () => {
@@ -170,5 +171,22 @@ describe('ArbitrageResearch', () => {
 
     expect(screen.getByText('No stored arbitrage calculations')).toBeInTheDocument()
     expect(screen.getByText(/Missing or stale tax rules/)).toBeInTheDocument()
+  })
+})
+
+describe('dashboard resource states', () => {
+  it('keeps partial API failures and comparison failures visible', () => {
+    render(
+      <>
+        <ResourceErrors errors={{ signals: 'API request failed: 503', arbitrage: 'API request failed: 502' }} />
+        <InlineError message="API request failed: 504" />
+        <InlineLoading text="Loading price comparison" />
+      </>,
+    )
+
+    expect(screen.getByText('Some dashboard resources are unavailable')).toBeInTheDocument()
+    expect(screen.getByText(/Signals, Arbitrage/)).toBeInTheDocument()
+    expect(screen.getByText(/API request failed: 504/)).toBeInTheDocument()
+    expect(screen.getByText('Loading price comparison')).toBeInTheDocument()
   })
 })

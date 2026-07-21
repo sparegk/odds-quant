@@ -70,6 +70,18 @@ export interface ModelVersion {
   created_at: string
 }
 
+export type DashboardResource =
+  | 'status'
+  | 'events'
+  | 'providers'
+  | 'imports'
+  | 'jobs'
+  | 'models'
+  | 'evaluations'
+  | 'signals'
+  | 'underdogs'
+  | 'arbitrage'
+
 export interface CalibrationBucket {
   selection_code: string
   bucket_index: number
@@ -239,4 +251,5 @@ export interface DashboardData {
   signals: ValueSignal[]
   underdogs: ValueSignal[]
   arbitrage: ArbitrageOpportunity[]
+  resource_errors: Partial<Record<DashboardResource, string>>
 }

@@ -1,6 +1,7 @@
 import type {
   ArbitrageOpportunity,
   DashboardData,
+  DashboardResource,
   EvaluationRun,
   EventSummary,
   ImportJob,
@@ -33,20 +34,59 @@ async function request<T>(path: string): Promise<T> {
   return (await response.json()) as T
 }
 
+interface ResourceResult<T> {
+  resource: DashboardResource
+  data: T
+  error?: string
+}
+
+async function loadResource<T>(resource: DashboardResource, path: string, fallback: T): Promise<ResourceResult<T>> {
+  try {
+    return { resource, data: await request<T>(path) }
+  } catch (caught) {
+    return {
+      resource,
+      data: fallback,
+      error: caught instanceof Error ? caught.message : 'Unknown API error',
+    }
+  }
+}
+
 export async function loadDashboard(): Promise<DashboardData> {
   const [status, events, providers, imports, jobs, models, evaluations, signals, underdogs, arbitrage] = await Promise.all([
-    request<ProjectStatus>('/api/v1/status'),
-    request<EventSummary[]>('/api/v1/events?include_past=true'),
-    request<ProviderSummary[]>('/api/v1/providers'),
-    request<ImportJob[]>('/api/v1/imports'),
-    request<ProviderJob[]>('/api/v1/jobs'),
-    request<ModelVersion[]>('/api/v1/models'),
-    request<EvaluationRun[]>('/api/v1/evaluations'),
-    request<ValueSignal[]>('/api/v1/signals'),
-    request<ValueSignal[]>('/api/v1/signals/underdogs'),
-    request<ArbitrageOpportunity[]>('/api/v1/arbitrage/opportunities'),
+    loadResource<ProjectStatus>('status', '/api/v1/status', {
+      phase: 'unavailable',
+      sports: [],
+      data_mode: 'unknown',
+      automated_betting: false,
+    }),
+    loadResource<EventSummary[]>('events', '/api/v1/events?include_past=true', []),
+    loadResource<ProviderSummary[]>('providers', '/api/v1/providers', []),
+    loadResource<ImportJob[]>('imports', '/api/v1/imports', []),
+    loadResource<ProviderJob[]>('jobs', '/api/v1/jobs', []),
+    loadResource<ModelVersion[]>('models', '/api/v1/models', []),
+    loadResource<EvaluationRun[]>('evaluations', '/api/v1/evaluations', []),
+    loadResource<ValueSignal[]>('signals', '/api/v1/signals', []),
+    loadResource<ValueSignal[]>('underdogs', '/api/v1/signals/underdogs', []),
+    loadResource<ArbitrageOpportunity[]>('arbitrage', '/api/v1/arbitrage/opportunities', []),
   ])
-  return { status, events, providers, imports, jobs, models, evaluations, signals, underdogs, arbitrage }
+  const resources = [status, events, providers, imports, jobs, models, evaluations, signals, underdogs, arbitrage]
+  const resource_errors = Object.fromEntries(
+    resources.filter((result) => result.error).map((result) => [result.resource, result.error]),
+  ) as DashboardData['resource_errors']
+  return {
+    status: status.data,
+    events: events.data,
+    providers: providers.data,
+    imports: imports.data,
+    jobs: jobs.data,
+    models: models.data,
+    evaluations: evaluations.data,
+    signals: signals.data,
+    underdogs: underdogs.data,
+    arbitrage: arbitrage.data,
+    resource_errors,
+  }
 }
 
 export function loadComparison(eventId: number): Promise<MarketComparison[]> {
