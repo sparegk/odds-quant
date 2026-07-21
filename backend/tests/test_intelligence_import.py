@@ -24,6 +24,7 @@ from app.db.session import Base, get_db
 from app.main import app
 from app.schemas.intelligence import AvailabilityInput, IntelligenceImportRequest
 from app.services.demo_seed import seed_demo_data
+from app.services.intelligence import event_intelligence_coverage
 from app.services.intelligence_import import (
     IntelligenceImportError,
     import_intelligence_bundle,
@@ -187,3 +188,53 @@ def test_intelligence_api_persists_typed_bundle(session: Session) -> None:
 
     assert response.status_code == 201
     assert response.json()["created"]["availability"] == 1
+
+
+def test_point_in_time_coverage_rejects_later_lineup_and_correction(
+    session: Session,
+) -> None:
+    request = _request(session)
+    result = import_intelligence_bundle(session, request, now=NOW)
+    assert result.status == "completed"
+    event = session.get_one(Event, request.lineups[0].event_id)
+    player = session.scalar(select(Player).where(Player.provider_player_key == "player-1"))
+    lineup = session.scalar(select(LineupSnapshot))
+    assert player is not None and lineup is not None
+    session.add(
+        LineupSnapshot(
+            event_id=event.id,
+            team_id=event.away_team_id,
+            coach_id=None,
+            provider_id=lineup.provider_id,
+            lineup_type="confirmed",
+            formation="4-4-2",
+            source_updated_at=NOW + timedelta(minutes=30),
+            observed_at=NOW + timedelta(minutes=31),
+            confidence=1,
+        )
+    )
+    session.add(
+        AvailabilityReport(
+            player_id=player.id,
+            team_id=event.home_team_id,
+            event_id=event.id,
+            provider_id=lineup.provider_id,
+            status="out",
+            reason="later correction",
+            evidence_class="correction",
+            confidence=1,
+            source_updated_at=NOW + timedelta(minutes=30),
+            observed_at=NOW - timedelta(seconds=1),
+            effective_from=NOW - timedelta(hours=1),
+            effective_to=None,
+            supersedes_id=None,
+        )
+    )
+    session.commit()
+
+    coverage = event_intelligence_coverage(session, event_id=event.id, as_of=NOW)
+
+    assert coverage.expected_lineups == 1
+    assert coverage.confirmed_lineups == 0
+    assert coverage.availability_reports == 1
+    assert "both_team_lineups" in coverage.missing_inputs

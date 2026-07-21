@@ -206,3 +206,16 @@ class IntelligenceImportSummary(BaseModel):
     rows_imported: int
     created: dict[str, int]
     content_sha256: str
+
+
+class IntelligenceCoverageView(BaseModel):
+    event_id: int
+    as_of: datetime
+    historical_player_statistics: int
+    availability_reports: int
+    expected_lineups: int
+    confirmed_lineups: int
+    tactical_snapshots: int
+    coach_tenures: int
+    status: Literal["available", "partial", "missing"]
+    missing_inputs: list[str]
