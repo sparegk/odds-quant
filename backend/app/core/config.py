@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     seed_demo: bool = True
     odds_stale_after_seconds: int = Field(default=300, ge=1)
     provider_poll_seconds: int = Field(default=300, ge=30)
+    matchday_timezone: str = "Europe/Athens"
+    matchday_form_matches: int = Field(default=5, ge=1, le=20)
 
     @field_validator("admin_api_key", mode="before")
     @classmethod

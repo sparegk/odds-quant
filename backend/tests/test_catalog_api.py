@@ -3,16 +3,18 @@ from __future__ import annotations
 from collections.abc import Generator, Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Competition, Event, OddsSnapshot
+from app.db.models import Competition, Event, MatchResult, OddsSnapshot
 from app.db.session import Base, get_db
 from app.main import app
 from app.services.demo_seed import build_demo_odds_csv, build_demo_results_csv, seed_demo_data
+from app.services.matchday import competition_group
 
 
 @pytest.fixture
@@ -136,6 +138,103 @@ def test_unknown_event_returns_not_found(api: tuple[TestClient, Session, datetim
     client, _, _ = api
     assert client.get("/api/v1/events/999999").status_code == 404
     assert client.get("/api/v1/odds/comparison", params={"event_id": 999999}).status_code == 404
+
+
+def test_matchday_groups_a_local_calendar_day_and_rejects_unknown_timezones(
+    api: tuple[TestClient, Session, datetime],
+) -> None:
+    client, session, as_of = api
+    target = session.scalar(select(Event).order_by(Event.kickoff_at))
+    assert target is not None
+    local_date = target.kickoff_at.astimezone(ZoneInfo("Europe/Athens")).date()
+
+    response = client.get(
+        "/api/v1/matchdays",
+        params={
+            "date": local_date.isoformat(),
+            "timezone": "Europe/Athens",
+            "as_of": as_of.isoformat(),
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["date"] == local_date.isoformat()
+    assert payload["timezone"] == "Europe/Athens"
+    event_ids = {
+        event["event"]["id"]
+        for competition in payload["competitions"]
+        for event in competition["events"]
+    }
+    assert target.id in event_ids
+    assert payload["total_events"] == len(event_ids)
+    assert (
+        client.get("/api/v1/matchdays", params={"timezone": "Mars/Olympus_Mons"}).status_code == 422
+    )
+
+
+def test_matchday_detail_uses_only_pre_cutoff_form_and_fails_closed_for_player_bets(
+    api: tuple[TestClient, Session, datetime],
+) -> None:
+    client, session, as_of = api
+    result_upload = client.post(
+        "/api/v1/imports/results",
+        files={
+            "file": (
+                "historical-results.csv",
+                build_demo_results_csv(as_of),
+                "text/csv",
+            )
+        },
+    )
+    assert result_upload.status_code == 201
+    target = session.scalar(
+        select(Event).where(Event.status == "scheduled").order_by(Event.kickoff_at)
+    )
+    assert target is not None
+    leaked = session.scalar(
+        select(MatchResult)
+        .join(Event, Event.id == MatchResult.event_id)
+        .where(
+            (Event.home_team_id == target.home_team_id)
+            | (Event.away_team_id == target.home_team_id)
+        )
+        .order_by(Event.kickoff_at.desc())
+    )
+    assert leaked is not None
+    leaked.settled_at = as_of + timedelta(minutes=30)
+    leaked.observed_at = as_of + timedelta(minutes=30)
+    session.commit()
+
+    response = client.get(
+        f"/api/v1/matchdays/events/{target.id}", params={"as_of": as_of.isoformat()}
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    home_form = payload["team_form"][0]
+    assert leaked.event_id not in {result["event_id"] for result in home_form["results"]}
+    assert all(result["observed_at"] <= payload["as_of"] for result in home_form["results"])
+    assert payload["markets"][0]["best_prices"]
+    assert payload["player_research"]["status"] == "blocked"
+    assert "settlement rules" in payload["player_research"]["reasons"][0]
+    assert payload["builder_value"]["status"] == "blocked"
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("UEFA Champions League", "champions-league"),
+        ("Premier League", "premier-league"),
+        ("Bundesliga", "bundesliga"),
+        ("Ligue 1", "ligue-1"),
+        ("La Liga", "la-liga"),
+        ("UEFA Conference League", "conference-league"),
+        ("Copa del Rey", "top-cups"),
+    ],
+)
+def test_matchday_featured_competition_classification(name: str, expected: str) -> None:
+    assert competition_group(name)[0] == expected
 
 
 def test_results_training_and_prediction_api_are_connected(
