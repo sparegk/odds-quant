@@ -22,12 +22,14 @@ import { API_BASE_URL, loadComparison, loadDashboard } from './api/client'
 import { FreshnessBadge } from './components/FreshnessBadge'
 import { BetBuilderLab } from './components/BetBuilderLab'
 import { BankrollResearch } from './components/BankrollResearch'
+import { MatchdayResearch } from './components/MatchdayResearch'
 import { QuantPriceTable } from './components/QuantPriceTable'
 import { formatDateTime, humanizeCode } from './lib/format'
 import type { DashboardData, EvaluationRun, EventSummary, MarketComparison, ValueSignal } from './types'
 
 type ViewKey =
   | 'overview'
+  | 'matchday'
   | 'opportunities'
   | 'underdogs'
   | 'arbitrage'
@@ -42,6 +44,7 @@ type ViewKey =
 
 const navigation = [
   { key: 'overview', label: 'Overview', icon: Gauge },
+  { key: 'matchday', label: 'Matchday', icon: CalendarDays },
   { key: 'opportunities', label: 'Value opportunities', icon: TrendingUp },
   { key: 'underdogs', label: 'Underdog scanner', icon: ScanSearch },
   { key: 'arbitrage', label: 'Arbitrage', icon: ShieldCheck },
@@ -271,6 +274,8 @@ function ActiveView(props: ActiveViewProps) {
   switch (props.view) {
     case 'overview':
       return <Overview dashboard={props.dashboard} onSelectEvent={props.onSelectEvent} />
+    case 'matchday':
+      return <MatchdayResearch onSelectEvent={props.onSelectEvent} />
     case 'event':
       return <EventMarkets {...props} />
     case 'comparison':

@@ -380,6 +380,86 @@ export interface MarketComparison {
   best_prices: BestPrice[]
 }
 
+export interface MatchdayEvent {
+  event: EventSummary
+  market_count: number
+  bookmaker_count: number
+  latest_prediction_at: string | null
+  qualified_signal_count: number
+}
+
+export interface MatchdayCompetition {
+  competition_id: number
+  name: string
+  country: string
+  season: string
+  group_key: string
+  group_label: string
+  priority: number
+  is_featured: boolean
+  events: MatchdayEvent[]
+}
+
+export interface Matchday {
+  date: string
+  timezone: string
+  local_start: string
+  local_end: string
+  as_of: string
+  total_events: number
+  competitions: MatchdayCompetition[]
+  data_note: string
+}
+
+export interface RecentTeamResult {
+  event_id: number
+  kickoff_at: string
+  opponent: string
+  venue: 'home' | 'away'
+  goals_for: number
+  goals_against: number
+  outcome: 'W' | 'D' | 'L'
+  observed_at: string
+}
+
+export interface TeamForm {
+  team_id: number
+  team: string
+  sample_size: number
+  wins: number
+  draws: number
+  losses: number
+  goals_for: number
+  goals_against: number
+  clean_sheets: number
+  points_per_game: number | null
+  results: RecentTeamResult[]
+  warnings: string[]
+}
+
+export interface ResearchGate {
+  status: 'available' | 'blocked'
+  title: string
+  available_records: number
+  reasons: string[]
+}
+
+export interface MatchdayEventDetail {
+  event: EventSummary
+  competition_group: string
+  competition_group_label: string
+  as_of: string
+  team_form: TeamForm[]
+  markets: MarketComparison[]
+  latest_prediction: ModelOutput | null
+  signals: ValueSignal[]
+  builder_quotes: BetBuilderQuote[]
+  player_research: ResearchGate
+  builder_value: ResearchGate
+  bookmaker_guidance: string
+  evidence_note: string
+}
+
 export interface DashboardData {
   status: ProjectStatus
   events: EventSummary[]

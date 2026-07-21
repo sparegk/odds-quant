@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { createBuilderQuote, loadComparison, loadDashboard, loadPredictions } from './client'
+import {
+  createBuilderQuote,
+  loadComparison,
+  loadDashboard,
+  loadMatchday,
+  loadMatchdayEvent,
+  loadPredictions,
+} from './client'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -74,6 +81,25 @@ describe('API client', () => {
   it('raises a typed error for failed API responses', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response('{}', { status: 503 }))))
     await expect(loadComparison(1)).rejects.toMatchObject({ status: 503 })
+  })
+
+  it('requests a timezone-aware matchday and its selected match research', async () => {
+    const fetchMock = vi.fn(() => Promise.resolve(new Response('{}', { status: 200 })))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await loadMatchday('2026-07-21', 'Europe/Athens')
+    await loadMatchdayEvent(42)
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('/api/v1/matchdays?date=2026-07-21&timezone=Europe%2FAthens'),
+      expect.any(Object),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('/api/v1/matchdays/events/42'),
+      expect.any(Object),
+    )
   })
 
   it('loads prediction evidence and submits timestamped builder inputs', async () => {

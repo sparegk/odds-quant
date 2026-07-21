@@ -9,6 +9,8 @@ import type {
   EventSummary,
   ImportJob,
   MarketComparison,
+  Matchday,
+  MatchdayEventDetail,
   ModelVersion,
   ModelOutput,
   ProjectStatus,
@@ -107,6 +109,15 @@ export function loadPredictions(eventId: number): Promise<ModelOutput[]> {
 
 export function loadBuilderQuotes(eventId: number): Promise<BetBuilderQuote[]> {
   return request<BetBuilderQuote[]>(`/api/v1/bet-builder/quotes?event_id=${eventId}`)
+}
+
+export function loadMatchday(date: string, timezone: string): Promise<Matchday> {
+  const query = new URLSearchParams({ date, timezone })
+  return request<Matchday>(`/api/v1/matchdays?${query.toString()}`)
+}
+
+export function loadMatchdayEvent(eventId: number): Promise<MatchdayEventDetail> {
+  return request<MatchdayEventDetail>(`/api/v1/matchdays/events/${eventId}`)
 }
 
 export function createBuilderQuote(payload: CreateBetBuilderQuote): Promise<BetBuilderQuote> {
