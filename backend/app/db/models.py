@@ -643,11 +643,38 @@ class BetBuilderQuote(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
     event_id: Mapped[int] = mapped_column(ForeignKey("events.id"))
     model_version_id: Mapped[int] = mapped_column(ForeignKey("model_versions.id"))
+    prediction_output_id: Mapped[int | None] = mapped_column(
+        ForeignKey("model_event_outputs.id", ondelete="CASCADE")
+    )
+    fingerprint: Mapped[str | None] = mapped_column(String(64), unique=True)
+    feature_version: Mapped[str | None] = mapped_column(String(80))
+    input_fingerprint: Mapped[str | None] = mapped_column(String(64))
     legs: Mapped[list[dict[str, object]]] = mapped_column(JSON)
     joint_probability: Mapped[float] = mapped_column(Float)
+    lower_joint_probability: Mapped[float | None] = mapped_column(Float)
+    upper_joint_probability: Mapped[float | None] = mapped_column(Float)
+    independent_product: Mapped[float | None] = mapped_column(Float)
+    dependence_ratio: Mapped[float | None] = mapped_column(Float)
     fair_odds: Mapped[float] = mapped_column(Float)
     offered_odds: Mapped[float | None] = mapped_column(Float)
+    offered_odds_source: Mapped[str | None] = mapped_column(String(120))
+    offered_odds_observed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     expected_value: Mapped[float | None] = mapped_column(Float)
+    lower_expected_value: Mapped[float | None] = mapped_column(Float)
+    warnings: Mapped[list[str]] = mapped_column(JSON, default=list)
+    __table_args__ = (
+        CheckConstraint("joint_probability >= 0 AND joint_probability <= 1"),
+        CheckConstraint(
+            "lower_joint_probability IS NULL OR "
+            "(lower_joint_probability >= 0 AND lower_joint_probability <= joint_probability)"
+        ),
+        CheckConstraint(
+            "upper_joint_probability IS NULL OR "
+            "(upper_joint_probability >= joint_probability AND upper_joint_probability <= 1)"
+        ),
+        CheckConstraint("fair_odds >= 1"),
+        CheckConstraint("offered_odds IS NULL OR offered_odds > 1"),
+    )
 
 
 class BacktestRun(Base, TimestampMixin):

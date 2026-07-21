@@ -70,6 +70,82 @@ export interface ModelVersion {
   created_at: string
 }
 
+export interface SelectionPrediction {
+  id: number
+  market_id: number
+  market_type: string
+  line: number | null
+  selection_id: number
+  selection_code: string
+  selection_name: string
+  probability: number
+  lower_probability: number
+  upper_probability: number
+  fair_odds: number
+}
+
+export interface ModelOutput {
+  id: number
+  event_id: number
+  model_version_id: number
+  model_version: string
+  predicted_at: string
+  inputs_as_of: string
+  evidence_class: string
+  home_lambda: number
+  away_lambda: number
+  sample_size: number
+  score_matrix: number[][]
+  derived_probabilities: Record<string, Record<string, number>>
+  predictions: SelectionPrediction[]
+}
+
+export interface BetBuilderLeg {
+  market_type: string
+  selection: string
+  line: number | null
+  marginal_probability: number
+}
+
+export interface BetBuilderQuote {
+  id: number
+  event_id: number
+  model_version_id: number
+  model_version: string
+  is_demo: boolean
+  evidence_class: string
+  prediction_output_id: number
+  predicted_at: string
+  inputs_as_of: string
+  quoted_at: string
+  fingerprint: string
+  feature_version: string
+  input_fingerprint: string
+  legs: BetBuilderLeg[]
+  joint_probability: number
+  lower_joint_probability: number
+  upper_joint_probability: number
+  independent_product: number
+  dependence_ratio: number
+  fair_odds: number
+  offered_odds: number | null
+  offered_odds_source: string | null
+  offered_odds_observed_at: string | null
+  expected_value: number | null
+  lower_expected_value: number | null
+  warnings: string[]
+}
+
+export interface CreateBetBuilderQuote {
+  event_id: number
+  prediction_output_id: number
+  legs: Array<{ market_type: string; selection: string; line: number | null }>
+  offered_odds?: number
+  offered_odds_source?: string
+  offered_odds_observed_at?: string
+  quoted_at: string
+}
+
 export type DashboardResource =
   | 'status'
   | 'events'

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { loadComparison, loadDashboard } from './client'
+import { createBuilderQuote, loadComparison, loadDashboard, loadPredictions } from './client'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -74,5 +74,39 @@ describe('API client', () => {
   it('raises a typed error for failed API responses', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response('{}', { status: 503 }))))
     await expect(loadComparison(1)).rejects.toMatchObject({ status: 503 })
+  })
+
+  it('loads prediction evidence and submits timestamped builder inputs', async () => {
+    const fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => {
+      void input
+      void init
+      return Promise.resolve(new Response('[]', { status: 200 }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await loadPredictions(42)
+    await createBuilderQuote({
+      event_id: 42,
+      prediction_output_id: 9,
+      legs: [
+        { market_type: 'MATCH_RESULT', selection: 'HOME', line: null },
+        { market_type: 'TOTAL_GOALS', selection: 'OVER', line: 2.5 },
+      ],
+      quoted_at: '2026-07-19T12:00:00Z',
+    })
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('/api/v1/events/42/predictions'),
+      expect.any(Object),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('/api/v1/bet-builder/quotes'),
+      expect.objectContaining({ method: 'POST' }),
+    )
+    const requestBody = fetchMock.mock.calls[1]?.[1]?.body
+    expect(typeof requestBody).toBe('string')
+    if (typeof requestBody === 'string') expect(requestBody).toContain('prediction_output_id')
   })
 })

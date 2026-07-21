@@ -1,5 +1,7 @@
 import type {
   ArbitrageOpportunity,
+  BetBuilderQuote,
+  CreateBetBuilderQuote,
   DashboardData,
   DashboardResource,
   EvaluationRun,
@@ -7,6 +9,7 @@ import type {
   ImportJob,
   MarketComparison,
   ModelVersion,
+  ModelOutput,
   ProjectStatus,
   ProviderJob,
   ProviderSummary,
@@ -24,9 +27,10 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string): Promise<T> {
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: { Accept: 'application/json' },
+    ...init,
+    headers: { Accept: 'application/json', ...init?.headers },
   })
   if (!response.ok) {
     throw new ApiError(`API request failed: ${response.status}`, response.status)
@@ -91,6 +95,22 @@ export async function loadDashboard(): Promise<DashboardData> {
 
 export function loadComparison(eventId: number): Promise<MarketComparison[]> {
   return request<MarketComparison[]>(`/api/v1/odds/comparison?event_id=${eventId}`)
+}
+
+export function loadPredictions(eventId: number): Promise<ModelOutput[]> {
+  return request<ModelOutput[]>(`/api/v1/events/${eventId}/predictions`)
+}
+
+export function loadBuilderQuotes(eventId: number): Promise<BetBuilderQuote[]> {
+  return request<BetBuilderQuote[]>(`/api/v1/bet-builder/quotes?event_id=${eventId}`)
+}
+
+export function createBuilderQuote(payload: CreateBetBuilderQuote): Promise<BetBuilderQuote> {
+  return request<BetBuilderQuote>('/api/v1/bet-builder/quotes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
 }
 
 export { API_BASE_URL }

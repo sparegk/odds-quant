@@ -20,6 +20,7 @@ import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 
 import { API_BASE_URL, loadComparison, loadDashboard } from './api/client'
 import { FreshnessBadge } from './components/FreshnessBadge'
+import { BetBuilderLab } from './components/BetBuilderLab'
 import { QuantPriceTable } from './components/QuantPriceTable'
 import { formatDateTime, humanizeCode } from './lib/format'
 import type { DashboardData, EvaluationRun, EventSummary, MarketComparison, ValueSignal } from './types'
@@ -284,7 +285,7 @@ function ActiveView(props: ActiveViewProps) {
     case 'arbitrage':
       return <ArbitrageResearch dashboard={props.dashboard} />
     case 'builder':
-      return <UnavailableModule title="Bet Builder Laboratory" requirement="A stored scoreline distribution for the selected event" />
+      return <BetBuilderLab events={props.dashboard.events} onSelectEvent={props.onSelectEvent} selectedEventId={props.selectedEventId} />
     case 'models':
       return <ModelPerformance dashboard={props.dashboard} />
     case 'backtests':

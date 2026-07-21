@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import TypedDict
+
 import numpy as np
 from numpy.typing import NDArray
 from scipy.stats import poisson  # type: ignore[import-untyped]
@@ -7,6 +9,18 @@ from scipy.stats import poisson  # type: ignore[import-untyped]
 from app.quant.odds import fair_odds
 
 ScoreMatrix = NDArray[np.float64]
+
+
+class BuilderEvaluation(TypedDict):
+    leg_probabilities: list[float]
+    independent_product: float
+    joint_probability: float
+    fair_odds: float | None
+    offered_odds: float | None
+    expected_value: float | None
+    dependence_ratio: float
+    dependence_warning: str
+    uncertainty: str
 
 
 def score_matrix(home_lambda: float, away_lambda: float, max_goals: int = 20) -> ScoreMatrix:
@@ -128,7 +142,7 @@ def joint_probability(matrix: ScoreMatrix, legs: list[dict[str, object]]) -> flo
 
 def evaluate_builder(
     matrix: ScoreMatrix, legs: list[dict[str, object]], offered_odds: float | None
-) -> dict[str, object]:
+) -> BuilderEvaluation:
     marginals = [
         selection_probability(
             matrix,
