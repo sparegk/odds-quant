@@ -145,7 +145,7 @@ The React dashboard navigation includes:
 - Backtesting and bankroll simulation.
 - CSV imports, providers, jobs, methodology, and disclaimers.
 
-Stored events, odds comparison, provider/import status, freshness, and methodology are connected to the API now. Model-dependent views remain visibly blocked until real prediction, calibration, backtest, and bankroll records exist.
+Stored events, odds comparison, provider/import status, freshness, signals, underdogs, arbitrage, bet-builder quotes, calibration, signal backtests, and bankroll research are connected to the API. Each evidence-dependent view shows a fail-closed empty state until its required stored records exist.
 
 ## Planned Tech Stack
 
@@ -179,7 +179,7 @@ Stored events, odds comparison, provider/import status, freshness, and methodolo
 
 ## Current Implementation
 
-The repository is in the **Phase 1 model-baseline milestone**. It includes:
+The repository is in the **Phase 1 research-workflow milestone**. It includes:
 
 - FastAPI application configuration and CORS handling.
 - `GET /health` and `GET /api/v1/status`.
@@ -204,6 +204,11 @@ The repository is in the **Phase 1 model-baseline milestone**. It includes:
 - A versioned, shrunk Poisson team-strength baseline trained only from final results observed by its cutoff.
 - Stored score matrices, expected goals, selection probabilities, uncertainty intervals, data fingerprints, and immutable prediction timestamps.
 - Model registry, training, prediction, and event-prediction API routes plus CLI equivalents.
+- Dedicated value, underdog, and tax-aware arbitrage dashboards with provenance, costs, risk, loading, error, and empty states.
+- Reproducible 2–4 leg bet-builder quotes derived by summing stored scoreline cells rather than multiplying correlated marginal probabilities.
+- Immutable bet-builder prediction, cutoff, feature, input-fingerprint, uncertainty, and optional manual offered-price provenance.
+- Stored-signal return backtests that enforce pre-kickoff prediction/price availability, settle against results known by the evaluation cutoff, and report unit profit, ROI, yield, hit rate, profit factor, and drawdown.
+- Flat, percentage, and capped fractional-Kelly bankroll research using the stored lower probability bound, per-bet caps, daily exposure limits, and deterministic simulation fingerprints.
 
 The backend now supports expanding-window chronological evaluation with immutable per-match training fingerprints, 1X2 Brier score, log loss, one-vs-rest calibration buckets, coverage accounting, uniform and optional market benchmarks, and an explicit promotion policy.
 
@@ -233,7 +238,7 @@ frontend/
   public/        Frontend assets
 ```
 
-Additional player, tactical, bankroll, and backtesting modules will be added during Phase 1.
+Additional player, lineup, coach-regime, and tactical-ablation modules still require adequate permitted timestamped history during Phase 1.
 
 Run the current PostgreSQL-backed backend stack from the repository root:
 
@@ -325,8 +330,13 @@ Current stored-data routes include:
 - `POST /api/v1/arbitrage/calculate`
 - `GET /api/v1/arbitrage/opportunities?event_id={event_id}`
 - `GET /api/v1/events/{event_id}/predictions`
+- `POST /api/v1/bet-builder/quotes`
+- `GET /api/v1/bet-builder/quotes?event_id={event_id}`
+- `POST /api/v1/backtests/signals`
+- `GET /api/v1/backtests` and `GET /api/v1/backtests/{run_id}`
+- `POST /api/v1/bankroll/simulate`
 
-Odds comparison, model prediction, calibration, value signals, and arbitrage remain separate records. Signal generation requires a non-demo calibrated evaluation completed before the prediction input cutoff, selects the best compatible fresh price, derives consensus only from complete compatible bookmaker snapshots, and persists every classification with its uncertainty, movement, freshness, and evaluation provenance. Arbitrage calculation is an administrative write operation; in protected environments it requires `X-Admin-Key`. Listing is read-only. A result marked `executable` is still only a pre-acceptance calculation, never a guarantee that every leg will be accepted and honoured.
+Odds comparison, model prediction, calibration, value signals, arbitrage, bet-builder quotes, signal-return backtests, and bankroll simulations remain separate evidence layers. Signal generation requires a non-demo calibrated evaluation completed before the prediction input cutoff, selects the best compatible fresh price, derives consensus only from complete compatible bookmaker snapshots, and persists every classification with its uncertainty, movement, freshness, and evaluation provenance. Bet-builder quotes use a specific stored prediction and require complete source/timestamp provenance when optional offered odds are supplied. Signal backtests use only pre-kickoff records and final results known by their evaluation cutoff; bankroll paths are deterministic research replays, not profitability forecasts. Administrative write operations require `X-Admin-Key` in protected environments. A result marked `executable` is still only a pre-acceptance arbitrage calculation, never a guarantee that every leg will be accepted and honoured.
 
 Run the available checks from `backend`:
 
@@ -341,7 +351,7 @@ Copy `.env.example` to `.env` for local configuration. Never commit API keys, to
 
 ## Project Status
 
-OddsQuant now has a migrated point-in-time data layer, atomic odds and result ingestion, a leakage-safe versioned Poisson baseline, stored scoreline predictions, chronological calibration infrastructure, gated explainable value and underdog signals, an independent tax-aware arbitrage service, connected research dashboards, provider scheduling, CI, and prepared full-stack deployment. The next milestone is adequate permitted history plus independently validated player, tactical, and bankroll extensions.
+OddsQuant now has a migrated point-in-time data layer, atomic odds and result ingestion, a leakage-safe versioned Poisson baseline, stored scoreline predictions, chronological calibration, gated explainable value and underdog signals, an independent tax-aware arbitrage service, correlated bet-builder quotes, timestamp-valid signal-return backtests, constrained bankroll research, connected dashboards, provider scheduling, CI, and prepared full-stack deployment. The next milestone is adequate permitted non-demo history, closing-price coverage, richer benchmarks, and independently validated player, lineup, coach, and tactical extensions. No current demo result is evidence of profitability.
 
 See [context.md](context.md), [ARCHITECTURE.md](ARCHITECTURE.md), [METHODOLOGY.md](METHODOLOGY.md), [ROADMAP.md](ROADMAP.md), and [AGENTS.md](AGENTS.md) for detailed decisions and operating rules.
 

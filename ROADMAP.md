@@ -6,7 +6,7 @@
 
 ## Phase 1: Runnable Football MVP
 
-Completed slices: Alembic schema lifecycle, labelled demo odds and results, atomic CSV ingestion, stored-data API, connected React dashboard, scheduled-provider boundary, full-stack deployment configuration, backend/frontend CI, and a versioned leakage-safe Poisson baseline with stored scoreline predictions. Live deployment has not been claimed or tested.
+Completed slices: Alembic schema lifecycle, labelled demo odds and results, atomic CSV ingestion, stored-data API, connected React research dashboards, scheduled-provider boundary, full-stack deployment configuration, backend/frontend CI, a versioned leakage-safe Poisson baseline, stored scoreline predictions, scoreline-based bet builders, signal-return backtests, and bankroll research. Live deployment has not been claimed or tested.
 
 - Alembic migration and deterministic labelled demo dataset.
 - Timestamped team, player, coach, roster, appearance, availability, lineup, formation, tactical, and matchup data contracts.
@@ -17,8 +17,10 @@ Completed slices: Alembic schema lifecycle, labelled demo odds and results, atom
 - Completed: gated explainable value signals, best-price selection, compatible market consensus, lower-bound EV, freshness and movement checks, immutable calibration provenance, and positive-EV team-underdog ranking.
 - Remaining: adequate permitted evaluation history, richer model benchmarks, and independently validated confidence thresholds.
 - Recency-weighted player and lineup strength, coach-regime handling, tactical matchup features, scenario sensitivity, and walk-forward ablation tests.
-- Completed: arbitrage calculation and opportunity-listing APIs. Remaining: opportunity, underdog, arbitrage, and bet-builder dashboard pages plus unfinished bet-builder APIs.
-- Walk-forward backtesting and bankroll simulation.
+- Completed: value, underdog, arbitrage, bet-builder, backtesting, and bankroll dashboard pages with typed API integration and partial-resource failure states.
+- Completed: reproducible scoreline-based bet-builder quote APIs with correlated joint probability, uncertainty, manual offered-price provenance, and immutable prediction/model fingerprints.
+- Completed: expanding-window probability replay plus timestamp-valid stored-signal return backtests and flat, percentage, and capped fractional-Kelly bankroll simulation with exposure limits.
+- Remaining: adequate permitted signal/result history, timestamped closing prices for CLV coverage, richer benchmarks, and independently validated staking/confidence thresholds. Demo backtests remain software evidence only.
 - Connected React dashboard, Docker Compose, CI, and deployment configuration.
 
 ## Later Phases
