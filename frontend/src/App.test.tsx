@@ -1,8 +1,10 @@
-import { render, screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { cleanup, render, screen, within } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
 
 import type { DashboardData, ValueSignal } from './types'
-import { SignalResearch } from './App'
+import { ArbitrageResearch, SignalResearch } from './App'
+
+afterEach(cleanup)
 
 const valueSignal: ValueSignal = {
   id: 1,
@@ -70,6 +72,7 @@ const dashboard: DashboardData = {
   evaluations: [],
   signals: [valueSignal],
   underdogs: [valueSignal],
+  arbitrage: [],
 }
 
 describe('SignalResearch', () => {
@@ -94,5 +97,78 @@ describe('SignalResearch', () => {
 
     expect(screen.getByText('No qualified underdogs')).toBeInTheDocument()
     expect(screen.getByText(/Long odds and demo prices are never treated as value/)).toBeInTheDocument()
+  })
+})
+
+describe('ArbitrageResearch', () => {
+  it('shows worst-case economics, costs, provenance, and execution warnings', () => {
+    render(
+      <ArbitrageResearch
+        dashboard={{
+          ...dashboard,
+          arbitrage: [
+            {
+              id: 31,
+              event_id: 7,
+              market_id: 17,
+              market_type: 'MATCH_RESULT',
+              line: null,
+              period: 'FULL_TIME',
+              settlement_rule_key: 'standard_90_minutes',
+              calculated_at: '2026-07-19T12:01:00Z',
+              fingerprint: 'abcdef1234567890',
+              status: 'executable',
+              inverse_sum: 0.97,
+              budget: 100,
+              total_cash_outlay: 99.98,
+              minimum_net_payout: 102.5,
+              net_profit: 2.52,
+              net_roi: 0.0252,
+              tax_status: 'verified',
+              constraint_status: 'verified',
+              freshness_status: 'fresh',
+              currency: 'EUR',
+              risks: ['Recheck every price immediately before submitting any leg.'],
+              legs: [
+                {
+                  id: 37,
+                  selection_id: 19,
+                  selection_code: 'HOME',
+                  selection_name: 'Northbridge FC win',
+                  bookmaker_id: 23,
+                  bookmaker: 'Beacon',
+                  odds_snapshot_id: 29,
+                  tax_profile_id: 41,
+                  bookmaker_constraint_id: 43,
+                  decimal_odds: 3.1,
+                  stake: 33.2,
+                  cash_outlay: 33.2,
+                  gross_payout: 102.92,
+                  win_deductions: 0.42,
+                  taxes_and_fees: 0.42,
+                  net_payout: 102.5,
+                },
+              ],
+            },
+          ],
+        }}
+      />,
+    )
+
+    expect(screen.getAllByText('EXECUTABLE')).toHaveLength(1)
+    expect(screen.getByText('EUR 99.98')).toBeInTheDocument()
+    expect(screen.getAllByText('EUR 102.50')).toHaveLength(2)
+    expect(screen.getAllByText('EUR 2.52')).toHaveLength(2)
+    expect(screen.getByText('+2.5%')).toBeInTheDocument()
+    expect(screen.getByText('Snapshot #29 / tax #41 / limit #43')).toBeInTheDocument()
+    expect(screen.getByText('Recheck every price immediately before submitting any leg.')).toBeInTheDocument()
+    expect(screen.getByText(/never a guarantee that every bookmaker leg/)).toBeInTheDocument()
+  })
+
+  it('explains why no gross calculation is displayed as executable by default', () => {
+    render(<ArbitrageResearch dashboard={dashboard} />)
+
+    expect(screen.getByText('No stored arbitrage calculations')).toBeInTheDocument()
+    expect(screen.getByText(/Missing or stale tax rules/)).toBeInTheDocument()
   })
 })

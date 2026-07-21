@@ -1,4 +1,5 @@
 import type {
+  ArbitrageOpportunity,
   DashboardData,
   EvaluationRun,
   EventSummary,
@@ -33,7 +34,7 @@ async function request<T>(path: string): Promise<T> {
 }
 
 export async function loadDashboard(): Promise<DashboardData> {
-  const [status, events, providers, imports, jobs, models, evaluations, signals, underdogs] = await Promise.all([
+  const [status, events, providers, imports, jobs, models, evaluations, signals, underdogs, arbitrage] = await Promise.all([
     request<ProjectStatus>('/api/v1/status'),
     request<EventSummary[]>('/api/v1/events?include_past=true'),
     request<ProviderSummary[]>('/api/v1/providers'),
@@ -43,8 +44,9 @@ export async function loadDashboard(): Promise<DashboardData> {
     request<EvaluationRun[]>('/api/v1/evaluations'),
     request<ValueSignal[]>('/api/v1/signals'),
     request<ValueSignal[]>('/api/v1/signals/underdogs'),
+    request<ArbitrageOpportunity[]>('/api/v1/arbitrage/opportunities'),
   ])
-  return { status, events, providers, imports, jobs, models, evaluations, signals, underdogs }
+  return { status, events, providers, imports, jobs, models, evaluations, signals, underdogs, arbitrage }
 }
 
 export function loadComparison(eventId: number): Promise<MarketComparison[]> {

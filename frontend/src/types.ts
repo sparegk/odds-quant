@@ -136,6 +136,50 @@ export interface ValueSignal {
   risks: string[]
 }
 
+export interface ArbitrageLeg {
+  id: number
+  selection_id: number
+  selection_code: string
+  selection_name: string
+  bookmaker_id: number
+  bookmaker: string
+  odds_snapshot_id: number
+  tax_profile_id: number | null
+  bookmaker_constraint_id: number | null
+  decimal_odds: number
+  stake: number
+  cash_outlay: number
+  gross_payout: number
+  win_deductions: number
+  taxes_and_fees: number
+  net_payout: number
+}
+
+export interface ArbitrageOpportunity {
+  id: number
+  event_id: number
+  market_id: number
+  market_type: string
+  line: number | null
+  period: string
+  settlement_rule_key: string
+  calculated_at: string
+  fingerprint: string
+  status: string
+  inverse_sum: number
+  budget: number
+  total_cash_outlay: number
+  minimum_net_payout: number
+  net_profit: number
+  net_roi: number
+  tax_status: string
+  constraint_status: string
+  freshness_status: string
+  currency: string
+  risks: string[]
+  legs: ArbitrageLeg[]
+}
+
 export interface PriceComparison {
   selection_code: string
   selection_name: string
@@ -194,4 +238,5 @@ export interface DashboardData {
   evaluations: EvaluationRun[]
   signals: ValueSignal[]
   underdogs: ValueSignal[]
+  arbitrage: ArbitrageOpportunity[]
 }

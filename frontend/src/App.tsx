@@ -28,6 +28,7 @@ type ViewKey =
   | 'overview'
   | 'opportunities'
   | 'underdogs'
+  | 'arbitrage'
   | 'event'
   | 'comparison'
   | 'builder'
@@ -41,6 +42,7 @@ const navigation = [
   { key: 'overview', label: 'Overview', icon: Gauge },
   { key: 'opportunities', label: 'Value opportunities', icon: TrendingUp },
   { key: 'underdogs', label: 'Underdog scanner', icon: ScanSearch },
+  { key: 'arbitrage', label: 'Arbitrage', icon: ShieldCheck },
   { key: 'event', label: 'Event markets', icon: CalendarDays },
   { key: 'comparison', label: 'Odds comparison', icon: GitCompareArrows },
   { key: 'builder', label: 'Bet Builder Lab', icon: Beaker },
@@ -257,6 +259,8 @@ function ActiveView(props: ActiveViewProps) {
       return <SignalResearch dashboard={props.dashboard} mode="value" />
     case 'underdogs':
       return <SignalResearch dashboard={props.dashboard} mode="underdog" />
+    case 'arbitrage':
+      return <ArbitrageResearch dashboard={props.dashboard} />
     case 'builder':
       return <UnavailableModule title="Bet Builder Laboratory" requirement="A stored scoreline distribution for the selected event" />
     case 'models':
@@ -519,6 +523,119 @@ export function SignalResearch({ dashboard, mode }: { dashboard: DashboardData; 
       </div>
     </div>
   )
+}
+
+export function ArbitrageResearch({ dashboard }: { dashboard: DashboardData }) {
+  const executable = dashboard.arbitrage.filter((opportunity) => opportunity.status === 'executable')
+  const blocked = dashboard.arbitrage.filter((opportunity) => opportunity.status !== 'executable')
+  const bestExecutable = executable.reduce(
+    (best, opportunity) => best === null || opportunity.net_profit > best.net_profit ? opportunity : best,
+    null as (typeof executable)[number] | null,
+  )
+
+  if (!dashboard.arbitrage.length) {
+    return (
+      <div className="space-y-5">
+        <EmptyState
+          title="No stored arbitrage calculations"
+          detail="Run the protected calculation workflow for a complete compatible market to populate this research view."
+        />
+        <div className="border-l-4 border-amber-400 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
+          Gross inverse-sum opportunities are insufficient. Missing or stale tax rules, stake limits, prices, or settlement compatibility must block execution.
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-7">
+      <SectionHeading eyebrow="Tax and constraint aware" title="Stored arbitrage calculations" />
+      <section className="grid grid-cols-2 border border-zinc-200 bg-white md:grid-cols-4">
+        <Metric label="Calculations" value={dashboard.arbitrage.length.toString()} />
+        <Metric label="Executable" value={executable.length.toString()} />
+        <Metric label="Blocked" value={blocked.length.toString()} tone={blocked.length ? 'amber' : 'default'} />
+        <Metric
+          label="Best net profit"
+          value={bestExecutable ? formatMoney(bestExecutable.net_profit, bestExecutable.currency) : '—'}
+        />
+      </section>
+
+      <div className="space-y-5">
+        {dashboard.arbitrage.map((opportunity) => {
+          const event = dashboard.events.find((candidate) => candidate.id === opportunity.event_id)
+          return (
+            <article key={opportunity.id} className="border border-zinc-200 bg-white">
+              <div className="flex flex-wrap items-start justify-between gap-4 border-b border-zinc-200 p-5">
+                <div>
+                  <p className="text-xs font-bold uppercase text-emerald-700">{humanizeCode(opportunity.market_type)} / {humanizeCode(opportunity.period)}</p>
+                  <h3 className="mt-1 text-lg font-bold">{event ? `${event.home_team} vs ${event.away_team}` : `Event ${opportunity.event_id}`}</h3>
+                  <p className="mt-1 text-xs text-zinc-500">Calculated {formatDateTime(opportunity.calculated_at)} / fingerprint {opportunity.fingerprint.slice(0, 12)}</p>
+                </div>
+                <span className={`rounded-[4px] border px-2.5 py-1 text-xs font-bold ${arbitrageStatusClass(opportunity.status)}`}>
+                  {opportunity.status.toUpperCase()}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 border-b border-zinc-200 md:grid-cols-5">
+                <ArbitrageMetric label="Cash outlay" value={formatMoney(opportunity.total_cash_outlay, opportunity.currency)} />
+                <ArbitrageMetric label="Minimum payout" value={formatMoney(opportunity.minimum_net_payout, opportunity.currency)} />
+                <ArbitrageMetric label="Worst-case profit" value={formatMoney(opportunity.net_profit, opportunity.currency)} />
+                <ArbitrageMetric label="Net ROI" value={formatSignedPercent(opportunity.net_roi)} />
+                <ArbitrageMetric label="Inverse sum" value={opportunity.inverse_sum.toFixed(4)} />
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[850px] text-left text-sm">
+                  <thead className="bg-zinc-50 text-xs uppercase text-zinc-500">
+                    <tr><th className="px-4 py-3">Outcome</th><th className="px-4 py-3">Bookmaker</th><th className="px-4 py-3 text-right">Odds</th><th className="px-4 py-3 text-right">Stake</th><th className="px-4 py-3 text-right">Costs</th><th className="px-4 py-3 text-right">Net payout</th><th className="px-4 py-3">Provenance</th></tr>
+                  </thead>
+                  <tbody>
+                    {opportunity.legs.map((leg) => (
+                      <tr key={leg.id} className="border-t border-zinc-100">
+                        <td className="px-4 py-3 font-semibold">{leg.selection_name}</td>
+                        <td className="px-4 py-3">{leg.bookmaker}</td>
+                        <td className="px-4 py-3 text-right font-mono">{leg.decimal_odds.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right font-mono">{formatMoney(leg.stake, opportunity.currency)}</td>
+                        <td className="px-4 py-3 text-right font-mono">{formatMoney(leg.taxes_and_fees, opportunity.currency)}</td>
+                        <td className="px-4 py-3 text-right font-mono">{formatMoney(leg.net_payout, opportunity.currency)}</td>
+                        <td className="px-4 py-3 text-xs text-zinc-500">Snapshot #{leg.odds_snapshot_id} / tax #{leg.tax_profile_id ?? 'missing'} / limit #{leg.bookmaker_constraint_id ?? 'missing'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="grid gap-3 border-t border-zinc-200 bg-zinc-50 px-5 py-4 text-xs md:grid-cols-[1fr_auto] md:items-start">
+                <div>
+                  <p className="font-semibold text-zinc-700">Tax {humanizeCode(opportunity.tax_status)} / constraints {humanizeCode(opportunity.constraint_status)} / prices {humanizeCode(opportunity.freshness_status)}</p>
+                  {opportunity.risks.map((risk) => <p key={risk} className="mt-1 text-amber-800">{risk}</p>)}
+                </div>
+                <p className="font-semibold text-zinc-500">Pre-acceptance calculation only</p>
+              </div>
+            </article>
+          )
+        })}
+      </div>
+
+      <div className="border-l-4 border-rose-500 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-950">
+        “Executable” means the stored calculation passed configured checks at its cutoff. It is never a guarantee that every bookmaker leg will be accepted and honoured.
+      </div>
+    </div>
+  )
+}
+
+function ArbitrageMetric({ label, value }: { label: string; value: string }) {
+  return <div className="border-r border-b border-zinc-200 p-4 last:border-r-0 md:border-b-0"><p className="text-xs font-semibold uppercase text-zinc-500">{label}</p><p className="mt-1 font-mono text-base font-bold">{value}</p></div>
+}
+
+function formatMoney(value: number, currency: string): string {
+  return `${currency} ${value.toFixed(2)}`
+}
+
+function arbitrageStatusClass(status: string): string {
+  return status === 'executable'
+    ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+    : 'border-amber-200 bg-amber-50 text-amber-800'
 }
 
 function SignalRow({ dashboard, signal }: { dashboard: DashboardData; signal: ValueSignal }) {

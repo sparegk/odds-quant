@@ -26,7 +26,11 @@ describe('API client', () => {
     const data = await loadDashboard()
 
     expect(data.status.automated_betting).toBe(false)
-    expect(fetchMock).toHaveBeenCalledTimes(9)
+    expect(fetchMock).toHaveBeenCalledTimes(10)
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/api/v1/arbitrage/opportunities'),
+      expect.any(Object),
+    )
   })
 
   it('requests comparison data for the selected event', async () => {
