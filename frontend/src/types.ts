@@ -146,6 +146,69 @@ export interface CreateBetBuilderQuote {
   quoted_at: string
 }
 
+export interface SignalBacktestObservation {
+  id: number
+  event_id: number
+  selection_id: number
+  prediction_id: number
+  odds_snapshot_id: number
+  predicted_at: string
+  settled_at: string
+  market_type: string
+  selection_code: string
+  decimal_odds: number
+  model_probability: number
+  lower_probability: number
+  expected_value: number
+  settlement: string
+  stake: number
+  profit_units: number
+}
+
+export interface SignalBacktest {
+  id: number
+  model_version_id: number
+  model_version: string
+  status: string
+  evaluation_start: string
+  evaluation_end: string
+  fingerprint: string
+  evaluation_status: string
+  is_demo: boolean
+  config: Record<string, unknown>
+  policy: Record<string, unknown>
+  metrics: Record<string, unknown>
+  observations: SignalBacktestObservation[]
+  created_at: string
+}
+
+export interface BankrollPoint {
+  observation_id: number
+  bankroll: number
+  stake: number
+  profit: number
+  drawdown: number
+}
+
+export interface BankrollSimulation {
+  backtest_run_id: number
+  backtest_fingerprint: string
+  simulation_fingerprint: string
+  strategy: string
+  initial_bankroll: number
+  final_bankroll: number
+  total_staked: number
+  net_profit: number
+  roi: number
+  maximum_drawdown: number
+  maximum_drawdown_fraction: number
+  bets_placed: number
+  bets_skipped: number
+  is_demo: boolean
+  warnings: string[]
+  points: BankrollPoint[]
+}
+
 export type DashboardResource =
   | 'status'
   | 'events'
@@ -157,6 +220,7 @@ export type DashboardResource =
   | 'signals'
   | 'underdogs'
   | 'arbitrage'
+  | 'backtests'
 
 export interface CalibrationBucket {
   selection_code: string
@@ -327,5 +391,6 @@ export interface DashboardData {
   signals: ValueSignal[]
   underdogs: ValueSignal[]
   arbitrage: ArbitrageOpportunity[]
+  backtests: SignalBacktest[]
   resource_errors: Partial<Record<DashboardResource, string>>
 }

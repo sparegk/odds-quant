@@ -21,6 +21,7 @@ import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { API_BASE_URL, loadComparison, loadDashboard } from './api/client'
 import { FreshnessBadge } from './components/FreshnessBadge'
 import { BetBuilderLab } from './components/BetBuilderLab'
+import { BankrollResearch } from './components/BankrollResearch'
 import { QuantPriceTable } from './components/QuantPriceTable'
 import { formatDateTime, humanizeCode } from './lib/format'
 import type { DashboardData, EvaluationRun, EventSummary, MarketComparison, ValueSignal } from './types'
@@ -289,9 +290,9 @@ function ActiveView(props: ActiveViewProps) {
     case 'models':
       return <ModelPerformance dashboard={props.dashboard} />
     case 'backtests':
-      return <EvaluationPerformance evaluations={props.dashboard.evaluations} />
+      return <BacktestResearch dashboard={props.dashboard} />
     case 'bankroll':
-      return <UnavailableModule title="Bankroll research" requirement="Validated signal history and uncertainty-aware return assumptions" />
+      return <BankrollResearch backtests={props.dashboard.backtests} />
   }
 }
 
@@ -491,6 +492,27 @@ function EvaluationPerformance({ evaluations }: { evaluations: EvaluationRun[] }
           This run verifies the software path only. Demo results cannot validate the model or unlock value signals.
         </div>
       ) : null}
+    </div>
+  )
+}
+
+export function BacktestResearch({ dashboard }: { dashboard: DashboardData }) {
+  return (
+    <div className="space-y-10">
+      <section>
+        <SectionHeading eyebrow="Timestamped signal replay" title="Settled strategy backtests" />
+        {dashboard.backtests.length ? (
+          <div className="overflow-x-auto border-y border-zinc-200 bg-white">
+            <table className="w-full min-w-[900px] text-left text-sm">
+              <thead className="bg-zinc-50 text-xs uppercase text-zinc-500"><tr><th className="px-4 py-3">Run</th><th className="px-4 py-3">Evidence</th><th className="px-4 py-3 text-right">Bets</th><th className="px-4 py-3 text-right">Profit</th><th className="px-4 py-3 text-right">ROI</th><th className="px-4 py-3 text-right">Max drawdown</th><th className="px-4 py-3">Fingerprint</th></tr></thead>
+              <tbody>{dashboard.backtests.map((run) => <tr key={run.id} className="border-t border-zinc-100"><td className="px-4 py-3 font-semibold">#{run.id} / {run.model_version}</td><td className="px-4 py-3"><span className="rounded-[4px] border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800">{humanizeCode(run.evaluation_status)}</span></td><td className="px-4 py-3 text-right font-mono">{metricValue(run.metrics, 'bet_count') ?? 0}</td><td className="px-4 py-3 text-right font-mono">{formatScore(metricValue(run.metrics, 'net_profit_units'))}</td><td className="px-4 py-3 text-right font-mono">{formatSignedPercent(metricValue(run.metrics, 'roi') ?? 0)}</td><td className="px-4 py-3 text-right font-mono">{formatScore(metricValue(run.metrics, 'maximum_drawdown_units'))}</td><td className="px-4 py-3 font-mono text-xs">{run.fingerprint.slice(0, 12)}</td></tr>)}</tbody>
+            </table>
+          </div>
+        ) : <EmptyState title="No settled signal backtests" detail="Stored calibration runs remain below. Strategy returns require timestamp-valid signals and final results known by the evaluation cutoff." />}
+      </section>
+      <section>
+        <EvaluationPerformance evaluations={dashboard.evaluations} />
+      </section>
     </div>
   )
 }
@@ -854,19 +876,6 @@ function Methodology() {
       <div className="mt-5 flex gap-3 border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-950">
         <AlertTriangle aria-hidden="true" className="mt-0.5 shrink-0" size={19} />
         <p>No prediction guarantees profit. Odds and statistical relationships change, historical performance does not ensure future performance, and this project is not affiliated with any bookmaker.</p>
-      </div>
-    </div>
-  )
-}
-
-function UnavailableModule({ title, requirement }: { title: string; requirement: string }) {
-  return (
-    <div className="grid min-h-[420px] place-items-center border-y border-zinc-200 bg-white p-6 text-center">
-      <div className="max-w-lg">
-        <span className="mx-auto grid h-12 w-12 place-items-center rounded-[6px] bg-zinc-100 text-zinc-600"><ShieldCheck aria-hidden="true" size={24} /></span>
-        <p className="mt-5 text-xs font-bold uppercase text-amber-700">Insufficient validated data</p>
-        <h2 className="mt-2 text-xl font-bold">{title} is blocked</h2>
-        <p className="mt-3 text-sm leading-6 text-zinc-600">Required: {requirement}. OddsQuant will not display synthetic performance or infer a model edge from market prices alone.</p>
       </div>
     </div>
   )

@@ -297,12 +297,17 @@ def list_evaluations(session: Session, *, model_id: int | None = None) -> list[E
     statement = select(BacktestRun).order_by(BacktestRun.created_at.desc(), BacktestRun.id.desc())
     if model_id is not None:
         statement = statement.where(BacktestRun.model_version_id == model_id)
-    return [_run_view(session, run) for run in session.scalars(statement).all()]
+    runs = [run for run in session.scalars(statement).all() if _is_calibration_run(run)]
+    return [_run_view(session, run) for run in runs]
 
 
 def get_evaluation(session: Session, run_id: int) -> EvaluationRunView | None:
     run = session.get(BacktestRun, run_id)
-    return _run_view(session, run) if run is not None else None
+    return _run_view(session, run) if run is not None and _is_calibration_run(run) else None
+
+
+def _is_calibration_run(run: BacktestRun) -> bool:
+    return run.config.get("evaluation_kind") == "expanding_window_match_result"
 
 
 def _evaluation_observations(

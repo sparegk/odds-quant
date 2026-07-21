@@ -2,7 +2,7 @@ import { cleanup, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import type { DashboardData, ValueSignal } from './types'
-import { ArbitrageResearch, InlineError, InlineLoading, ResourceErrors, SignalResearch } from './App'
+import { ArbitrageResearch, BacktestResearch, InlineError, InlineLoading, ResourceErrors, SignalResearch } from './App'
 
 afterEach(cleanup)
 
@@ -73,6 +73,7 @@ const dashboard: DashboardData = {
   signals: [valueSignal],
   underdogs: [valueSignal],
   arbitrage: [],
+  backtests: [],
   resource_errors: {},
 }
 
@@ -188,5 +189,34 @@ describe('dashboard resource states', () => {
     expect(screen.getByText(/Signals, Arbitrage/)).toBeInTheDocument()
     expect(screen.getByText(/API request failed: 504/)).toBeInTheDocument()
     expect(screen.getByText('Loading price comparison')).toBeInTheDocument()
+  })
+})
+
+describe('BacktestResearch', () => {
+  it('shows settled return evidence separately from calibration', () => {
+    render(<BacktestResearch dashboard={{
+      ...dashboard,
+      backtests: [{
+        id: 44,
+        model_version_id: 3,
+        model_version: 'poisson-v1',
+        status: 'completed',
+        evaluation_start: '2026-01-01T00:00:00Z',
+        evaluation_end: '2026-06-01T00:00:00Z',
+        fingerprint: 'abcdef1234567890',
+        evaluation_status: 'research_only',
+        is_demo: false,
+        config: {},
+        policy: { profitability_claim_allowed: false },
+        metrics: { bet_count: 24, net_profit_units: 3.2, roi: 0.1333, maximum_drawdown_units: 4.5 },
+        observations: [],
+        created_at: '2026-07-19T12:00:00Z',
+      }],
+    }} />)
+
+    expect(screen.getByText('#44 / poisson-v1')).toBeInTheDocument()
+    expect(screen.getByText('Research Only')).toBeInTheDocument()
+    expect(screen.getByText('+13.3%')).toBeInTheDocument()
+    expect(screen.getByText('No chronological evaluations')).toBeInTheDocument()
   })
 })

@@ -1,5 +1,6 @@
 import type {
   ArbitrageOpportunity,
+  BankrollSimulation,
   BetBuilderQuote,
   CreateBetBuilderQuote,
   DashboardData,
@@ -13,6 +14,7 @@ import type {
   ProjectStatus,
   ProviderJob,
   ProviderSummary,
+  SignalBacktest,
   ValueSignal,
 } from '../types'
 
@@ -57,7 +59,7 @@ async function loadResource<T>(resource: DashboardResource, path: string, fallba
 }
 
 export async function loadDashboard(): Promise<DashboardData> {
-  const [status, events, providers, imports, jobs, models, evaluations, signals, underdogs, arbitrage] = await Promise.all([
+  const [status, events, providers, imports, jobs, models, evaluations, signals, underdogs, arbitrage, backtests] = await Promise.all([
     loadResource<ProjectStatus>('status', '/api/v1/status', {
       phase: 'unavailable',
       sports: [],
@@ -73,8 +75,9 @@ export async function loadDashboard(): Promise<DashboardData> {
     loadResource<ValueSignal[]>('signals', '/api/v1/signals', []),
     loadResource<ValueSignal[]>('underdogs', '/api/v1/signals/underdogs', []),
     loadResource<ArbitrageOpportunity[]>('arbitrage', '/api/v1/arbitrage/opportunities', []),
+    loadResource<SignalBacktest[]>('backtests', '/api/v1/backtests', []),
   ])
-  const resources = [status, events, providers, imports, jobs, models, evaluations, signals, underdogs, arbitrage]
+  const resources = [status, events, providers, imports, jobs, models, evaluations, signals, underdogs, arbitrage, backtests]
   const resource_errors = Object.fromEntries(
     resources.filter((result) => result.error).map((result) => [result.resource, result.error]),
   ) as DashboardData['resource_errors']
@@ -89,6 +92,7 @@ export async function loadDashboard(): Promise<DashboardData> {
     signals: signals.data,
     underdogs: underdogs.data,
     arbitrage: arbitrage.data,
+    backtests: backtests.data,
     resource_errors,
   }
 }
@@ -107,6 +111,18 @@ export function loadBuilderQuotes(eventId: number): Promise<BetBuilderQuote[]> {
 
 export function createBuilderQuote(payload: CreateBetBuilderQuote): Promise<BetBuilderQuote> {
   return request<BetBuilderQuote>('/api/v1/bet-builder/quotes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+}
+
+export function simulateBankroll(payload: {
+  backtest_run_id: number
+  strategy: 'flat' | 'percentage' | 'fractional_kelly'
+  initial_bankroll: number
+}): Promise<BankrollSimulation> {
+  return request<BankrollSimulation>('/api/v1/bankroll/simulate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
