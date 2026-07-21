@@ -468,7 +468,7 @@ function EvaluationPerformance({ evaluations }: { evaluations: EvaluationRun[] }
   )
 }
 
-function SignalResearch({ dashboard, mode }: { dashboard: DashboardData; mode: 'value' | 'underdog' }) {
+export function SignalResearch({ dashboard, mode }: { dashboard: DashboardData; mode: 'value' | 'underdog' }) {
   const signals = mode === 'underdog' ? dashboard.underdogs : dashboard.signals
   const title = mode === 'underdog' ? 'Positive-EV team underdogs' : 'Explainable price signals'
   const valueCount = signals.filter((signal) => signal.signal_type === 'VALUE').length
