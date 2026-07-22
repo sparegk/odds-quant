@@ -20,7 +20,9 @@ import type {
   MatchdayCompetition,
   MatchdayEvent,
   MatchdayEventDetail,
+  MarketComparison,
   ResearchGate,
+  SnapshotComparison,
   TeamForm,
 } from '../types'
 
@@ -374,6 +376,9 @@ function MatchDetail({ detail }: { detail: MatchdayEventDetail }) {
               </table>
             </div>
           ) : <ResearchEmpty text="No complete timestamp-valid bookmaker comparison is stored." />}
+          {detail.markets.length ? (
+            <div className="mt-4 space-y-3">{detail.markets.map((market) => <MarketSnapshotStats key={market.market_id} market={market} />)}</div>
+          ) : null}
           <p className="mt-3 text-xs leading-5 text-zinc-500">{detail.bookmaker_guidance}</p>
         </section>
 
@@ -392,6 +397,60 @@ function MatchDetail({ detail }: { detail: MatchdayEventDetail }) {
       </div>
     </article>
   )
+}
+
+function MarketSnapshotStats({ market }: { market: MarketComparison }) {
+  return (
+    <div className="border border-zinc-200">
+      <div className="flex flex-wrap items-start justify-between gap-2 bg-zinc-50 px-3 py-2.5">
+        <div>
+          <p className="text-sm font-bold">{humanizeCode(market.market_type)}{market.line === null ? '' : ` ${market.line}`}</p>
+          <p className="mt-0.5 text-[11px] text-zinc-500">{humanizeCode(market.period)} ? {market.currency}</p>
+        </div>
+        <p className="max-w-xs text-right text-[11px] text-zinc-500">Settlement: {humanizeCode(market.settlement_rule_key)}</p>
+      </div>
+      {market.snapshots.length ? market.snapshots.map((snapshot) => (
+        <SnapshotStats key={snapshot.snapshot_id} snapshot={snapshot} />
+      )) : <p className="border-t border-zinc-100 px-3 py-3 text-xs text-zinc-500">No complete snapshot details are available for this market.</p>}
+    </div>
+  )
+}
+
+function SnapshotStats({ snapshot }: { snapshot: SnapshotComparison }) {
+  return (
+    <div className="border-t border-zinc-100 p-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-bold">{snapshot.bookmaker}</p>
+            <span className={`border px-1.5 py-0.5 text-[10px] font-bold uppercase ${snapshot.is_stale ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-emerald-300 bg-emerald-50 text-emerald-800'}`}>{snapshot.is_stale ? 'stale' : 'fresh'}</span>
+          </div>
+          <p className="mt-1 text-[11px] text-zinc-500">Observed {formatDateTime(snapshot.observed_at)} ? source updated {formatDateTime(snapshot.source_updated_at)}</p>
+        </div>
+        <div className="grid grid-cols-3 gap-4 text-right text-[11px]">
+          <StatValue label="Age" value={formatAge(snapshot.freshness_seconds)} />
+          <StatValue label="Overround" value={percentage(snapshot.overround)} />
+          <StatValue label="Margin" value={percentage(snapshot.bookmaker_margin)} />
+        </div>
+      </div>
+      <div className="mt-3 overflow-x-auto">
+        <table className="w-full min-w-[610px] text-left text-xs">
+          <thead className="text-[10px] uppercase text-zinc-500"><tr><th className="pb-2">Selection</th><th className="pb-2 text-right">Odds</th><th className="pb-2 text-right">Raw implied</th><th className="pb-2 text-right">Fair probability</th><th className="pb-2 text-right">Fair odds</th></tr></thead>
+          <tbody>{snapshot.prices.map((price) => <tr className="border-t border-zinc-100" key={price.selection_code}><td className="py-2 font-semibold">{price.selection_name}</td><td className="py-2 text-right font-mono font-bold">{price.decimal_odds.toFixed(2)}</td><td className="py-2 text-right font-mono">{percentage(price.raw_implied_probability)}</td><td className="py-2 text-right font-mono">{percentage(price.proportional_fair_probability)}</td><td className="py-2 text-right font-mono">{price.proportional_fair_odds.toFixed(2)}</td></tr>)}</tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+function StatValue({ label, value }: { label: string; value: string }) {
+  return <div><p className="uppercase text-zinc-400">{label}</p><p className="mt-0.5 font-mono font-bold text-zinc-700">{value}</p></div>
+}
+
+function formatAge(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`
+  return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`
 }
 
 function TeamFormCard({ form }: { form: TeamForm }) {

@@ -104,7 +104,31 @@ const detail: MatchdayEventDetail = {
       period: 'FULL_TIME',
       currency: 'EUR',
       settlement_rule_key: 'standard_90_minutes',
-      snapshots: [],
+      snapshots: [
+        {
+          snapshot_id: 9,
+          bookmaker_id: 4,
+          bookmaker: 'Beacon Bet',
+          provider: 'Licensed feed',
+          observed_at: '2026-07-21T12:00:00Z',
+          source_updated_at: '2026-07-21T11:59:00Z',
+          is_closing: false,
+          is_demo: false,
+          source_label: 'LICENSED API',
+          freshness_seconds: 300,
+          is_stale: false,
+          overround: 1.05,
+          bookmaker_margin: 0.05,
+          prices: [
+            {
+              selection_code: 'HOME', selection_name: 'Home win', decimal_odds: 2.4,
+              raw_implied_probability: 0.4167, proportional_fair_probability: 0.3968,
+              proportional_fair_odds: 2.52, power_fair_probability: 0.4,
+              power_fair_odds: 2.5,
+            },
+          ],
+        },
+      ],
       best_prices: [
         {
           selection_code: 'HOME',
@@ -175,7 +199,11 @@ describe('MatchdayResearch', () => {
     expect(await screen.findByRole('heading', { name: /Northbridge FC vs Riverside Athletic/ })).toBeInTheDocument()
     expect(screen.getByText(/Likelihood only/)).toBeInTheDocument()
     expect(screen.getByText('52.0%')).toBeInTheDocument()
-    expect(screen.getByText('Beacon Bet')).toBeInTheDocument()
+    expect(screen.getAllByText('Beacon Bet')).toHaveLength(2)
+    expect(screen.getByText('Overround')).toBeInTheDocument()
+    expect(screen.getByText('Margin')).toBeInTheDocument()
+    expect(screen.getByText('Fair probability')).toBeInTheDocument()
+    expect(screen.getByText('39.7%')).toBeInTheDocument()
     expect(screen.getByText('Player markets remain research-only')).toBeInTheDocument()
     expect(screen.getByText('No verified builder value')).toBeInTheDocument()
     expect(selectEvent).toHaveBeenCalledWith(42)
