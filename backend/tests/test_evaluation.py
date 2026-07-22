@@ -103,6 +103,14 @@ def test_walk_forward_evaluation_persists_immutable_demo_evidence(
         "home_advantage": 75.0,
         "draw_probability_at_even_strength": 0.26,
     }
+    assert run.benchmarks["dixon_coles"]["observations"] == 8
+    assert isinstance(run.benchmarks["dixon_coles"]["brier_score"], float)
+    assert isinstance(run.benchmarks["dixon_coles"]["log_loss"], float)
+    assert run.config["dixon_coles_benchmark"] == {
+        "version": "time-decayed-dixon-coles-v1",
+        "decay_rate": 0.0018,
+        "low_score_rho_bounds": [-0.2, 0.2],
+    }
     assert len(run.calibration) > 0
     session.refresh(model)
     assert model.evaluation_status == "unvalidated"

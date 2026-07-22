@@ -89,39 +89,35 @@ def fit_dixon_coles(
         0.1,
         sum(match.home_goals + match.away_goals for match in eligible) / (2 * len(eligible)),
     )
-    initial = np.zeros(2 * team_count + 3, dtype=np.float64)
-    initial[2 * team_count] = math.log(average_goals)
-    initial[2 * team_count + 1] = 0.15
-    bounds = [(-3.0, 3.0)] * (2 * team_count) + [(-3.0, 2.0), (-1.0, 1.0), (-0.2, 0.2)]
-    constraints = [
-        {"type": "eq", "fun": lambda values: float(np.sum(values[:team_count]))},
-        {
-            "type": "eq",
-            "fun": lambda values: float(np.sum(values[team_count : 2 * team_count])),
-        },
+    free_team_parameters = team_count - 1
+    initial = np.zeros(2 * free_team_parameters + 3, dtype=np.float64)
+    initial[2 * free_team_parameters] = math.log(average_goals)
+    initial[2 * free_team_parameters + 1] = 0.15
+    bounds = [(-3.0, 3.0)] * (2 * free_team_parameters) + [
+        (-3.0, 2.0),
+        (-1.0, 1.0),
+        (-0.2, 0.2),
     ]
     result = minimize(
         _negative_log_likelihood,
         initial,
         args=(eligible, team_index, cutoff, decay_rate),
-        method="SLSQP",
+        method="L-BFGS-B",
         bounds=bounds,
-        constraints=constraints,
-        options={"ftol": 1e-10, "maxiter": 1000},
+        options={"ftol": 1e-10, "maxiter": 300},
     )
     if not result.success or not np.all(np.isfinite(result.x)):
         raise ValueError(f"Dixon-Coles optimization failed: {result.message}")
     values = result.x
+    attacks, defences, intercept, home_advantage, rho = _unpack_parameters(values, team_count)
     return DixonColesModel(
         fitted_as_of=cutoff,
         decay_rate=decay_rate,
-        home_advantage=float(values[2 * team_count + 1]),
-        intercept=float(values[2 * team_count]),
-        rho=float(values[2 * team_count + 2]),
-        attacks={team_id: float(values[index]) for team_id, index in team_index.items()},
-        defences={
-            team_id: float(values[team_count + index]) for team_id, index in team_index.items()
-        },
+        home_advantage=home_advantage,
+        intercept=intercept,
+        rho=rho,
+        attacks={team_id: float(attacks[index]) for team_id, index in team_index.items()},
+        defences={team_id: float(defences[index]) for team_id, index in team_index.items()},
         sample_size=len(eligible),
     )
 
@@ -158,11 +154,7 @@ def _negative_log_likelihood(
     decay_rate: float,
 ) -> float:
     team_count = len(team_index)
-    attacks = values[:team_count]
-    defences = values[team_count : 2 * team_count]
-    intercept = float(values[2 * team_count])
-    home_advantage = float(values[2 * team_count + 1])
-    rho = float(values[2 * team_count + 2])
+    attacks, defences, intercept, home_advantage, rho = _unpack_parameters(values, team_count)
     likelihood = 0.0
     for match in matches:
         home_index = team_index[match.home_team_id]
@@ -183,12 +175,34 @@ def _negative_log_likelihood(
         age_days = max(0.0, (cutoff - _utc(match.kickoff_at)).total_seconds() / 86400)
         weight = math.exp(-decay_rate * age_days)
         log_probability = (
-            poisson.logpmf(match.home_goals, home_lambda)
-            + poisson.logpmf(match.away_goals, away_lambda)
+            _poisson_log_probability(match.home_goals, home_lambda)
+            + _poisson_log_probability(match.away_goals, away_lambda)
             + math.log(correction)
         )
-        likelihood -= weight * float(log_probability)
+        likelihood -= weight * log_probability
     return likelihood
+
+
+def _poisson_log_probability(goals: int, expected_goals: float) -> float:
+    return goals * math.log(expected_goals) - expected_goals - math.lgamma(goals + 1)
+
+
+def _unpack_parameters(
+    values: NDArray[np.float64],
+    team_count: int,
+) -> tuple[NDArray[np.float64], NDArray[np.float64], float, float, float]:
+    free_count = team_count - 1
+    attack_free = values[:free_count]
+    defence_free = values[free_count : 2 * free_count]
+    attacks = np.append(attack_free, -float(np.sum(attack_free)))
+    defences = np.append(defence_free, -float(np.sum(defence_free)))
+    return (
+        attacks,
+        defences,
+        float(values[2 * free_count]),
+        float(values[2 * free_count + 1]),
+        float(values[2 * free_count + 2]),
+    )
 
 
 def _tau(
