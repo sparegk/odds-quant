@@ -93,6 +93,35 @@ def test_provider_error_never_exposes_the_api_key() -> None:
     assert SECRET not in str(caught.value)
 
 
+def test_collects_champions_league_fixtures_without_bookmaker_markets() -> None:
+    league_slug = "international-clubs-uefa-champions-league-qualification"
+    event = _event(
+        321,
+        league_name="UEFA Champions League Qualification",
+        league_slug=league_slug,
+    )
+    requested_leagues: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path.endswith("/events")
+        league = request.url.params["league"]
+        requested_leagues.append(league)
+        return httpx.Response(200, json=[event] if league == league_slug else [])
+
+    with OddsApiIoClient(SECRET, transport=httpx.MockTransport(handler)) as client:
+        fixtures = client.collect_fixtures(observed_at=OBSERVED_AT)
+
+    assert len(fixtures) == 1
+    fixture = fixtures[0]
+    assert fixture.provider_event_key == "321"
+    assert fixture.competition == "UEFA Champions League Qualification"
+    assert fixture.country == "International"
+    assert fixture.season == "2026/27"
+    assert fixture.status == "scheduled"
+    assert fixture.observed_at == OBSERVED_AT
+    assert requested_leagues == list(LEAGUE_COUNTRIES)
+
+
 def test_collects_complete_timestamped_prematch_match_result_rows() -> None:
     requested_leagues: list[str] = []
 

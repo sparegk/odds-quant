@@ -14,13 +14,14 @@ from app.collectors.registry import (
     registered_odds_providers,
 )
 from app.core.config import Settings
-from app.db.models import OddsSnapshot, ProviderJob
+from app.db.models import Event, FixtureObservation, OddsSnapshot, ProviderJob
 from app.db.session import Base
 from app.jobs.scheduler import (
     register_configured_providers,
     run_provider_collection,
     seed_development_demo,
 )
+from app.schemas.fixtures import FixtureImportRow
 from app.schemas.odds import OddsImportRow
 from app.services.demo_seed import build_demo_odds_csv
 from app.services.odds_import import parse_odds_csv
@@ -45,6 +46,15 @@ class FakeLicensedProvider:
 class FailingProvider(FakeLicensedProvider):
     def collect_odds(self) -> Iterable[OddsImportRow]:
         raise RuntimeError("secret-token-must-not-be-persisted")
+
+
+class FixtureOnlyProvider(FakeLicensedProvider):
+    def __init__(self, fixtures: list[FixtureImportRow]) -> None:
+        super().__init__([])
+        self.fixtures = fixtures
+
+    def collect_fixtures(self) -> Iterable[FixtureImportRow]:
+        return self.fixtures
 
 
 @pytest.fixture(autouse=True)
@@ -82,6 +92,36 @@ def test_registered_provider_collection_records_completed_job(
         assert job.status == "completed"
         assert job.message == "Imported 24 prices across 8 snapshots"
         assert session.scalar(select(func.count()).select_from(OddsSnapshot)) == 8
+
+
+def test_registered_provider_persists_fixture_without_supported_odds(
+    sessions: sessionmaker[Session],
+) -> None:
+    provider = FixtureOnlyProvider(
+        [
+            FixtureImportRow(
+                provider_event_key="ucl-321",
+                competition="UEFA Champions League Qualification",
+                country="International",
+                season="2026/27",
+                kickoff_at=AS_OF + timedelta(days=1),
+                home_team="Northbridge FC",
+                away_team="Harbour Athletic",
+                observed_at=AS_OF,
+            )
+        ]
+    )
+
+    job_id = run_provider_collection(provider, session_factory=sessions, now=AS_OF)
+
+    with sessions() as session:
+        job = session.get(ProviderJob, job_id)
+        assert job is not None
+        assert job.status == "completed"
+        assert job.message == "Observed 1 fixtures (1 new); provider returned no odds rows"
+        assert session.scalar(select(func.count()).select_from(Event)) == 1
+        assert session.scalar(select(func.count()).select_from(FixtureObservation)) == 1
+        assert session.scalar(select(func.count()).select_from(OddsSnapshot)) == 0
 
 
 def test_collection_cutoff_is_recorded_after_provider_observation(

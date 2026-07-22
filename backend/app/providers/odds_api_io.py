@@ -10,6 +10,7 @@ from typing import Any
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
+from app.schemas.fixtures import FixtureImportRow
 from app.schemas.odds import MarketType, OddsImportRow
 
 ODDS_API_IO_TERMS_URL = "https://odds-api.io/terms"
@@ -208,6 +209,19 @@ class OddsApiIoClient:
             rows.extend(_normalize_batch(batch, odds_events, observed_at))
         return rows
 
+    def collect_fixtures(
+        self,
+        *,
+        observed_at: datetime,
+        horizon: timedelta = COLLECTION_HORIZON,
+    ) -> list[FixtureImportRow]:
+        _require_aware(observed_at, "observation timestamp")
+        if horizon <= timedelta(0):
+            raise ValueError("collection horizon must be positive")
+        return [
+            _fixture_row(event, observed_at) for event in self._pending_events(observed_at, horizon)
+        ]
+
     def probe_bet_builder_markets(
         self,
         *,
@@ -339,6 +353,15 @@ class OddsApiIoProvider:
         self._base_url = base_url
         self._transport = transport
         self._clock = clock
+
+    def collect_fixtures(self) -> Iterable[FixtureImportRow]:
+        observed_at = self._clock()
+        with OddsApiIoClient(
+            self._api_key,
+            base_url=self._base_url,
+            transport=self._transport,
+        ) as client:
+            return client.collect_fixtures(observed_at=observed_at)
 
     def collect_odds(self) -> Iterable[OddsImportRow]:
         observed_at = self._clock()
@@ -515,6 +538,26 @@ def _normalize_corner_totals(
                 )
             )
     return rows
+
+
+def _fixture_row(event: _Event, observed_at: datetime) -> FixtureImportRow:
+    country = LEAGUE_COUNTRIES.get(event.league.slug.casefold())
+    if country is None:
+        raise OddsApiIoError("odds provider returned an unsupported competition")
+    try:
+        return FixtureImportRow(
+            provider_event_key=str(event.id),
+            competition=event.league.name,
+            country=country,
+            season=_football_season(event.date),
+            kickoff_at=event.date,
+            home_team=event.home,
+            away_team=event.away,
+            status="scheduled",
+            observed_at=observed_at,
+        )
+    except ValidationError:
+        raise OddsApiIoError("odds provider returned an invalid fixture") from None
 
 
 def _odds_row(
