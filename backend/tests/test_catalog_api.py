@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Competition, Event, MatchResult, OddsSnapshot
+from app.db.models import Bookmaker, Competition, Event, MatchResult, OddsSnapshot, Provider
 from app.db.session import Base, get_db
 from app.main import app
 from app.services.demo_seed import build_demo_odds_csv, build_demo_results_csv, seed_demo_data
@@ -59,6 +59,44 @@ def test_events_providers_and_detail_use_stored_data(
     assert detail.status_code == 200
     assert detail.json()["event"]["home_team"] == "Northbridge FC"
     assert len(detail.json()["markets"]) == 1
+
+
+def test_data_coverage_fails_closed_for_demo_and_reports_permitted_gaps(
+    api: tuple[TestClient, Session, datetime],
+) -> None:
+    client, session, _ = api
+
+    demo = client.get("/api/v1/data/coverage")
+
+    assert demo.status_code == 200
+    assert demo.json()["total_events"] == 4
+    assert demo.json()["permitted_events"] == 0
+    assert demo.json()["permitted_final_results"] == 0
+    assert demo.json()["competitions"][0]["blockers"] == [
+        "no_permitted_events",
+        "fewer_than_200_final_results",
+        "no_timestamped_odds",
+        "no_closing_prices",
+    ]
+
+    for provider in session.scalars(select(Provider)).all():
+        provider.is_demo = False
+    for bookmaker in session.scalars(select(Bookmaker)).all():
+        bookmaker.is_demo = False
+    for event in session.scalars(select(Event)).all():
+        event.is_demo = False
+    snapshot = session.scalar(select(OddsSnapshot).order_by(OddsSnapshot.id))
+    assert snapshot is not None
+    snapshot.is_closing = True
+    session.commit()
+
+    permitted = client.get("/api/v1/data/coverage").json()
+    competition = permitted["competitions"][0]
+    assert permitted["permitted_events"] == 4
+    assert permitted["permitted_odds_snapshots"] == 8
+    assert permitted["permitted_closing_snapshots"] == 1
+    assert competition["closing_event_coverage"] == pytest.approx(0.25)
+    assert competition["blockers"] == ["fewer_than_200_final_results"]
 
 
 def test_odds_comparison_calculates_devig_and_best_prices(

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.db.session import get_db
 from app.schemas.api import (
+    DataCoverageView,
     EventDetail,
     EventSummary,
     MarketComparison,
@@ -23,6 +24,7 @@ from app.services.catalog import (
     list_providers,
     odds_comparison,
 )
+from app.services.data_coverage import data_coverage
 from app.services.readiness import readiness_counts
 
 router = APIRouter()
@@ -32,6 +34,11 @@ Database = Annotated[Session, Depends(get_db)]
 @router.get("/readiness", response_model=ReadinessCounts, tags=["system"])
 def readiness(database: Database) -> ReadinessCounts:
     return readiness_counts(database)
+
+
+@router.get("/data/coverage", response_model=DataCoverageView, tags=["data"])
+def coverage(database: Database) -> DataCoverageView:
+    return data_coverage(database)
 
 
 @router.get("/events", response_model=list[EventSummary], tags=["events"])

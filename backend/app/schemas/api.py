@@ -48,6 +48,34 @@ class ReadinessCounts(BaseModel):
     intelligence_records: int
 
 
+class CompetitionDataCoverage(BaseModel):
+    competition_id: int
+    competition: str
+    country: str
+    season: str
+    total_events: int
+    permitted_events: int
+    permitted_teams: int
+    permitted_final_results: int
+    permitted_odds_snapshots: int
+    permitted_closing_snapshots: int
+    first_result_kickoff_at: datetime | None
+    last_result_kickoff_at: datetime | None
+    closing_event_coverage: float
+    evaluation_ready: bool
+    blockers: list[str]
+
+
+class DataCoverageView(BaseModel):
+    minimum_evaluation_results: int
+    total_events: int
+    permitted_events: int
+    permitted_final_results: int
+    permitted_odds_snapshots: int
+    permitted_closing_snapshots: int
+    competitions: list[CompetitionDataCoverage]
+
+
 class ImportJobView(BaseModel):
     id: int
     filename: str
