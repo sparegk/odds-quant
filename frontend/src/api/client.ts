@@ -9,6 +9,7 @@ import type {
   EvaluationRun,
   EventSummary,
   ImportJob,
+  ImportUploadResult,
   MarketComparison,
   Matchday,
   MatchdayEventDetail,
@@ -41,13 +42,27 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     let detail = ''
     try {
       const body: unknown = await response.json()
-      if (typeof body === 'object' && body !== null && 'detail' in body && typeof body.detail === 'string') detail = ` — ${body.detail}`
+      const message = apiProblemMessage(body)
+      if (message) detail = ` — ${message}`
     } catch {
       // Non-JSON failures still retain their HTTP status.
     }
     throw new ApiError(`API request failed: ${response.status}${detail}`, response.status)
   }
   return (await response.json()) as T
+}
+
+function apiProblemMessage(body: unknown): string | null {
+  if (typeof body !== 'object' || body === null || !('detail' in body)) return null
+  if (typeof body.detail === 'string') return body.detail
+  if (typeof body.detail !== 'object' || body.detail === null) return null
+  const problem = body.detail as Record<string, unknown>
+  const summary = typeof problem.detail === 'string' ? problem.detail : typeof problem.title === 'string' ? problem.title : null
+  const errors: unknown[] = Array.isArray(problem.errors) ? problem.errors as unknown[] : []
+  const first = errors[0]
+  const firstRecord = typeof first === 'object' && first !== null ? first as Record<string, unknown> : null
+  const firstMessage = firstRecord && typeof firstRecord.message === 'string' ? firstRecord.message : null
+  return [summary, firstMessage].filter(Boolean).join(': ') || null
 }
 
 interface ResourceResult<T> {
@@ -109,6 +124,26 @@ export async function loadDashboard(): Promise<DashboardData> {
 
 export function loadComparison(eventId: number): Promise<MarketComparison[]> {
   return request<MarketComparison[]>(`/api/v1/odds/comparison?event_id=${eventId}`)
+}
+
+export function uploadCsv(
+  kind: 'odds' | 'results' | 'availability',
+  file: File,
+  options: { adminKey?: string; sourceKey?: string; providerSlug?: string; providerName?: string } = {},
+): Promise<ImportUploadResult> {
+  const form = new FormData()
+  form.append('file', file)
+  if (kind === 'availability') {
+    form.append('source_key', options.sourceKey ?? '')
+    form.append('provider_slug', options.providerSlug ?? '')
+    form.append('provider_name', options.providerName ?? '')
+  }
+  const path = kind === 'availability' ? '/api/v1/imports/intelligence/availability' : `/api/v1/imports/${kind}`
+  return request<ImportUploadResult>(path, {
+    method: 'POST',
+    headers: options.adminKey ? { 'X-Admin-Key': options.adminKey } : undefined,
+    body: form,
+  })
 }
 
 export function calculateArbitrage(payload: {

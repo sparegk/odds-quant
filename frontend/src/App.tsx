@@ -19,7 +19,7 @@ import {
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 
-import { API_BASE_URL, calculateArbitrage, loadComparison, loadDashboard, runSignalBacktest } from './api/client'
+import { calculateArbitrage, loadComparison, loadDashboard, runSignalBacktest } from './api/client'
 import { FreshnessBadge } from './components/FreshnessBadge'
 import { BetBuilderLab } from './components/BetBuilderLab'
 import { BankrollResearch } from './components/BankrollResearch'
@@ -28,6 +28,7 @@ import { UnderdogScanner } from './components/UnderdogScanner'
 import { ValueOpportunities } from './components/ValueOpportunities'
 import { EventMarkets } from './components/EventMarkets'
 import { ModelPerformance } from './components/ModelPerformance'
+import { DataOperations } from './components/DataOperations'
 import { QuantPriceTable } from './components/QuantPriceTable'
 import { formatDateTime, humanizeCode } from './lib/format'
 import type { DashboardData, EvaluationRun, EventSummary, MarketComparison, ValueSignal } from './types'
@@ -802,35 +803,6 @@ function OddsComparison(props: ActiveViewProps) {
   )
 }
 
-function DataOperations({ dashboard }: { dashboard: DashboardData }) {
-  return (
-    <div className="space-y-7">
-      <section>
-        <SectionHeading eyebrow="Sources" title="Provider status" />
-        <div className="overflow-x-auto border-y border-zinc-200 bg-white">
-          <table className="w-full min-w-[700px] text-left text-sm">
-            <thead className="bg-zinc-50 text-xs uppercase text-zinc-500"><tr><th className="px-4 py-3">Provider</th><th className="px-4 py-3">Kind</th><th className="px-4 py-3 text-right">Events</th><th className="px-4 py-3 text-right">Snapshots</th><th className="px-4 py-3">Classification</th></tr></thead>
-            <tbody>{dashboard.providers.map((provider) => <tr key={provider.id} className="border-t border-zinc-100"><td className="px-4 py-3 font-semibold">{provider.name}</td><td className="px-4 py-3">{humanizeCode(provider.kind)}</td><td className="px-4 py-3 text-right font-mono">{provider.event_count}</td><td className="px-4 py-3 text-right font-mono">{provider.snapshot_count}</td><td className="px-4 py-3"><span className={`rounded-[4px] border px-2 py-1 text-xs font-semibold ${provider.is_demo ? 'border-sky-200 bg-sky-50 text-sky-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>{provider.is_demo ? 'DEMO' : 'EXTERNAL'}</span></td></tr>)}</tbody>
-          </table>
-        </div>
-      </section>
-      <section className="grid gap-7 xl:grid-cols-2">
-        <div>
-          <SectionHeading eyebrow="Ingestion" title="Recent import jobs" />
-          <JobList items={dashboard.imports.map((job) => ({ id: job.id, title: job.filename, detail: `${job.rows_imported}/${job.rows_received} rows`, status: job.status, timestamp: job.created_at }))} />
-        </div>
-        <div>
-          <SectionHeading eyebrow="Scheduler" title="Provider jobs" />
-          <JobList items={dashboard.jobs.map((job) => ({ id: job.id, title: job.provider, detail: job.message || job.job_type, status: job.status, timestamp: job.created_at }))} />
-        </div>
-      </section>
-      <div className="border-l-4 border-sky-500 bg-sky-50 px-4 py-3 text-sm text-sky-950">
-        API endpoint: <code className="font-mono">{API_BASE_URL}/api/v1/imports/odds</code>. Production uploads require the configured administrative key.
-      </div>
-    </div>
-  )
-}
-
 function Methodology() {
   const methods = [
     ['Market probability', 'Decimal prices are converted to raw implied probabilities. Complete markets are de-vigged with proportional and power methods; overlapping outcomes are never treated as independent.'],
@@ -872,11 +844,6 @@ function EventRow({ event, onSelect }: { event: EventSummary; onSelect: (eventId
 
 function ReadinessRow({ label, ready, detail }: { label: string; ready: boolean; detail?: string }) {
   return <div className="flex items-center justify-between gap-4 border-b border-zinc-100 py-3 first:pt-0 last:border-0 last:pb-0"><div><p className="text-sm font-semibold">{label}</p>{detail ? <p className="mt-0.5 text-xs text-zinc-500">{detail}</p> : null}</div><span className={`rounded-[4px] border px-2 py-1 text-xs font-bold ${ready ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>{ready ? 'READY' : 'BLOCKED'}</span></div>
-}
-
-function JobList({ items }: { items: Array<{ id: number; title: string; detail: string; status: string; timestamp: string }> }) {
-  if (!items.length) return <div className="border-y border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-500">No jobs recorded.</div>
-  return <div className="border-y border-zinc-200 bg-white">{items.slice(0, 8).map((item) => <div key={item.id} className="flex items-start justify-between gap-3 border-b border-zinc-100 px-4 py-3 last:border-0"><div className="min-w-0"><p className="truncate text-sm font-semibold">{item.title}</p><p className="mt-1 truncate text-xs text-zinc-500">{item.detail} / {formatDateTime(item.timestamp)}</p></div><span className={`rounded-[4px] border px-2 py-1 text-xs font-bold ${item.status === 'completed' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : item.status === 'failed' || item.status === 'rejected' ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>{item.status.toUpperCase()}</span></div>)}</div>
 }
 
 function EmptyState({ title, detail }: { title: string; detail: string }) {

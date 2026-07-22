@@ -9,6 +9,7 @@ import {
   loadMatchdayEvent,
   loadPredictions,
   runSignalBacktest,
+  uploadCsv,
 } from './client'
 
 afterEach(() => {
@@ -160,6 +161,16 @@ describe('API client', () => {
     const init = fetchMock.mock.calls[0]?.[1]
     expect(init?.method).toBe('POST')
     expect(init?.body).toContain('evaluation_start')
+    expect(init?.headers).toMatchObject({ 'X-Admin-Key': 'secret' })
+  })
+
+  it('uploads CSV data as multipart with an in-memory admin key', async () => {
+    const fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => { void input; void init; return Promise.resolve(new Response(JSON.stringify({ job_id: 8, status: 'completed', rows_received: 1, rows_imported: 1 }), { status: 201 })) })
+    vi.stubGlobal('fetch', fetchMock)
+    await uploadCsv('odds', new File(['header\nvalue'], 'odds.csv', { type: 'text/csv' }), { adminKey: 'secret' })
+    const init = fetchMock.mock.calls[0]?.[1]
+    expect(init?.method).toBe('POST')
+    expect(init?.body).toBeInstanceOf(FormData)
     expect(init?.headers).toMatchObject({ 'X-Admin-Key': 'secret' })
   })
 })

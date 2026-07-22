@@ -70,6 +70,17 @@ export interface ModelVersion {
   created_at: string
 }
 
+export interface ImportUploadResult {
+  job_id: number
+  status: string
+  rows_received: number
+  rows_imported: number
+  snapshots_created?: number
+  results_created?: number
+  created?: Record<string, number>
+  content_sha256?: string
+}
+
 export interface SelectionPrediction {
   id: number
   market_id: number
