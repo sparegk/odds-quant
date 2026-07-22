@@ -233,6 +233,21 @@ export type DashboardResource =
   | 'underdogs'
   | 'arbitrage'
   | 'backtests'
+  | 'readiness'
+
+export interface ReadinessCounts {
+  events: number
+  odds_snapshots: number
+  final_results: number
+  model_versions: number
+  predictions: number
+  non_demo_calibrated_evaluations: number
+  signals: number
+  signal_backtests: number
+  bookmaker_tax_mappings: number
+  bookmaker_constraints: number
+  intelligence_records: number
+}
 
 export interface CalibrationBucket {
   selection_code: string
@@ -544,5 +559,6 @@ export interface DashboardData {
   underdogs: ValueSignal[]
   arbitrage: ArbitrageOpportunity[]
   backtests: SignalBacktest[]
+  readiness?: ReadinessCounts
   resource_errors: Partial<Record<DashboardResource, string>>
 }

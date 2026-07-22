@@ -38,7 +38,7 @@ describe('API client', () => {
 
     expect(data.status.automated_betting).toBe(false)
     expect(data.resource_errors).toEqual({})
-    expect(fetchMock).toHaveBeenCalledTimes(11)
+    expect(fetchMock).toHaveBeenCalledTimes(12)
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/api/v1/arbitrage/opportunities'),
       expect.any(Object),

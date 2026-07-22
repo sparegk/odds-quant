@@ -14,6 +14,7 @@ from app.schemas.api import (
     MarketComparison,
     ProviderJobView,
     ProviderSummary,
+    ReadinessCounts,
 )
 from app.services.catalog import (
     get_event,
@@ -22,9 +23,15 @@ from app.services.catalog import (
     list_providers,
     odds_comparison,
 )
+from app.services.readiness import readiness_counts
 
 router = APIRouter()
 Database = Annotated[Session, Depends(get_db)]
+
+
+@router.get("/readiness", response_model=ReadinessCounts, tags=["system"])
+def readiness(database: Database) -> ReadinessCounts:
+    return readiness_counts(database)
 
 
 @router.get("/events", response_model=list[EventSummary], tags=["events"])

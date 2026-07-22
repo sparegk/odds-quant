@@ -30,6 +30,7 @@ import { EventMarkets } from './components/EventMarkets'
 import { ModelPerformance } from './components/ModelPerformance'
 import { DataOperations } from './components/DataOperations'
 import { ArbitrageSettings } from './components/ArbitrageSettings'
+import { WorkflowReadiness } from './components/WorkflowReadiness'
 import { QuantPriceTable } from './components/QuantPriceTable'
 import { formatDateTime, humanizeCode } from './lib/format'
 import { chooseDefaultEventId } from './lib/events'
@@ -246,6 +247,7 @@ function App() {
           {!error && dashboard ? (
             <>
               <ResourceErrors errors={dashboard.resource_errors} />
+              <WorkflowReadiness dashboard={dashboard} view={view} onNavigate={(target) => selectView(target as ViewKey)} />
               <ActiveView
                 comparisonError={comparisonError}
                 comparisonLoading={comparisonLoading}

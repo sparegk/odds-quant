@@ -303,3 +303,17 @@ def test_results_training_and_prediction_api_are_connected(
     stored = client.get(f"/api/v1/events/{target.id}/predictions")
     assert stored.status_code == 200
     assert stored.json()[0]["id"] == prediction.json()["id"]
+
+
+def test_readiness_reports_stored_evidence_counts(
+    api: tuple[TestClient, Session, datetime],
+) -> None:
+    client, _, _ = api
+    response = client.get("/api/v1/readiness")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["events"] > 0
+    assert payload["odds_snapshots"] > 0
+    assert payload["non_demo_calibrated_evaluations"] == 0
+    assert payload["signals"] == 0

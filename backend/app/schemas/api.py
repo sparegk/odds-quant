@@ -34,6 +34,20 @@ class ProviderSummary(BaseModel):
     snapshot_count: int
 
 
+class ReadinessCounts(BaseModel):
+    events: int
+    odds_snapshots: int
+    final_results: int
+    model_versions: int
+    predictions: int
+    non_demo_calibrated_evaluations: int
+    signals: int
+    signal_backtests: int
+    bookmaker_tax_mappings: int
+    bookmaker_constraints: int
+    intelligence_records: int
+
+
 class ImportJobView(BaseModel):
     id: int
     filename: str
