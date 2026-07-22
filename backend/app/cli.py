@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from pydantic import BaseModel
@@ -59,6 +59,10 @@ def _parser() -> argparse.ArgumentParser:
     commands.add_parser(
         "probe-target-bookmakers",
         help="verify configured odds-provider coverage for required bookmakers",
+    )
+    commands.add_parser(
+        "probe-bet-builder-markets",
+        help="report sanitized corner/shot/player market metadata without ingesting props",
     )
     train = commands.add_parser("train-poisson", help="train a versioned Poisson baseline")
     train.add_argument("competition_id", type=int)
@@ -140,6 +144,13 @@ def main() -> int:
                     base_url=settings.odds_api_io_base_url,
                 ) as client:
                     result = client.probe_target_bookmakers()
+            elif args.command == "probe-bet-builder-markets":
+                settings = get_settings()
+                with OddsApiIoClient(
+                    settings.odds_api_io_key or "",
+                    base_url=settings.odds_api_io_base_url,
+                ) as client:
+                    result = client.probe_bet_builder_markets(observed_at=datetime.now(UTC))
             elif args.command == "train-poisson":
                 result = train_poisson_model(
                     session,

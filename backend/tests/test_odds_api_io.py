@@ -182,6 +182,83 @@ def test_collects_uefa_conference_league_corner_totals_from_novibet() -> None:
     assert {row.settlement_rule_key for row in rows} == {"novibet_total_corners_regulation_time"}
 
 
+def test_bet_builder_probe_reports_metadata_without_player_names_or_prices() -> None:
+    league_slug = "international-clubs-uefa-champions-league-qualification"
+    event = _event(
+        789,
+        league_name="UEFA Champions League Qualification",
+        league_slug=league_slug,
+    )
+    player_name = "Sensitive Player Name"
+    sensitive_price = "7.77"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/bookmakers/selected"):
+            return httpx.Response(
+                200,
+                json={"bookmakers": ["Pamestoixima", "Novibet"], "count": 2},
+            )
+        if request.url.path.endswith("/events"):
+            return httpx.Response(
+                200,
+                json=[event] if request.url.params["league"] == league_slug else [],
+            )
+        return httpx.Response(
+            200,
+            json=[
+                {
+                    **event,
+                    "bookmakers": {
+                        "Pamestoixima": [
+                            {
+                                "name": "Team Shots",
+                                "updatedAt": "2026-07-22T09:55:00Z",
+                                "odds": [{"hdp": "12.5", "over": sensitive_price, "under": "1.80"}],
+                            }
+                        ],
+                        "Novibet": [
+                            {
+                                "name": "Corners Totals",
+                                "updatedAt": "2026-07-22T09:56:00Z",
+                                "odds": [{"hdp": "9.5", "over": "1.90", "under": "1.90"}],
+                            },
+                            {
+                                "name": "Player Shots",
+                                "updatedAt": "2026-07-22T09:57:00Z",
+                                "odds": [
+                                    {
+                                        "label": player_name,
+                                        "hdp": "2.5",
+                                        "over": sensitive_price,
+                                        "under": "1.08",
+                                    }
+                                ],
+                            },
+                        ],
+                    },
+                }
+            ],
+        )
+
+    with OddsApiIoClient(SECRET, transport=httpx.MockTransport(handler)) as client:
+        report = client.probe_bet_builder_markets(observed_at=OBSERVED_AT)
+
+    serialized = report.model_dump_json()
+    assert player_name not in serialized
+    assert sensitive_price not in serialized
+    assert report.player_props_ingestion_enabled is False
+    assert report.raw_values_included is False
+    assert report.events_checked == 1
+    by_market = {(item.bookmaker, item.market_name): item for item in report.markets}
+    assert by_market[("Novibet", "Corners Totals")].ingestion_status == "implemented"
+    player = by_market[("Novibet", "Player Shots")]
+    assert player.ingestion_status == "discovery_only"
+    assert player.labeled_outcome_entries == 1
+    assert player.field_names == ["hdp", "label", "over", "under"]
+    assert "stable player identity is not validated" in player.blockers
+    assert by_market[("Allwyn / Pamestoixima", "Team Shots")].ingestion_status == ("discovery_only")
+
+
 @pytest.mark.parametrize(
     ("odds", "message"),
     [

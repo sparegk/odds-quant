@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -36,6 +38,37 @@ class TargetBookmakerProbe(BaseModel):
     active_bookmakers: list[str]
     missing_bookmakers: list[str]
     complete: bool
+
+
+class MarketDiscoverySummary(BaseModel):
+    bookmaker: str
+    market_name: str
+    event_markets: int
+    timestamped_event_markets: int
+    outcome_entries: int
+    labeled_outcome_entries: int
+    field_names: list[str]
+    ingestion_status: str
+    blockers: list[str]
+
+
+class BetBuilderMarketProbe(BaseModel):
+    provider: str
+    observed_at: datetime
+    competition_slugs: list[str]
+    events_checked: int
+    markets: list[MarketDiscoverySummary]
+    player_props_ingestion_enabled: bool = False
+    raw_values_included: bool = False
+
+
+@dataclass
+class _DiscoveryAccumulator:
+    event_markets: int = 0
+    timestamped_event_markets: int = 0
+    outcome_entries: int = 0
+    labeled_outcome_entries: int = 0
+    field_names: set[str] = dataclass_field(default_factory=set)
 
 
 class _League(BaseModel):
@@ -161,12 +194,7 @@ class OddsApiIoClient:
         if not probe.complete:
             missing = ", ".join(probe.missing_bookmakers)
             raise OddsApiIoError(f"required bookmakers are not selected: {missing}")
-        events: list[_Event] = []
-        for league_slug in LEAGUE_COUNTRIES:
-            events.extend(self._events(observed_at, observed_at + horizon, league_slug))
-        if len({event.id for event in events}) != len(events):
-            raise OddsApiIoError("odds provider returned duplicate cross-competition events")
-        events.sort(key=lambda event: (event.date, event.id))
+        events = self._pending_events(observed_at, horizon)
         rows: list[OddsImportRow] = []
         for offset in range(0, len(events), 10):
             batch = events[offset : offset + 10]
@@ -179,6 +207,73 @@ class OddsApiIoClient:
             odds_events = _validate_list(payload, _EventOdds, "event odds")
             rows.extend(_normalize_batch(batch, odds_events, observed_at))
         return rows
+
+    def probe_bet_builder_markets(
+        self,
+        *,
+        observed_at: datetime,
+        horizon: timedelta = COLLECTION_HORIZON,
+    ) -> BetBuilderMarketProbe:
+        _require_aware(observed_at, "observation timestamp")
+        if horizon <= timedelta(0):
+            raise ValueError("collection horizon must be positive")
+        probe = self.probe_target_bookmakers()
+        if not probe.complete:
+            missing = ", ".join(probe.missing_bookmakers)
+            raise OddsApiIoError(f"required bookmakers are not selected: {missing}")
+        events = self._pending_events(observed_at, horizon)
+        discovered: dict[tuple[str, str], _DiscoveryAccumulator] = {}
+        for offset in range(0, len(events), 10):
+            batch = events[offset : offset + 10]
+            payload = self._get_json(
+                "/odds/multi",
+                eventIds=",".join(str(event.id) for event in batch),
+                bookmakers=",".join(TARGET_BOOKMAKERS.values()),
+            )
+            returned = _validate_list(payload, _EventOdds, "event odds")
+            _validate_returned_events(batch, returned)
+            for event in returned:
+                if event.status.casefold() != "pending" or event.date <= observed_at:
+                    continue
+                for bookmaker, markets in _target_bookmaker_markets(event.bookmakers).items():
+                    for market in markets:
+                        if not _is_bet_builder_market(market.name):
+                            continue
+                        key = (bookmaker, market.name)
+                        aggregate = discovered.setdefault(key, _DiscoveryAccumulator())
+                        aggregate.event_markets += 1
+                        if (
+                            market.updated_at is not None
+                            and market.updated_at <= observed_at
+                            and market.updated_at < event.date
+                        ):
+                            aggregate.timestamped_event_markets += 1
+                        aggregate.outcome_entries += len(market.odds)
+                        aggregate.labeled_outcome_entries += sum(
+                            1 for outcome in market.odds if "label" in outcome
+                        )
+                        for outcome in market.odds:
+                            aggregate.field_names.update(outcome)
+        summaries = [
+            _market_discovery_summary(bookmaker, market_name, aggregate)
+            for (bookmaker, market_name), aggregate in sorted(discovered.items())
+        ]
+        return BetBuilderMarketProbe(
+            provider="Odds-API.io",
+            observed_at=observed_at,
+            competition_slugs=list(LEAGUE_COUNTRIES),
+            events_checked=len(events),
+            markets=summaries,
+        )
+
+    def _pending_events(self, observed_at: datetime, horizon: timedelta) -> list[_Event]:
+        events: list[_Event] = []
+        for league_slug in LEAGUE_COUNTRIES:
+            events.extend(self._events(observed_at, observed_at + horizon, league_slug))
+        if len({event.id for event in events}) != len(events):
+            raise OddsApiIoError("odds provider returned duplicate cross-competition events")
+        events.sort(key=lambda event: (event.date, event.id))
+        return events
 
     def _events(self, start: datetime, end: datetime, league_slug: str) -> list[_Event]:
         event_params: dict[str, str | int] = {
@@ -273,15 +368,9 @@ def _normalize_batch(
     returned: list[_EventOdds],
     observed_at: datetime,
 ) -> list[OddsImportRow]:
-    requested_by_id = {event.id: event for event in requested}
-    if len({event.id for event in returned}) != len(returned):
-        raise OddsApiIoError("odds provider returned duplicate event odds")
+    _validate_returned_events(requested, returned)
     rows: list[OddsImportRow] = []
     for event in returned:
-        expected = requested_by_id.get(event.id)
-        if expected is None:
-            raise OddsApiIoError("odds provider returned unrequested event odds")
-        _require_matching_identity(expected, event)
         if event.status.casefold() != "pending" or event.date <= observed_at:
             continue
         bookmaker_markets = _target_bookmaker_markets(event.bookmakers)
@@ -290,6 +379,55 @@ def _normalize_batch(
             if display_name == "Novibet":
                 rows.extend(_normalize_corner_totals(event, display_name, markets, observed_at))
     return rows
+
+
+def _validate_returned_events(requested: list[_Event], returned: list[_EventOdds]) -> None:
+    requested_by_id = {event.id: event for event in requested}
+    if len({event.id for event in returned}) != len(returned):
+        raise OddsApiIoError("odds provider returned duplicate event odds")
+    for event in returned:
+        expected = requested_by_id.get(event.id)
+        if expected is None:
+            raise OddsApiIoError("odds provider returned unrequested event odds")
+        _require_matching_identity(expected, event)
+
+
+def _is_bet_builder_market(name: str) -> bool:
+    normalized = name.casefold()
+    return any(term in normalized for term in ("corner", "player", "shot"))
+
+
+def _market_discovery_summary(
+    bookmaker: str,
+    market_name: str,
+    aggregate: _DiscoveryAccumulator,
+) -> MarketDiscoverySummary:
+    normalized = market_name.casefold()
+    implemented = bookmaker == "Novibet" and normalized == "corners totals"
+    if implemented:
+        blockers: list[str] = []
+        ingestion_status = "implemented"
+    elif "player" in normalized or aggregate.labeled_outcome_entries:
+        blockers = [
+            "stable player identity is not validated",
+            "player-level target and settlement are not independently validated",
+            "outcome completeness is not validated",
+        ]
+        ingestion_status = "discovery_only"
+    else:
+        blockers = ["market target and settlement are not independently validated"]
+        ingestion_status = "discovery_only"
+    return MarketDiscoverySummary(
+        bookmaker=bookmaker,
+        market_name=market_name,
+        event_markets=aggregate.event_markets,
+        timestamped_event_markets=aggregate.timestamped_event_markets,
+        outcome_entries=aggregate.outcome_entries,
+        labeled_outcome_entries=aggregate.labeled_outcome_entries,
+        field_names=sorted(aggregate.field_names),
+        ingestion_status=ingestion_status,
+        blockers=blockers,
+    )
 
 
 def _normalize_match_result(
