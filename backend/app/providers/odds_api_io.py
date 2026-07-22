@@ -12,11 +12,10 @@ from app.schemas.odds import MarketType, OddsImportRow
 
 ODDS_API_IO_TERMS_URL = "https://odds-api.io/terms"
 PREMIER_LEAGUE_SLUG = "england-premier-league"
-COLLECTION_HORIZON = timedelta(days=7)
+COLLECTION_HORIZON = timedelta(days=35)
 TARGET_BOOKMAKERS: Mapping[str, str] = {
     "Allwyn / Pamestoixima": "Pamestoixima",
     "Novibet": "Novibet",
-    "bet365": "Bet365",
 }
 
 

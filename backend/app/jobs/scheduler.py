@@ -61,6 +61,7 @@ def run_provider_collection(
 
     try:
         rows = list(provider_adapter.collect_odds())
+        collected_at = datetime.now(UTC)
         if not rows:
             message = "Provider returned no odds rows"
         else:
@@ -72,7 +73,7 @@ def run_provider_collection(
                     provider_slug=provider_adapter.slug,
                     provider_name=provider_adapter.name,
                     is_demo=provider_adapter.is_demo,
-                    now=started_at,
+                    now=collected_at,
                 )
             message = (
                 f"Imported {result.rows_imported} prices across "

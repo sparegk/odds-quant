@@ -17,9 +17,8 @@ from app.schemas.api import CompetitionDataCoverage, DataCoverageView
 
 MINIMUM_EVALUATION_RESULTS = 200
 REQUIRED_BOOKMAKERS = {
-    "pamestoixima": "Allwyn / Pamestoixima",
+    "allwyn-pamestoixima": "Allwyn / Pamestoixima",
     "novibet": "Novibet",
-    "bet365": "bet365",
 }
 
 

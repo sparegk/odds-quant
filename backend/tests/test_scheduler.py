@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Iterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -81,6 +81,24 @@ def test_registered_provider_collection_records_completed_job(
         assert job is not None
         assert job.status == "completed"
         assert job.message == "Imported 24 prices across 8 snapshots"
+        assert session.scalar(select(func.count()).select_from(OddsSnapshot)) == 8
+
+
+def test_collection_cutoff_is_recorded_after_provider_observation(
+    sessions: sessionmaker[Session],
+) -> None:
+    observed_after_start = [
+        row.model_copy(update={"observed_at": AS_OF + timedelta(seconds=1)})
+        for row in _provider_rows()
+    ]
+    provider = FakeLicensedProvider(observed_after_start)
+
+    job_id = run_provider_collection(provider, session_factory=sessions, now=AS_OF)
+
+    with sessions() as session:
+        job = session.get(ProviderJob, job_id)
+        assert job is not None
+        assert job.status == "completed"
         assert session.scalar(select(func.count()).select_from(OddsSnapshot)) == 8
 
 

@@ -39,19 +39,18 @@ def _event_odds(
         "bookmakers": {
             "Pamestoixima": [market],
             "Novibet": [market],
-            "Bet365": [market],
         },
     }
 
 
-def test_probe_requires_all_three_target_bookmakers() -> None:
+def test_probe_requires_both_target_bookmakers() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.params["apiKey"] == SECRET
         return httpx.Response(
             200,
             json={
-                "bookmakers": ["Pamestoixima", "Novibet", "Bet365", "Another Book"],
-                "count": 4,
+                "bookmakers": ["Pamestoixima", "Novibet", "Another Book"],
+                "count": 3,
             },
         )
 
@@ -59,7 +58,7 @@ def test_probe_requires_all_three_target_bookmakers() -> None:
         probe = client.probe_target_bookmakers()
 
     assert probe.complete is True
-    assert probe.active_bookmakers == ["Allwyn / Pamestoixima", "Novibet", "bet365"]
+    assert probe.active_bookmakers == ["Allwyn / Pamestoixima", "Novibet"]
     assert probe.missing_bookmakers == []
 
 
@@ -67,7 +66,7 @@ def test_probe_fails_closed_when_a_target_is_not_selected() -> None:
     def handler(_: httpx.Request) -> httpx.Response:
         return httpx.Response(
             200,
-            json={"bookmakers": ["Pamestoixima", "Bet365"], "count": 2},
+            json={"bookmakers": ["Pamestoixima"], "count": 1},
         )
 
     with OddsApiIoClient(SECRET, transport=httpx.MockTransport(handler)) as client:
@@ -92,7 +91,7 @@ def test_collects_complete_timestamped_prematch_match_result_rows() -> None:
         if request.url.path.endswith("/bookmakers/selected"):
             return httpx.Response(
                 200,
-                json={"bookmakers": ["Pamestoixima", "Novibet", "Bet365"], "count": 3},
+                json={"bookmakers": ["Pamestoixima", "Novibet"], "count": 2},
             )
         if request.url.path.endswith("/events"):
             assert request.url.params["league"] == "england-premier-league"
@@ -100,17 +99,16 @@ def test_collects_complete_timestamped_prematch_match_result_rows() -> None:
             return httpx.Response(200, json=[_event()])
         assert request.url.path.endswith("/odds/multi")
         assert request.url.params["eventIds"] == "123"
-        assert request.url.params["bookmakers"] == "Pamestoixima,Novibet,Bet365"
+        assert request.url.params["bookmakers"] == "Pamestoixima,Novibet"
         return httpx.Response(200, json=[_event_odds()])
 
     with OddsApiIoClient(SECRET, transport=httpx.MockTransport(handler)) as client:
         rows = client.collect_prematch_match_result(observed_at=OBSERVED_AT)
 
-    assert len(rows) == 9
+    assert len(rows) == 6
     assert {row.bookmaker for row in rows} == {
         "Allwyn / Pamestoixima",
         "Novibet",
-        "bet365",
     }
     assert {row.selection_code for row in rows} == {"HOME", "DRAW", "AWAY"}
     assert {row.provider_event_key for row in rows} == {"123"}
@@ -145,7 +143,7 @@ def test_rejects_unsafe_match_result_snapshots(
         if request.url.path.endswith("/bookmakers/selected"):
             return httpx.Response(
                 200,
-                json={"bookmakers": ["Pamestoixima", "Novibet", "Bet365"], "count": 3},
+                json={"bookmakers": ["Pamestoixima", "Novibet"], "count": 2},
             )
         if request.url.path.endswith("/events"):
             return httpx.Response(200, json=[_event()])
@@ -163,11 +161,11 @@ def test_collection_stops_before_events_when_a_target_is_not_selected() -> None:
         requested_paths.append(request.url.path)
         return httpx.Response(
             200,
-            json={"bookmakers": ["Pamestoixima", "Novibet"], "count": 2},
+            json={"bookmakers": ["Pamestoixima"], "count": 1},
         )
 
     with OddsApiIoClient(SECRET, transport=httpx.MockTransport(handler)) as client:
-        with pytest.raises(OddsApiIoError, match="bet365"):
+        with pytest.raises(OddsApiIoError, match="Novibet"):
             client.collect_prematch_match_result(observed_at=OBSERVED_AT)
 
     assert requested_paths == ["/v3/bookmakers/selected"]

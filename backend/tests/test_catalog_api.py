@@ -75,12 +75,10 @@ def test_data_coverage_fails_closed_for_demo_and_reports_permitted_gaps(
     assert demo.json()["required_bookmakers"] == [
         "Allwyn / Pamestoixima",
         "Novibet",
-        "bet365",
     ]
     assert demo.json()["competitions"][0]["missing_required_bookmakers"] == [
         "Allwyn / Pamestoixima",
         "Novibet",
-        "bet365",
     ]
     assert demo.json()["competitions"][0]["blockers"] == [
         "no_permitted_events",
@@ -92,8 +90,11 @@ def test_data_coverage_fails_closed_for_demo_and_reports_permitted_gaps(
 
     for provider in session.scalars(select(Provider)).all():
         provider.is_demo = False
-    for bookmaker in session.scalars(select(Bookmaker)).all():
+    bookmakers = session.scalars(select(Bookmaker).order_by(Bookmaker.id)).all()
+    for bookmaker in bookmakers:
         bookmaker.is_demo = False
+    bookmakers[0].slug = "allwyn-pamestoixima"
+    bookmakers[0].name = "Allwyn / Pamestoixima"
     for event in session.scalars(select(Event)).all():
         event.is_demo = False
     snapshot = session.scalar(select(OddsSnapshot).order_by(OddsSnapshot.id))
@@ -107,6 +108,8 @@ def test_data_coverage_fails_closed_for_demo_and_reports_permitted_gaps(
     assert permitted["permitted_odds_snapshots"] == 8
     assert permitted["permitted_closing_snapshots"] == 1
     assert competition["closing_event_coverage"] == pytest.approx(0.25)
+    assert competition["covered_required_bookmakers"] == ["Allwyn / Pamestoixima"]
+    assert competition["missing_required_bookmakers"] == ["Novibet"]
     assert competition["blockers"] == [
         "fewer_than_200_final_results",
         "missing_required_bookmakers",
@@ -198,7 +201,7 @@ def test_matchday_groups_a_local_calendar_day_and_rejects_unknown_timezones(
     client, session, as_of = api
     target = session.scalar(select(Event).order_by(Event.kickoff_at))
     assert target is not None
-    local_date = target.kickoff_at.astimezone(ZoneInfo("Europe/Athens")).date()
+    local_date = target.kickoff_at.replace(tzinfo=UTC).astimezone(ZoneInfo("Europe/Athens")).date()
 
     response = client.get(
         "/api/v1/matchdays",
