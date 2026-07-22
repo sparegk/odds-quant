@@ -14,6 +14,7 @@ class MarketType(StrEnum):
     DOUBLE_CHANCE = "DOUBLE_CHANCE"
     TEAM_TOTAL_HOME = "TEAM_TOTAL_HOME"
     TEAM_TOTAL_AWAY = "TEAM_TOTAL_AWAY"
+    TOTAL_CORNERS = "TOTAL_CORNERS"
 
 
 EXPECTED_SELECTIONS: dict[MarketType, frozenset[str]] = {
@@ -23,12 +24,14 @@ EXPECTED_SELECTIONS: dict[MarketType, frozenset[str]] = {
     MarketType.DOUBLE_CHANCE: frozenset({"HOME_OR_DRAW", "AWAY_OR_DRAW", "HOME_OR_AWAY"}),
     MarketType.TEAM_TOTAL_HOME: frozenset({"OVER", "UNDER"}),
     MarketType.TEAM_TOTAL_AWAY: frozenset({"OVER", "UNDER"}),
+    MarketType.TOTAL_CORNERS: frozenset({"OVER", "UNDER"}),
 }
 
 LINE_MARKETS = {
     MarketType.TOTAL_GOALS,
     MarketType.TEAM_TOTAL_HOME,
     MarketType.TEAM_TOTAL_AWAY,
+    MarketType.TOTAL_CORNERS,
 }
 
 

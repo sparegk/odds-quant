@@ -11,8 +11,15 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 from app.schemas.odds import MarketType, OddsImportRow
 
 ODDS_API_IO_TERMS_URL = "https://odds-api.io/terms"
-PREMIER_LEAGUE_SLUG = "england-premier-league"
 COLLECTION_HORIZON = timedelta(days=35)
+MAX_EVENTS_PER_LEAGUE = 30
+LEAGUE_COUNTRIES: Mapping[str, str] = {
+    "england-premier-league": "England",
+    "international-clubs-uefa-champions-league": "International",
+    "international-clubs-uefa-champions-league-qualification": "International",
+    "international-clubs-uefa-conference-league": "International",
+    "international-clubs-uefa-conference-league-qualification": "International",
+}
 TARGET_BOOKMAKERS: Mapping[str, str] = {
     "Allwyn / Pamestoixima": "Pamestoixima",
     "Novibet": "Novibet",
@@ -141,7 +148,7 @@ class OddsApiIoClient:
             complete=not missing_bookmakers,
         )
 
-    def collect_prematch_match_result(
+    def collect_prematch_odds(
         self,
         *,
         observed_at: datetime,
@@ -154,7 +161,12 @@ class OddsApiIoClient:
         if not probe.complete:
             missing = ", ".join(probe.missing_bookmakers)
             raise OddsApiIoError(f"required bookmakers are not selected: {missing}")
-        events = self._events(observed_at, observed_at + horizon)
+        events: list[_Event] = []
+        for league_slug in LEAGUE_COUNTRIES:
+            events.extend(self._events(observed_at, observed_at + horizon, league_slug))
+        if len({event.id for event in events}) != len(events):
+            raise OddsApiIoError("odds provider returned duplicate cross-competition events")
+        events.sort(key=lambda event: (event.date, event.id))
         rows: list[OddsImportRow] = []
         for offset in range(0, len(events), 10):
             batch = events[offset : offset + 10]
@@ -168,10 +180,10 @@ class OddsApiIoClient:
             rows.extend(_normalize_batch(batch, odds_events, observed_at))
         return rows
 
-    def _events(self, start: datetime, end: datetime) -> list[_Event]:
+    def _events(self, start: datetime, end: datetime, league_slug: str) -> list[_Event]:
         event_params: dict[str, str | int] = {
             "sport": "football",
-            "league": PREMIER_LEAGUE_SLUG,
+            "league": league_slug,
             "status": "pending",
             "from": _rfc3339(start),
             "to": _rfc3339(end),
@@ -184,11 +196,13 @@ class OddsApiIoClient:
         for event in events:
             if (
                 event.sport.slug.casefold() != "football"
-                or event.league.slug.casefold() != PREMIER_LEAGUE_SLUG
+                or event.league.slug.casefold() != league_slug
                 or event.status.casefold() != "pending"
             ):
                 raise OddsApiIoError("odds provider returned an event outside the requested scope")
-        return [event for event in events if start < event.date <= end]
+        eligible = [event for event in events if start < event.date <= end]
+        eligible.sort(key=lambda event: (event.date, event.id))
+        return eligible[:MAX_EVENTS_PER_LEAGUE]
 
     def _get_json(
         self,
@@ -238,7 +252,7 @@ class OddsApiIoProvider:
             base_url=self._base_url,
             transport=self._transport,
         ) as client:
-            return client.collect_prematch_match_result(observed_at=observed_at)
+            return client.collect_prematch_odds(observed_at=observed_at)
 
 
 def _validate_list[ModelT: BaseModel](
@@ -272,56 +286,151 @@ def _normalize_batch(
             continue
         bookmaker_markets = _target_bookmaker_markets(event.bookmakers)
         for display_name, markets in bookmaker_markets.items():
-            match_result = [market for market in markets if market.name.casefold() == "ml"]
-            if not match_result:
-                continue
-            if len(match_result) != 1:
-                raise OddsApiIoError("odds provider returned an ambiguous match-result market")
-            market = match_result[0]
-            if market.updated_at is None:
-                raise OddsApiIoError("odds provider match-result market lacks an update timestamp")
-            if market.updated_at > observed_at or market.updated_at >= event.date:
-                raise OddsApiIoError("odds provider returned an invalid pre-match update timestamp")
-            if len(market.odds) != 1:
-                raise OddsApiIoError("odds provider returned ambiguous match-result prices")
-            prices = market.odds[0]
-            if set(("home", "draw", "away")) - prices.keys():
-                raise OddsApiIoError("odds provider returned incomplete match-result prices")
-            season = _football_season(event.date)
-            for code, field, name in (
-                ("HOME", "home", event.home),
-                ("DRAW", "draw", "Draw"),
-                ("AWAY", "away", event.away),
-            ):
-                try:
-                    price = Decimal(str(prices[field]))
-                    rows.append(
-                        OddsImportRow(
-                            provider_event_key=str(event.id),
-                            competition=event.league.name,
-                            country="England",
-                            season=season,
-                            kickoff_at=event.date,
-                            home_team=event.home,
-                            away_team=event.away,
-                            bookmaker=display_name,
-                            market_type=MarketType.MATCH_RESULT,
-                            selection_code=code,
-                            selection_name=name,
-                            decimal_odds=price,
-                            observed_at=observed_at,
-                            source_updated_at=market.updated_at,
-                            period="FULL_TIME",
-                            currency="EUR",
-                            settlement_rule_key="standard_90_minutes",
-                            is_closing=False,
-                        )
-                    )
-                except (ArithmeticError, ValueError, ValidationError):
-                    raise OddsApiIoError(
-                        "odds provider returned invalid match-result prices"
-                    ) from None
+            rows.extend(_normalize_match_result(event, display_name, markets, observed_at))
+            if display_name == "Novibet":
+                rows.extend(_normalize_corner_totals(event, display_name, markets, observed_at))
     return rows
+
+
+def _normalize_match_result(
+    event: _EventOdds,
+    bookmaker: str,
+    markets: list[_Market],
+    observed_at: datetime,
+) -> list[OddsImportRow]:
+    match_result = [market for market in markets if market.name.casefold() == "ml"]
+    if not match_result:
+        return []
+    if len(match_result) != 1:
+        raise OddsApiIoError("odds provider returned an ambiguous match-result market")
+    market = match_result[0]
+    _require_prematch_market_timestamp(market, event, observed_at, "match-result")
+    if len(market.odds) != 1:
+        raise OddsApiIoError("odds provider returned ambiguous match-result prices")
+    prices = market.odds[0]
+    if set(("home", "draw", "away")) - prices.keys():
+        raise OddsApiIoError("odds provider returned incomplete match-result prices")
+    rows: list[OddsImportRow] = []
+    for code, field, name in (
+        ("HOME", "home", event.home),
+        ("DRAW", "draw", "Draw"),
+        ("AWAY", "away", event.away),
+    ):
+        rows.append(
+            _odds_row(
+                event,
+                bookmaker,
+                MarketType.MATCH_RESULT,
+                code,
+                name,
+                prices[field],
+                observed_at,
+                market.updated_at,
+                settlement_rule_key="standard_90_minutes",
+            )
+        )
+    return rows
+
+
+def _normalize_corner_totals(
+    event: _EventOdds,
+    bookmaker: str,
+    markets: list[_Market],
+    observed_at: datetime,
+) -> list[OddsImportRow]:
+    corner_markets = [market for market in markets if market.name.casefold() == "corners totals"]
+    if not corner_markets:
+        return []
+    if len(corner_markets) != 1:
+        raise OddsApiIoError("odds provider returned an ambiguous corners-total market")
+    market = corner_markets[0]
+    _require_prematch_market_timestamp(market, event, observed_at, "corners-total")
+    if not market.odds:
+        raise OddsApiIoError("odds provider returned empty corners-total prices")
+    rows: list[OddsImportRow] = []
+    seen_lines: set[Decimal] = set()
+    for prices in market.odds:
+        if set(("hdp", "over", "under")) - prices.keys():
+            raise OddsApiIoError("odds provider returned incomplete corners-total prices")
+        try:
+            line = Decimal(str(prices["hdp"]))
+        except (ArithmeticError, ValueError):
+            raise OddsApiIoError("odds provider returned invalid corners-total prices") from None
+        if not line.is_finite() or line <= 0:
+            raise OddsApiIoError("odds provider returned invalid corners-total prices")
+        if line in seen_lines:
+            raise OddsApiIoError("odds provider returned duplicate corners-total lines")
+        seen_lines.add(line)
+        for code, field in (("OVER", "over"), ("UNDER", "under")):
+            rows.append(
+                _odds_row(
+                    event,
+                    bookmaker,
+                    MarketType.TOTAL_CORNERS,
+                    code,
+                    f"{code.title()} {line.normalize()} corners",
+                    prices[field],
+                    observed_at,
+                    market.updated_at,
+                    line=line,
+                    settlement_rule_key="novibet_total_corners_regulation_time",
+                )
+            )
+    return rows
+
+
+def _odds_row(
+    event: _EventOdds,
+    bookmaker: str,
+    market_type: MarketType,
+    selection_code: str,
+    selection_name: str,
+    price: object,
+    observed_at: datetime,
+    source_updated_at: datetime | None,
+    *,
+    line: Decimal | None = None,
+    settlement_rule_key: str,
+) -> OddsImportRow:
+    country = LEAGUE_COUNTRIES.get(event.league.slug.casefold())
+    if country is None:
+        raise OddsApiIoError("odds provider returned an unsupported competition")
+    try:
+        return OddsImportRow(
+            provider_event_key=str(event.id),
+            competition=event.league.name,
+            country=country,
+            season=_football_season(event.date),
+            kickoff_at=event.date,
+            home_team=event.home,
+            away_team=event.away,
+            bookmaker=bookmaker,
+            market_type=market_type,
+            line=line,
+            selection_code=selection_code,
+            selection_name=selection_name,
+            decimal_odds=Decimal(str(price)),
+            observed_at=observed_at,
+            source_updated_at=source_updated_at,
+            period="FULL_TIME",
+            currency="EUR",
+            settlement_rule_key=settlement_rule_key,
+            is_closing=False,
+        )
+    except (ArithmeticError, ValueError, ValidationError):
+        raise OddsApiIoError(f"odds provider returned invalid {market_type} prices") from None
+
+
+def _require_prematch_market_timestamp(
+    market: _Market,
+    event: _EventOdds,
+    observed_at: datetime,
+    label: str,
+) -> None:
+    if market.updated_at is None:
+        raise OddsApiIoError(f"odds provider {label} market lacks an update timestamp")
+    if market.updated_at > observed_at or market.updated_at >= event.date:
+        raise OddsApiIoError(f"odds provider returned an invalid pre-match {label} timestamp")
 
 
 def _target_bookmaker_markets(
