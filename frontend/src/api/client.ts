@@ -7,6 +7,7 @@ import type {
   BankrollSimulation,
   BetBuilderQuote,
   CreateBetBuilderQuote,
+  DataCoverage,
   DashboardData,
   DashboardResource,
   EvaluationRun,
@@ -135,6 +136,10 @@ export async function loadDashboard(): Promise<DashboardData> {
 
 export function loadComparison(eventId: number): Promise<MarketComparison[]> {
   return request<MarketComparison[]>(`/api/v1/odds/comparison?event_id=${eventId}`)
+}
+
+export function loadDataCoverage(): Promise<DataCoverage> {
+  return request<DataCoverage>('/api/v1/data/coverage')
 }
 
 export function uploadCsv(

@@ -253,6 +253,34 @@ export interface ReadinessCounts {
   intelligence_records: number
 }
 
+export interface CompetitionDataCoverage {
+  competition_id: number
+  competition: string
+  country: string
+  season: string
+  total_events: number
+  permitted_events: number
+  permitted_teams: number
+  permitted_final_results: number
+  permitted_odds_snapshots: number
+  permitted_closing_snapshots: number
+  first_result_kickoff_at: string | null
+  last_result_kickoff_at: string | null
+  closing_event_coverage: number
+  evaluation_ready: boolean
+  blockers: string[]
+}
+
+export interface DataCoverage {
+  minimum_evaluation_results: number
+  total_events: number
+  permitted_events: number
+  permitted_final_results: number
+  permitted_odds_snapshots: number
+  permitted_closing_snapshots: number
+  competitions: CompetitionDataCoverage[]
+}
+
 export interface CalibrationBucket {
   selection_code: string
   bucket_index: number
