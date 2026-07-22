@@ -222,3 +222,59 @@ def test_arbitrage_api_calculates_and_lists_opportunities(session: Session) -> N
     assert calculated.json()["opportunities"][0]["status"] == "executable"
     assert listed.status_code == 200
     assert [item["id"] for item in listed.json()] == [calculated.json()["opportunities"][0]["id"]]
+
+
+def test_arbitrage_settings_api_records_sourced_tax_and_stake_evidence(session: Session) -> None:
+    bookmaker = session.scalar(select(Bookmaker).order_by(Bookmaker.id))
+    assert bookmaker is not None
+    engine = session.get_bind()
+
+    def database_override() -> Generator[Session, None, None]:
+        with Session(engine) as request_session:
+            yield request_session
+
+    app.dependency_overrides[get_db] = database_override
+    try:
+        with TestClient(app) as client:
+            tax = client.post(
+                "/api/v1/arbitrage/settings/tax-profiles",
+                json={
+                    "bookmaker_id": bookmaker.id,
+                    "name": "Verified terms",
+                    "jurisdiction": "Test",
+                    "currency": "EUR",
+                    "tax_basis": "per_bet",
+                    "stake_tax_rate": "0.01",
+                    "winnings_tax_rate": "0",
+                    "payout_withholding_rate": "0",
+                    "commission_rate": "0",
+                    "fixed_fee": "0",
+                    "effective_from": AS_OF.isoformat(),
+                    "verified_at": AS_OF.isoformat(),
+                    "source_url": "https://example.test/terms",
+                    "source_label": "Official terms",
+                },
+            )
+            constraint = client.post(
+                "/api/v1/arbitrage/settings/constraints",
+                json={
+                    "bookmaker_id": bookmaker.id,
+                    "currency": "EUR",
+                    "minimum_stake": "1",
+                    "maximum_stake": "500",
+                    "stake_increment": "0.01",
+                    "observed_at": AS_OF.isoformat(),
+                    "source_label": "Account limit observation",
+                },
+            )
+            settings = client.get("/api/v1/arbitrage/settings")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert tax.status_code == 201
+    assert tax.json()["source_label"] == "Official terms"
+    assert constraint.status_code == 201
+    assert constraint.json()["maximum_stake"] == "500.0000"
+    assert settings.status_code == 200
+    assert len(settings.json()["tax_profiles"]) == 1
+    assert len(settings.json()["constraints"]) == 1

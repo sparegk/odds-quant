@@ -1,6 +1,9 @@
 import type {
   ArbitrageOpportunity,
   ArbitrageBatch,
+  ArbitrageConstraint,
+  ArbitrageSettings,
+  ArbitrageTaxProfile,
   BankrollSimulation,
   BetBuilderQuote,
   CreateBetBuilderQuote,
@@ -163,6 +166,26 @@ export function calculateArbitrage(payload: {
     },
     body: JSON.stringify(payload),
   })
+}
+
+export function loadArbitrageSettings(): Promise<ArbitrageSettings> {
+  return request<ArbitrageSettings>('/api/v1/arbitrage/settings')
+}
+
+export function createTaxProfile(payload: {
+  bookmaker_id: number; name: string; jurisdiction: string; currency: string; tax_basis: string
+  stake_tax_rate: number; winnings_tax_rate: number; payout_withholding_rate: number
+  commission_rate: number; fixed_fee: number; effective_from: string; verified_at: string
+  source_url?: string; source_label: string
+}, adminKey?: string): Promise<ArbitrageTaxProfile> {
+  return request<ArbitrageTaxProfile>('/api/v1/arbitrage/settings/tax-profiles', { method: 'POST', headers: adminJson(adminKey), body: JSON.stringify(payload) })
+}
+
+export function createBookmakerConstraint(payload: {
+  bookmaker_id: number; currency: string; minimum_stake: number; maximum_stake?: number
+  stake_increment: number; observed_at: string; source_label: string
+}, adminKey?: string): Promise<ArbitrageConstraint> {
+  return request<ArbitrageConstraint>('/api/v1/arbitrage/settings/constraints', { method: 'POST', headers: adminJson(adminKey), body: JSON.stringify(payload) })
 }
 
 export function loadPredictions(eventId: number): Promise<ModelOutput[]> {

@@ -359,6 +359,51 @@ export interface ArbitrageBatch {
   opportunities: ArbitrageOpportunity[]
 }
 
+export interface ArbitrageBookmaker {
+  id: number
+  slug: string
+  name: string
+  is_demo: boolean
+}
+
+export interface ArbitrageTaxProfile {
+  id: number
+  bookmaker_id: number
+  bookmaker: string
+  name: string
+  jurisdiction: string
+  currency: string
+  stake_tax_rate: string
+  winnings_tax_rate: string
+  payout_withholding_rate: string
+  commission_rate: string
+  fixed_fee: string
+  effective_from: string
+  effective_to: string | null
+  verified_at: string
+  source_url: string | null
+  source_label: string
+  status: string
+}
+
+export interface ArbitrageConstraint {
+  id: number
+  bookmaker_id: number
+  bookmaker: string
+  currency: string
+  minimum_stake: string
+  maximum_stake: string | null
+  stake_increment: string
+  observed_at: string
+  source_label: string
+}
+
+export interface ArbitrageSettings {
+  bookmakers: ArbitrageBookmaker[]
+  tax_profiles: ArbitrageTaxProfile[]
+  constraints: ArbitrageConstraint[]
+}
+
 export interface PriceComparison {
   selection_code: string
   selection_name: string

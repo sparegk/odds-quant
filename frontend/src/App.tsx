@@ -29,6 +29,7 @@ import { ValueOpportunities } from './components/ValueOpportunities'
 import { EventMarkets } from './components/EventMarkets'
 import { ModelPerformance } from './components/ModelPerformance'
 import { DataOperations } from './components/DataOperations'
+import { ArbitrageSettings } from './components/ArbitrageSettings'
 import { QuantPriceTable } from './components/QuantPriceTable'
 import { formatDateTime, humanizeCode } from './lib/format'
 import { chooseDefaultEventId } from './lib/events'
@@ -604,6 +605,7 @@ export function ArbitrageResearch({ dashboard }: { dashboard: DashboardData }) {
   return (
     <div className="space-y-7">
       <SectionHeading eyebrow="Tax and constraint aware" title="Stored arbitrage calculations" />
+      <ArbitrageSettings />
       <form className="border-y border-zinc-200 bg-white p-5" onSubmit={(event) => void submitCalculation(event)}>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <label><span className="mb-1.5 block text-xs font-semibold uppercase text-zinc-500">Event</span><select aria-label="Arbitrage event" className="h-10 w-full border border-zinc-300 bg-white px-3 text-sm" required value={eventId} onChange={(event) => setEventId(event.target.value)}><option disabled value="">Select event</option>{dashboard.events.map((item) => <option key={item.id} value={item.id}>{item.home_team} vs {item.away_team}</option>)}</select></label>
