@@ -54,6 +54,27 @@ all of the following are independently validated:
 Do not infer player identity from display names, treat a bookmaker label as a validated
 target, or reuse team-market settlement for a player prop.
 
+### Live discovery receipt: 2026-07-23
+
+The authenticated football league catalog exposed these UEFA competition slugs:
+
+- `international-clubs-uefa-champions-league`;
+- `international-clubs-uefa-champions-league-qualification`;
+- `international-clubs-uefa-conference-league`; and
+- `international-clubs-uefa-conference-league-qualification`.
+
+The main-stage feeds had no upcoming events at discovery time. The qualification feeds
+reported 32 Champions League and 149 Conference League events. A sanitized sample of 30
+pending events from each qualification feed returned odds for 10 Champions League and 28
+Conference League events from the selected bookmakers.
+
+Within the requested bet-builder families, the sample exposed only Novibet
+`Corners Totals` on 28 Conference League events. Every discovered market carried
+`updatedAt`, exactly one unlabeled line with `hdp`, `over`, and `under`, and no player
+identity. No player shots, player shots-on-target, or other player-prop markets were observed.
+This receipt records market metadata only; it does not authorize player-prop ingestion or
+assert future availability.
+
 ## Permitted Coverage Audit
 
 `GET /api/v1/data/coverage` and the Data Operations dashboard audit count only records whose event provider and, for prices, bookmaker are non-demo. They report coverage separately by competition so volume in one league cannot conceal a gap in another. The current evaluation readiness gate requires:
