@@ -12,13 +12,14 @@ Completed slices: Alembic schema lifecycle, labelled demo odds and results, atom
 - Timestamped team, player, coach, roster, appearance, availability, lineup, formation, tactical, and matchup data contracts.
 - Atomic CSV odds import and manual coherent-market entry.
 - Completed: dashboard-driven atomic odds/result/player-availability imports and full timestamped football-intelligence bundle ingestion.
+- Completed: provenance-aware permitted-data coverage API and Data Operations audit with per-competition result, odds, closing-price, and evaluation blockers; the audit refreshes after successful imports and excludes demo provenance.
 - Completed: tax-aware football arbitrage engine for complete 1X2, over/under, and BTTS markets, including best-price selection, per-leg taxes/fees, rounded stake optimization, provenance fingerprints, conservative net-profit ranking, and execution-risk warnings.
 - Completed: leakage-safe Poisson training, sampling intervals, immutable versions, and scoreline-derived predictions.
 - Completed: expanding-window chronological evaluation, immutable replay evidence, Brier/log-loss/ECE metrics, calibration buckets, uniform and optional market benchmarks, and a non-demo promotion policy.
 - Completed: point-in-time Davidson-style Elo forecasts and a persisted Poisson-versus-Elo proper-score comparison exposed in Model Performance.
 - Completed: time-decayed Dixon–Coles fitting with bounded low-score correction, chronological held-out replay, persisted proper scores, and dashboard comparison.
 - Completed: gated explainable value signals, best-price selection, compatible market consensus, lower-bound EV, freshness and movement checks, immutable calibration provenance, and positive-EV team-underdog ranking.
-- Remaining: adequate permitted evaluation history, further independently justified model benchmarks, and independently validated confidence thresholds.
+- Remaining: import adequate licensed or user-supplied evaluation history and closing prices, then independently validate confidence thresholds. No local permitted dataset is currently bundled or claimed.
 - Recency-weighted player and lineup strength, coach-regime handling, tactical matchup features, scenario sensitivity, and walk-forward ablation tests.
 - Completed: value, underdog, arbitrage, bet-builder, backtesting, and bankroll dashboard pages with typed API integration and partial-resource failure states.
 - Completed: protected model operations for training, evaluation, prediction, and signal generation; sourced tax/constraint management; per-tab readiness; automatic post-write synchronization; preserved event context; and success notifications.

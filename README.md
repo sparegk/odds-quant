@@ -306,6 +306,17 @@ Required columns are `provider_event_key`, `competition`, `country`, `season`, `
 
 Result CSVs require `provider_event_key`, `competition`, `country`, `season`, `kickoff_at`, `home_team`, `away_team`, `home_goals`, `away_goals`, `settled_at`, and `observed_at`; `source_updated_at` is optional. Results must be final and observed no earlier than settlement. Later corrected scores append a superseding observation rather than rewriting history.
 
+### Permitted-data onboarding gate
+
+Use the Data Operations coverage audit, or `GET /api/v1/data/coverage`, before training or evaluation. The audit excludes every demo event, demo provider, and demo bookmaker, then reports blockers independently for each competition. Onboard a competition in this order:
+
+1. Import licensed or user-supplied final results with stable event and team identities. The evaluation gate currently requires at least 200 permitted final results per competition.
+2. Import complete timestamped odds snapshots for those events. Each snapshot must contain the exact mutually exclusive and exhaustive outcome set for its market.
+3. Preserve the last valid snapshot strictly before kickoff with `is_closing=true`. Closing snapshots are retrospective evidence for benchmark and CLV coverage; they never become prediction inputs.
+4. Confirm that the coverage audit shows permitted events, timestamped odds, closing prices, and no competition blockers. Only then train and run chronological evaluation.
+
+An upload may still be valid while the competition remains blocked for evaluation. Do not fill gaps with demo records, backfilled timestamps, inferred closing flags, or data acquired outside its licence or source terms.
+
 Train and apply the baseline after results and target-event odds exist:
 
 ```bash
@@ -327,6 +338,7 @@ Current stored-data routes include:
 
 - `GET /api/v1/matchdays?date={YYYY-MM-DD}&timezone={IANA timezone}`
 - `GET /api/v1/readiness`
+- `GET /api/v1/data/coverage`
 - `GET /api/v1/matchdays/events/{event_id}`
 - `GET /api/v1/events` and `GET /api/v1/events/{event_id}`
 - `GET /api/v1/providers`

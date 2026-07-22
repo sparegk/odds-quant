@@ -25,6 +25,17 @@ Rows are grouped into bookmaker snapshots by event, market, line, period, curren
 
 Accepted files preserve their SHA-256 digest and normalized payload in `raw_ingestions`. Rejected files create an auditable import job but cannot partially create football or odds records. Re-importing an identical snapshot is idempotent; reusing the same identity with changed prices is rejected rather than rewriting history.
 
+## Permitted Coverage Audit
+
+`GET /api/v1/data/coverage` and the Data Operations dashboard audit count only records whose event provider and, for prices, bookmaker are non-demo. They report coverage separately by competition so volume in one league cannot conceal a gap in another. The current evaluation readiness gate requires:
+
+- at least one permitted event and team set;
+- at least 200 permitted final results;
+- timestamped permitted odds snapshots; and
+- permitted closing snapshots observed strictly before kickoff.
+
+The audit is an evidence-availability gate, not proof that a source is licensed, representative, unbiased, or suitable for production. Source terms and the provider registry remain authoritative. A passing audit also does not promote a model; chronological evaluation, calibration, benchmark, and promotion-policy requirements still apply.
+
 ## Football Data Required
 
 ### Teams And Matches
