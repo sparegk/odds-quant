@@ -26,7 +26,8 @@ Completed slices: Alembic schema lifecycle, labelled demo odds and results, atom
 - Remaining: adequate permitted signal/result history, timestamped closing prices for CLV coverage, richer benchmarks, and independently validated staking/confidence thresholds. Demo backtests remain software evidence only.
 - Connected React dashboard, Docker Compose, CI, and deployment configuration.
 - Completed: Playwright Chromium workflows for ingestion-to-signals, sourced arbitrage calculation, and backtest-to-bankroll, alongside the Vitest component/API suite.
-- Next quantitative slice: timestamp-valid closing-price coverage and closing-line-value reporting without feeding post-kickoff information into predictions or signals.
+- Completed: timestamp-valid same-market/bookmaker/provider closing-price provenance, per-observation CLV, aggregate coverage/mean/median reporting, and explicit exclusion of post-kickoff closing evidence from retrospective metrics.
+- Remaining: adequate permitted closing-price history across target competitions; closing evidence remains retrospective and is never fed into predictions or signals.
 
 ## Later Phases
 

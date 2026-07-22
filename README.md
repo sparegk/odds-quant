@@ -210,7 +210,8 @@ The repository is in the **Phase 1 research-workflow milestone**. It includes:
 - A Matchday dashboard with local-date navigation, featured competition filters, fixture drill-down, recent pre-cutoff team form, best bookmaker by selection, and strict player/builder evidence gates.
 - Reproducible 2–4 leg bet-builder quotes derived by summing stored scoreline cells rather than multiplying correlated marginal probabilities.
 - Immutable bet-builder prediction, cutoff, feature, input-fingerprint, uncertainty, and optional manual offered-price provenance.
-- Stored-signal return backtests that enforce pre-kickoff prediction/price availability, settle against results known by the evaluation cutoff, and report unit profit, ROI, yield, hit rate, profit factor, and drawdown.
+- Stored-signal return backtests that enforce pre-kickoff prediction/price availability, settle against results known by the evaluation cutoff, and report unit profit, ROI, yield, hit rate, profit factor, drawdown, and closing-line-value coverage.
+- Auditable CLV observations using only complete explicitly closing snapshots for the same market, bookmaker, provider, and selection, observed before kickoff and ingested by the retrospective evaluation cutoff; closing evidence never enters predictions or signal generation.
 - Flat, percentage, and capped fractional-Kelly bankroll research using the stored lower probability bound, per-bet caps, daily exposure limits, and deterministic simulation fingerprints.
 - Protected dashboard operations for atomic odds/results/availability imports, full football-intelligence JSON bundles, Poisson training, chronological evaluation, prediction persistence, and signal generation.
 - Source-provenance forms for bookmaker tax profiles and observed stake constraints, followed by explicit arbitrage calculation against stored markets.

@@ -276,8 +276,8 @@ describe('BacktestResearch', () => {
         is_demo: false,
         config: {},
         policy: { profitability_claim_allowed: false },
-        metrics: { bet_count: 24, net_profit_units: 3.2, roi: 0.1333, maximum_drawdown_units: 4.5 },
-        observations: [],
+        metrics: { bet_count: 24, net_profit_units: 3.2, roi: 0.1333, maximum_drawdown_units: 4.5, closing_line_value_coverage: 1, average_closing_line_value: 0.1 },
+        observations: [{ id: 1, event_id: 9, selection_id: 2, prediction_id: 7, odds_snapshot_id: 70, predicted_at: '2026-05-01T12:00:00Z', settled_at: '2026-05-01T16:00:00Z', market_type: 'MATCH_RESULT', selection_code: 'AWAY', decimal_odds: 2.2, model_probability: 0.5, lower_probability: 0.45, expected_value: 0.1, settlement: 'WIN', stake: 1, profit_units: 1.2, closing_odds_snapshot_id: 77, closing_decimal_odds: 2, closing_observed_at: '2026-05-01T13:59:00Z', closing_line_value: 0.1 }],
         created_at: '2026-07-19T12:00:00Z',
       }],
     }} />)
@@ -285,6 +285,9 @@ describe('BacktestResearch', () => {
     expect(screen.getByText('#44 / poisson-v1')).toBeInTheDocument()
     expect(screen.getByText('Research Only')).toBeInTheDocument()
     expect(screen.getByText('+13.3%')).toBeInTheDocument()
+    expect(screen.getByText('CLV 100% covered', { exact: false })).toBeInTheDocument()
+    expect(screen.getByText('#77', { exact: false })).toBeInTheDocument()
+    expect(screen.getAllByText('+10.0%')).toHaveLength(2)
     expect(screen.getByText('No chronological evaluations')).toBeInTheDocument()
   })
 })

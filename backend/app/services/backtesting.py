@@ -21,12 +21,14 @@ from app.db.models import (
     ModelEventOutput,
     ModelPrediction,
     ModelVersion,
+    OddsPrice,
     OddsSnapshot,
     Provider,
     Selection,
     ValueSignal,
 )
 from app.quant.bankroll import BankrollBet, simulate_bankroll
+from app.quant.odds import closing_line_value
 from app.quant.settlement import profit_units, settle
 from app.schemas.backtesting import (
     BankrollPointView,
@@ -178,6 +180,11 @@ def run_signal_backtest(
     if not eligible:
         raise BacktestingError("eligible signals have no final results known by the cutoff")
     eligible.sort(key=lambda row: (_utc(row[1].kickoff_at), row[0].id))
+    closing_prices = {
+        row[0].id: closing
+        for row in eligible
+        if (closing := _closing_price(session, row, reference)) is not None
+    }
 
     is_demo = bool(
         model.is_demo
@@ -186,14 +193,14 @@ def run_signal_backtest(
             for _, event, _, _, _, _, _, bookmaker, provider, _ in eligible
         )
     )
-    fingerprint = _backtest_fingerprint(model, request, reference, eligible)
+    fingerprint = _backtest_fingerprint(model, request, reference, eligible, closing_prices)
     existing = session.scalar(select(BacktestRun).where(BacktestRun.fingerprint == fingerprint))
     if existing is not None:
         return _backtest_view(session, existing)
 
     evaluation_status = "demo_only" if is_demo else "research_only"
     policy: dict[str, object] = {
-        "version": "stored-value-signal-replay-v2",
+        "version": "stored-value-signal-replay-v3",
         "decision": evaluation_status,
         "one_latest_signal_per_event_selection": True,
         "unit_stake": True,
@@ -202,7 +209,7 @@ def run_signal_backtest(
     }
     config: dict[str, object] = {
         "evaluation_kind": "stored_value_signal_returns",
-        "metrics_version": "recommendation-returns-v2",
+        "metrics_version": "recommendation-returns-v3",
         "evaluation_start": start.isoformat(),
         "evaluation_end": end.isoformat(),
         "result_known_at": reference.isoformat(),
@@ -228,6 +235,7 @@ def run_signal_backtest(
     expected_values: list[float] = []
     offered_odds: list[float] = []
     model_probabilities: list[float] = []
+    closing_line_values: list[float | None] = []
     for signal, event, selection, market, prediction, output, snapshot, _, _, result in eligible:
         line = float(market.line) if market.line is not None else None
         settlement = settle(
@@ -242,6 +250,23 @@ def run_signal_backtest(
         expected_values.append(signal.expected_value)
         offered_odds.append(signal.offered_odds)
         model_probabilities.append(signal.model_probability)
+        closing = closing_prices.get(signal.id)
+        closing_snapshot, closing_price = closing if closing is not None else (None, None)
+        clv = (
+            closing_line_value(signal.offered_odds, float(closing_price.decimal_odds))
+            if closing_price is not None
+            else None
+        )
+        closing_line_values.append(clv)
+        probability_evidence = {
+            "model_probability": signal.model_probability,
+            "lower_probability": prediction.lower_probability,
+            "expected_value": signal.expected_value,
+            "offered_odds": signal.offered_odds,
+        }
+        if closing_snapshot is not None and closing_price is not None:
+            probability_evidence["closing_odds_snapshot_id"] = closing_snapshot.id
+            probability_evidence["closing_decimal_odds"] = float(closing_price.decimal_odds)
         session.add(
             BacktestObservation(
                 run_id=run.id,
@@ -255,16 +280,12 @@ def run_signal_backtest(
                 training_sample_size=output.sample_size,
                 training_fingerprint=model.data_fingerprint,
                 market_type=market.market_type,
-                probabilities={
-                    "model_probability": signal.model_probability,
-                    "lower_probability": prediction.lower_probability,
-                    "expected_value": signal.expected_value,
-                    "offered_odds": signal.offered_odds,
-                },
+                probabilities=probability_evidence,
                 actual_outcome=selection.code,
                 brier_score=None,
                 log_loss=None,
-                market_snapshot_ids=[snapshot.id],
+                market_snapshot_ids=[snapshot.id]
+                + ([closing_snapshot.id] if closing_snapshot is not None else []),
                 market_probabilities=None,
                 market_brier_score=None,
                 market_log_loss=None,
@@ -272,7 +293,7 @@ def run_signal_backtest(
                 settlement=settlement.value,
                 stake=1.0,
                 profit_units=profit,
-                closing_line_value=None,
+                closing_line_value=clv,
             )
         )
     metrics = _return_metrics(
@@ -280,6 +301,7 @@ def run_signal_backtest(
         expected_values,
         offered_odds,
         model_probabilities,
+        closing_line_values,
     )
     session.add(
         BacktestResult(
@@ -419,6 +441,12 @@ def _backtest_view(session: Session, run: BacktestRun) -> SignalBacktestView:
             or observation.profit_units is None
         ):
             raise BacktestingError("stored signal backtest observation is incomplete")
+        closing_snapshot_id = _optional_integer(probabilities, "closing_odds_snapshot_id")
+        closing_snapshot = (
+            session.get(OddsSnapshot, closing_snapshot_id)
+            if closing_snapshot_id is not None
+            else None
+        )
         observations.append(
             SignalBacktestObservationView(
                 id=observation.id,
@@ -437,6 +465,12 @@ def _backtest_view(session: Session, run: BacktestRun) -> SignalBacktestView:
                 settlement=observation.settlement,
                 stake=observation.stake,
                 profit_units=observation.profit_units,
+                closing_odds_snapshot_id=closing_snapshot_id,
+                closing_decimal_odds=_optional_number(probabilities, "closing_decimal_odds"),
+                closing_observed_at=(
+                    _utc(closing_snapshot.observed_at) if closing_snapshot is not None else None
+                ),
+                closing_line_value=observation.closing_line_value,
             )
         )
     return SignalBacktestView(
@@ -462,11 +496,16 @@ def _return_metrics(
     expected_values: list[float],
     offered_odds: list[float],
     model_probabilities: list[float],
+    closing_line_values: list[float | None] | None = None,
 ) -> dict[str, object]:
     if not (len(profits) == len(expected_values) == len(offered_odds) == len(model_probabilities)):
         raise BacktestingError("recommendation return inputs have inconsistent lengths")
     if not profits:
         raise BacktestingError("recommendation return metrics require observations")
+    clv_values = closing_line_values if closing_line_values is not None else [None] * len(profits)
+    if len(clv_values) != len(profits):
+        raise BacktestingError("closing-line value inputs have inconsistent lengths")
+    covered_clv = [value for value in clv_values if value is not None]
     wins = sum(value > 0 for value in profits)
     losses = sum(value < 0 for value in profits)
     pushes = len(profits) - wins - losses
@@ -528,7 +567,11 @@ def _return_metrics(
         "maximum_drawdown_units": max_drawdown,
         "maximum_losing_streak": maximum_losing_streak,
         "profit_factor": gross_profit / gross_loss if gross_loss else None,
-        "closing_line_value_coverage": 0.0,
+        "closing_line_value_coverage": len(covered_clv) / len(profits),
+        "average_closing_line_value": (
+            sum(covered_clv) / len(covered_clv) if covered_clv else None
+        ),
+        "median_closing_line_value": statistics.median(covered_clv) if covered_clv else None,
     }
 
 
@@ -537,9 +580,10 @@ def _backtest_fingerprint(
     request: RunSignalBacktestRequest,
     reference: datetime,
     rows: list[SettledSignalRow],
+    closing_prices: dict[int, tuple[OddsSnapshot, OddsPrice]],
 ) -> str:
     payload = {
-        "evaluator_version": "stored-value-signal-replay-v2",
+        "evaluator_version": "stored-value-signal-replay-v3",
         "model_version_id": model.id,
         "model_data_fingerprint": model.data_fingerprint,
         "request": request.model_dump(mode="json"),
@@ -554,6 +598,14 @@ def _backtest_fingerprint(
                 "snapshot_observed_at": _utc(snapshot.observed_at).isoformat(),
                 "result_id": result.id,
                 "result_observed_at": _utc(result.observed_at).isoformat(),
+                "closing_snapshot_id": (
+                    closing_prices[signal.id][0].id if signal.id in closing_prices else None
+                ),
+                "closing_odds": (
+                    float(closing_prices[signal.id][1].decimal_odds)
+                    if signal.id in closing_prices
+                    else None
+                ),
             }
             for signal, _, _, _, prediction, output, snapshot, _, _, result in rows
         ],
@@ -568,6 +620,48 @@ def _number(values: dict[str, float], key: str) -> float:
     if not isinstance(value, (int, float)):
         raise BacktestingError(f"stored observation is missing {key}")
     return float(value)
+
+
+def _optional_number(values: dict[str, float], key: str) -> float | None:
+    value = values.get(key)
+    return float(value) if isinstance(value, (int, float)) else None
+
+
+def _optional_integer(values: dict[str, float], key: str) -> int | None:
+    value = values.get(key)
+    return int(value) if isinstance(value, (int, float)) else None
+
+
+def _closing_price(
+    session: Session,
+    row: SettledSignalRow,
+    reference: datetime,
+) -> tuple[OddsSnapshot, OddsPrice] | None:
+    signal, event, selection, market, _, _, taken_snapshot, _, _, _ = row
+    kickoff = _utc(event.kickoff_at)
+    candidate = session.execute(
+        select(OddsSnapshot, OddsPrice)
+        .join(OddsPrice, OddsPrice.snapshot_id == OddsSnapshot.id)
+        .where(
+            OddsSnapshot.market_id == market.id,
+            OddsSnapshot.bookmaker_id == taken_snapshot.bookmaker_id,
+            OddsSnapshot.provider_id == taken_snapshot.provider_id,
+            OddsSnapshot.is_closing.is_(True),
+            OddsSnapshot.is_complete.is_(True),
+            OddsSnapshot.observed_at < kickoff,
+            OddsSnapshot.ingested_at <= reference,
+            OddsPrice.selection_id == selection.id,
+        )
+        .order_by(OddsSnapshot.observed_at.desc(), OddsSnapshot.id.desc())
+    ).first()
+    if candidate is None:
+        return None
+    snapshot, price = candidate
+    if snapshot.source_updated_at is not None and _utc(snapshot.source_updated_at) >= kickoff:
+        return None
+    if _utc(signal.generated_at) >= kickoff:
+        raise BacktestingError("closing-line lookup received an ineligible signal")
+    return snapshot, price
 
 
 def _utc(value: datetime) -> datetime:

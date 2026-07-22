@@ -53,6 +53,10 @@ class SignalBacktestObservationView(BaseModel):
     settlement: str
     stake: float
     profit_units: float
+    closing_odds_snapshot_id: int | None
+    closing_decimal_odds: float | None
+    closing_observed_at: datetime | None
+    closing_line_value: float | None
 
 
 class SignalBacktestView(BaseModel):

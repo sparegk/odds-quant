@@ -175,6 +175,10 @@ export interface SignalBacktestObservation {
   settlement: string
   stake: number
   profit_units: number
+  closing_odds_snapshot_id?: number | null
+  closing_decimal_odds?: number | null
+  closing_observed_at?: string | null
+  closing_line_value?: number | null
 }
 
 export interface SignalBacktest {
