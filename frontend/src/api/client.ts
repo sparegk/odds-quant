@@ -150,6 +150,12 @@ export function uploadCsv(
   })
 }
 
+export function importIntelligenceBundle(payload: Record<string, unknown>, adminKey?: string): Promise<ImportUploadResult> {
+  return request<ImportUploadResult>('/api/v1/imports/intelligence', {
+    method: 'POST', headers: adminJson(adminKey), body: JSON.stringify(payload),
+  })
+}
+
 export function calculateArbitrage(payload: {
   event_id: number
   budget: number

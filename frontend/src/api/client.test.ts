@@ -10,6 +10,7 @@ import {
   loadPredictions,
   runSignalBacktest,
   uploadCsv,
+  importIntelligenceBundle,
 } from './client'
 
 afterEach(() => {
@@ -171,6 +172,16 @@ describe('API client', () => {
     const init = fetchMock.mock.calls[0]?.[1]
     expect(init?.method).toBe('POST')
     expect(init?.body).toBeInstanceOf(FormData)
+    expect(init?.headers).toMatchObject({ 'X-Admin-Key': 'secret' })
+  })
+
+  it('submits the complete intelligence bundle as protected JSON', async () => {
+    const fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => { void input; void init; return Promise.resolve(new Response(JSON.stringify({ job_id: 10, status: 'completed', rows_received: 1, rows_imported: 1, created: { players: 1 }, content_sha256: 'abc' }), { status: 201 })) })
+    vi.stubGlobal('fetch', fetchMock)
+    await importIntelligenceBundle({ source_key: 'source', players: [{ provider_player_key: 'p1' }] }, 'secret')
+    const init = fetchMock.mock.calls[0]?.[1]
+    expect(init?.method).toBe('POST')
+    expect(init?.body).toContain('source_key')
     expect(init?.headers).toMatchObject({ 'X-Admin-Key': 'secret' })
   })
 })
