@@ -8,11 +8,12 @@ from apscheduler.schedulers.blocking import BlockingScheduler  # type: ignore[im
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.collectors.registry import registered_odds_providers
+from app.collectors.registry import register_odds_provider, registered_odds_providers
 from app.core.config import Settings, get_settings
 from app.db.models import Provider, ProviderJob
 from app.db.session import SessionLocal
 from app.providers.base import OddsProvider
+from app.providers.odds_api_io import OddsApiIoProvider
 from app.services.demo_seed import seed_demo_data
 from app.services.odds_import import import_odds_csv, serialize_odds_rows_csv
 
@@ -121,6 +122,16 @@ def poll_registered_providers() -> None:
         run_provider_collection(provider)
 
 
+def register_configured_providers(settings: Settings) -> None:
+    if settings.odds_api_io_key:
+        register_odds_provider(
+            OddsApiIoProvider(
+                settings.odds_api_io_key,
+                base_url=settings.odds_api_io_base_url,
+            )
+        )
+
+
 def seed_development_demo(
     *,
     settings: Settings | None = None,
@@ -165,6 +176,7 @@ def build_scheduler(settings: Settings | None = None) -> BlockingScheduler:
 def main() -> None:
     settings = get_settings()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+    register_configured_providers(settings)
     seed_development_demo(settings=settings)
     scheduler = build_scheduler(settings)
     logger.info("OddsQuant worker started")

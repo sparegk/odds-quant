@@ -16,7 +16,11 @@ from app.collectors.registry import (
 from app.core.config import Settings
 from app.db.models import OddsSnapshot, ProviderJob
 from app.db.session import Base
-from app.jobs.scheduler import run_provider_collection, seed_development_demo
+from app.jobs.scheduler import (
+    register_configured_providers,
+    run_provider_collection,
+    seed_development_demo,
+)
 from app.schemas.odds import OddsImportRow
 from app.services.demo_seed import build_demo_odds_csv
 from app.services.odds_import import parse_odds_csv
@@ -120,3 +124,19 @@ def test_production_never_seeds_demo_data(sessions: sessionmaker[Session]) -> No
 def test_render_postgres_url_selects_installed_psycopg_driver() -> None:
     settings = Settings(database_url="postgresql://user:password@db:5432/oddsquant")
     assert settings.database_url == "postgresql+psycopg://user:password@db:5432/oddsquant"
+
+
+def test_configured_odds_api_provider_is_registered() -> None:
+    register_configured_providers(
+        Settings(
+            odds_api_io_key="configured-test-key",
+            odds_api_io_base_url="https://provider.example/v3",
+        )
+    )
+
+    providers = registered_odds_providers()
+
+    assert len(providers) == 1
+    assert providers[0].slug == "odds-api-io"
+    assert providers[0].kind == "licensed_api"
+    assert providers[0].is_demo is False

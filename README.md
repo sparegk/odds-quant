@@ -335,7 +335,10 @@ The initial bookmaker target set is Allwyn's ΠΑΜΕ ΣΤΟΙΧΗΜΑ/Pamestoix
 python -m app.cli probe-target-bookmakers
 ```
 
-The probe is a credential and coverage check only. It does not ingest prices, and a successful response does not prove adequate event, market, freshness, or historical closing coverage.
+The probe checks the bookmakers selected for the authenticated account, not merely the
+provider's global catalog. Require `complete: true` before collection. It does not ingest
+prices, and a successful response does not prove adequate event, market, freshness, or
+historical closing coverage.
 
 Train and apply the baseline after results and target-event odds exist:
 
