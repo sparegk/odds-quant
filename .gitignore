@@ -6,6 +6,7 @@ __pycache__/
 *.db
 *.sqlite*
 *.log
+backend/data/imports/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/

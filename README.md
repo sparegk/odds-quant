@@ -294,9 +294,11 @@ python -m app.cli seed-demo-results --as-of 2026-07-19T10:00:00+00:00
 Import a user-provided UTF-8 CSV after applying migrations:
 
 ```bash
-python -m app.cli import-odds path/to/odds.csv
-python -m app.cli import-results path/to/results.csv
+python -m app.cli import-odds data/imports/odds.csv
+python -m app.cli import-results data/imports/results.csv
 ```
+
+When running from `backend`, place licensed or proprietary input files under `data/imports/`. That local intake directory is git-ignored; raw provider data must never be committed. Files may also remain outside the repository and be referenced by absolute path.
 
 The same workflows are available at `POST /api/v1/imports/odds` and `POST /api/v1/imports/results` as multipart uploads. Development permits local uploads without a key. Set `ODDSQUANT_ADMIN_API_KEY` and send it as `X-Admin-Key` for protected environments; production fails closed when the key is unset.
 
