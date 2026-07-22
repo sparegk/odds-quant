@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import type { DashboardData, ValueSignal } from './types'
 import { ArbitrageResearch, BacktestResearch, InlineError, InlineLoading, ResourceErrors, SignalResearch } from './App'
+import { chooseDefaultEventId } from './lib/events'
 import { UnderdogScanner } from './components/UnderdogScanner'
 import { ValueOpportunities } from './components/ValueOpportunities'
 
@@ -101,6 +102,17 @@ describe('SignalResearch', () => {
 
     expect(screen.getByText('No qualified underdogs')).toBeInTheDocument()
     expect(screen.getByText(/Long odds and demo prices are never treated as value/)).toBeInTheDocument()
+  })
+})
+
+describe('default event selection', () => {
+  it('prioritizes an event with timestamped odds over an empty historical event', () => {
+    const [event] = dashboard.events
+    if (!event) throw new Error('event fixture is required')
+    expect(chooseDefaultEventId([
+      { ...event, id: 1, latest_odds_at: null },
+      { ...event, id: 2, latest_odds_at: '2026-07-19T12:00:00Z' },
+    ])).toBe(2)
   })
 })
 

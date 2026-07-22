@@ -31,6 +31,7 @@ import { ModelPerformance } from './components/ModelPerformance'
 import { DataOperations } from './components/DataOperations'
 import { QuantPriceTable } from './components/QuantPriceTable'
 import { formatDateTime, humanizeCode } from './lib/format'
+import { chooseDefaultEventId } from './lib/events'
 import type { DashboardData, EvaluationRun, EventSummary, MarketComparison, ValueSignal } from './types'
 
 type ViewKey =
@@ -96,7 +97,7 @@ function App() {
     try {
       const loaded = await loadDashboard()
       setDashboard(loaded)
-      setSelectedEventId((current) => current ?? loaded.events[0]?.id ?? null)
+      setSelectedEventId((current) => current ?? chooseDefaultEventId(loaded.events))
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to reach the OddsQuant API')
     } finally {
@@ -110,7 +111,7 @@ function App() {
       .then((loaded) => {
         if (!active) return
         setDashboard(loaded)
-        setSelectedEventId(loaded.events[0]?.id ?? null)
+        setSelectedEventId(chooseDefaultEventId(loaded.events))
       })
       .catch((caught: unknown) => {
         if (active) setError(caught instanceof Error ? caught.message : 'Unable to reach the OddsQuant API')
