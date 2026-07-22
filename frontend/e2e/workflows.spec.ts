@@ -13,7 +13,7 @@ const evaluation = {
   id: 22, model_version_id: 12, model_version: 'poisson-e2e', evaluation_start: '2026-01-01T00:00:00Z', evaluation_end: now,
   status: 'completed', fingerprint: 'evaluation-fingerprint', config: {}, policy: {}, evaluation_status: 'calibrated',
   metrics: { evaluated_events: 40, candidate_events: 40, brier_score: 0.18, log_loss: 0.75, expected_calibration_error: 0.04 },
-  benchmarks: { uniform: { brier_score: 0.22 }, market_consensus: { brier_score: 0.2 } }, calibration: [], is_demo: false, created_at: now,
+  benchmarks: { elo: { observations: 40, brier_score: 0.2, log_loss: 0.8, expected_calibration_error: 0.05 }, uniform: { brier_score: 0.22, log_loss: 1.0986 }, market_consensus: { brier_score: 0.2, log_loss: 0.79 } }, calibration: [], is_demo: false, created_at: now,
 }
 const output = {
   id: 32, event_id: 7, model_version_id: 12, model_version: 'poisson-e2e', predicted_at: now, inputs_as_of: now, evidence_class: 'external',
@@ -73,6 +73,7 @@ test('imports odds and completes the model-to-signal workflow', async ({ page })
 
   await page.evaluate(() => { window.location.hash = 'models' })
   await expect(page.locator('header h1')).toHaveText('Model performance')
+  await expect(page.getByText('Chronological Elo')).toBeVisible()
   await page.getByLabel('Training start').fill('2025-01-01T00:00')
   await page.getByLabel('Training end').fill('2026-07-01T12:00')
   await page.getByRole('button', { name: 'Train model' }).click()

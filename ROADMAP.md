@@ -15,8 +15,9 @@ Completed slices: Alembic schema lifecycle, labelled demo odds and results, atom
 - Completed: tax-aware football arbitrage engine for complete 1X2, over/under, and BTTS markets, including best-price selection, per-leg taxes/fees, rounded stake optimization, provenance fingerprints, conservative net-profit ranking, and execution-risk warnings.
 - Completed: leakage-safe Poisson training, sampling intervals, immutable versions, and scoreline-derived predictions.
 - Completed: expanding-window chronological evaluation, immutable replay evidence, Brier/log-loss/ECE metrics, calibration buckets, uniform and optional market benchmarks, and a non-demo promotion policy.
+- Completed: point-in-time Davidson-style Elo forecasts and a persisted Poisson-versus-Elo proper-score comparison exposed in Model Performance.
 - Completed: gated explainable value signals, best-price selection, compatible market consensus, lower-bound EV, freshness and movement checks, immutable calibration provenance, and positive-EV team-underdog ranking.
-- Remaining: adequate permitted evaluation history, richer model benchmarks, and independently validated confidence thresholds.
+- Remaining: adequate permitted evaluation history, Dixon-Coles and other richer model benchmarks, and independently validated confidence thresholds.
 - Recency-weighted player and lineup strength, coach-regime handling, tactical matchup features, scenario sensitivity, and walk-forward ablation tests.
 - Completed: value, underdog, arbitrage, bet-builder, backtesting, and bankroll dashboard pages with typed API integration and partial-resource failure states.
 - Completed: protected model operations for training, evaluation, prediction, and signal generation; sourced tax/constraint management; per-tab readiness; automatic post-write synchronization; preserved event context; and success notifications.

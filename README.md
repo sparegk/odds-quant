@@ -204,6 +204,7 @@ The repository is in the **Phase 1 research-workflow milestone**. It includes:
 - Atomic historical-result CSV ingestion with raw provenance, corrections, and strict timestamp ordering.
 - A deterministic 32-match synthetic history generator covering every demo team at home and away.
 - A versioned, shrunk Poisson team-strength baseline trained only from final results observed by its cutoff.
+- A draw-aware chronological Elo benchmark replayed from the same pre-forecast result cutoffs and compared independently using Brier score, log loss, calibration error, and observation coverage.
 - Stored score matrices, expected goals, selection probabilities, uncertainty intervals, data fingerprints, and immutable prediction timestamps.
 - Model registry, training, prediction, and event-prediction API routes plus CLI equivalents.
 - Dedicated value, underdog, and tax-aware arbitrage dashboards with provenance, costs, risk, loading, error, and empty states.

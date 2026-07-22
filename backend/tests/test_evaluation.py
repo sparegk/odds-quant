@@ -134,6 +134,7 @@ def test_post_evaluation_correction_does_not_rewrite_existing_run(
 ) -> None:
     model = _model(session)
     original = evaluate_model(session, model.id, _request(), now=AS_OF)
+    original_elo = original.benchmarks["elo"]
     training_result = session.scalar(select(MatchResult).order_by(MatchResult.id))
     assert training_result is not None
     session.add(
@@ -156,6 +157,7 @@ def test_post_evaluation_correction_does_not_rewrite_existing_run(
 
     assert repeated.id == original.id
     assert repeated.fingerprint == original.fingerprint
+    assert repeated.benchmarks["elo"] == original_elo
     assert session.scalar(select(func.count()).select_from(BacktestRun)) == 1
 
 

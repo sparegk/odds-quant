@@ -286,9 +286,13 @@ def test_results_training_and_prediction_api_are_connected(
     assert evaluation.status_code == 201
     assert evaluation.json()["evaluation_status"] == "insufficient_evidence"
     assert evaluation.json()["metrics"]["evaluated_events"] == 8
+    assert evaluation.json()["benchmarks"]["elo"]["observations"] == 8
+    assert evaluation.json()["benchmarks"]["elo"]["brier_score"] >= 0
+    assert evaluation.json()["benchmarks"]["elo"]["log_loss"] >= 0
     evaluations = client.get("/api/v1/evaluations")
     assert evaluations.status_code == 200
     assert evaluations.json()[0]["id"] == evaluation.json()["id"]
+    assert evaluations.json()[0]["benchmarks"]["elo"] == evaluation.json()["benchmarks"]["elo"]
 
     prediction = client.post(
         f"/api/v1/models/{training.json()['id']}/predict",
