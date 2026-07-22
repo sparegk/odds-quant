@@ -23,6 +23,7 @@ import { FreshnessBadge } from './components/FreshnessBadge'
 import { BetBuilderLab } from './components/BetBuilderLab'
 import { BankrollResearch } from './components/BankrollResearch'
 import { MatchdayResearch } from './components/MatchdayResearch'
+import { UnderdogScanner } from './components/UnderdogScanner'
 import { QuantPriceTable } from './components/QuantPriceTable'
 import { formatDateTime, humanizeCode } from './lib/format'
 import type { DashboardData, EvaluationRun, EventSummary, MarketComparison, ValueSignal } from './types'
@@ -287,7 +288,7 @@ function ActiveView(props: ActiveViewProps) {
     case 'opportunities':
       return <SignalResearch dashboard={props.dashboard} mode="value" />
     case 'underdogs':
-      return <SignalResearch dashboard={props.dashboard} mode="underdog" />
+      return <UnderdogScanner dashboard={props.dashboard} onOpenEvent={(eventId) => { props.onSelectEvent(eventId); navigateTo('event') }} />
     case 'arbitrage':
       return <ArbitrageResearch dashboard={props.dashboard} />
     case 'builder':

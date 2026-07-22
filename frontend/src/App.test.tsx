@@ -1,8 +1,9 @@
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import type { DashboardData, ValueSignal } from './types'
 import { ArbitrageResearch, BacktestResearch, InlineError, InlineLoading, ResourceErrors, SignalResearch } from './App'
+import { UnderdogScanner } from './components/UnderdogScanner'
 
 afterEach(cleanup)
 
@@ -95,10 +96,30 @@ describe('SignalResearch', () => {
   })
 
   it('fails closed when no qualified underdog signals exist', () => {
-    render(<SignalResearch dashboard={{ ...dashboard, underdogs: [] }} mode="underdog" />)
+    render(<UnderdogScanner dashboard={{ ...dashboard, underdogs: [] }} onOpenEvent={() => undefined} />)
 
     expect(screen.getByText('No qualified underdogs')).toBeInTheDocument()
     expect(screen.getByText(/Long odds and demo prices are never treated as value/)).toBeInTheDocument()
+  })
+})
+
+describe('UnderdogScanner', () => {
+  it('ranks by conservative evidence and exposes provenance', () => {
+    render(<UnderdogScanner dashboard={dashboard} onOpenEvent={() => undefined} />)
+
+    expect(screen.getByText('Underdog evidence scanner')).toBeInTheDocument()
+    expect(screen.getByText('Best lower EV')).toBeInTheDocument()
+    expect(screen.getAllByText('+5.4%')).toHaveLength(2)
+    fireEvent.click(screen.getByText('Evidence and provenance'))
+    expect(screen.getByText(/evaluation #5 · prediction #13/)).toBeInTheDocument()
+  })
+
+  it('filters the stored qualified set without redefining qualification', () => {
+    render(<UnderdogScanner dashboard={dashboard} onOpenEvent={() => undefined} />)
+
+    fireEvent.change(screen.getByLabelText('Minimum confidence (%)'), { target: { value: '90' } })
+    expect(screen.getByText('No underdogs match these filters')).toBeInTheDocument()
+    expect(screen.getByText('0 of 1 shown')).toBeInTheDocument()
   })
 })
 
