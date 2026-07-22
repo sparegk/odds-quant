@@ -8,6 +8,7 @@ export interface ProjectStatus {
 export interface EventSummary {
   id: number
   provider_event_key: string
+  competition_id?: number
   competition: string
   country: string
   season: string
@@ -297,6 +298,15 @@ export interface ValueSignal {
   generated_at: string
   reasons: string[]
   risks: string[]
+}
+
+export interface SignalBatch {
+  event_id: number
+  output_id: number
+  model_version_id: number
+  evaluation_run_id: number
+  generated_at: string
+  signals: ValueSignal[]
 }
 
 export interface ArbitrageLeg {

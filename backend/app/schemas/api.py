@@ -10,6 +10,7 @@ class EventSummary(BaseModel):
 
     id: int
     provider_event_key: str
+    competition_id: int
     competition: str
     country: str
     season: str

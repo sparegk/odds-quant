@@ -19,6 +19,7 @@ import type {
   ProviderJob,
   ProviderSummary,
   SignalBacktest,
+  SignalBatch,
   ValueSignal,
 } from '../types'
 
@@ -166,6 +167,26 @@ export function calculateArbitrage(payload: {
 
 export function loadPredictions(eventId: number): Promise<ModelOutput[]> {
   return request<ModelOutput[]>(`/api/v1/events/${eventId}/predictions`)
+}
+
+function adminJson(adminKey?: string): HeadersInit {
+  return { 'Content-Type': 'application/json', ...(adminKey ? { 'X-Admin-Key': adminKey } : {}) }
+}
+
+export function trainPoissonModel(payload: { competition_id: number; training_start: string; training_end: string; minimum_matches: number; minimum_team_matches: number; shrinkage_matches: number }, adminKey?: string): Promise<ModelVersion> {
+  return request<ModelVersion>('/api/v1/models/train', { method: 'POST', headers: adminJson(adminKey), body: JSON.stringify(payload) })
+}
+
+export function evaluateModel(modelId: number, payload: { evaluation_start: string; evaluation_end: string; prediction_lead_minutes: number; minimum_training_matches: number; calibration_bins: number }, adminKey?: string): Promise<EvaluationRun> {
+  return request<EvaluationRun>(`/api/v1/models/${modelId}/evaluate`, { method: 'POST', headers: adminJson(adminKey), body: JSON.stringify(payload) })
+}
+
+export function predictEvent(modelId: number, payload: { event_id: number; predicted_at?: string; inputs_as_of?: string }, adminKey?: string): Promise<ModelOutput> {
+  return request<ModelOutput>(`/api/v1/models/${modelId}/predict`, { method: 'POST', headers: adminJson(adminKey), body: JSON.stringify(payload) })
+}
+
+export function generateSignals(payload: { output_id: number; generated_at?: string }, adminKey?: string): Promise<SignalBatch> {
+  return request<SignalBatch>('/api/v1/signals/generate', { method: 'POST', headers: adminJson(adminKey), body: JSON.stringify(payload) })
 }
 
 export function loadBuilderQuotes(eventId: number): Promise<BetBuilderQuote[]> {

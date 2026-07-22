@@ -3,6 +3,7 @@ import { AlertTriangle, LineChart } from 'lucide-react'
 
 import { formatDateTime, humanizeCode } from '../lib/format'
 import type { DashboardData, EvaluationRun } from '../types'
+import { ModelOperations } from './ModelOperations'
 
 export function ModelPerformance({ dashboard }: { dashboard: DashboardData }) {
   const [selectedId, setSelectedId] = useState<number | null>(dashboard.models[0]?.id ?? null)
@@ -10,9 +11,10 @@ export function ModelPerformance({ dashboard }: { dashboard: DashboardData }) {
   const evaluations = useMemo(() => selected ? dashboard.evaluations.filter((run) => run.model_version_id === selected.id) : [], [dashboard.evaluations, selected])
   const latest = evaluations[0]
 
-  if (!selected) return <div className="space-y-5"><ModelEmpty title="No trained model versions" detail="Import timestamped historical results and train the Poisson baseline to populate this registry." /><EvidenceWarning /></div>
+  if (!selected) return <div className="space-y-5"><ModelOperations dashboard={dashboard} /><ModelEmpty title="No trained model versions" detail="Import timestamped historical results and train the Poisson baseline to populate this registry." /><EvidenceWarning /></div>
 
   return <div className="space-y-7">
+    <ModelOperations dashboard={dashboard} />
     <div><p className="text-xs font-bold uppercase text-emerald-700">Versioned evidence registry</p><h2 className="mt-1 text-lg font-bold">Model performance and audit</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-zinc-500">Compare immutable training versions with their own chronological evaluation evidence. Training fit is never shown as validation.</p></div>
     <div className="grid gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
       <aside><h3 className="mb-3 text-xs font-bold uppercase text-zinc-500">Model versions</h3><div className="border-y border-zinc-200 bg-white">{dashboard.models.map((model) => <button key={model.id} className={`w-full border-b border-zinc-100 p-4 text-left last:border-0 ${selected.id === model.id ? 'bg-emerald-50' : 'hover:bg-zinc-50'}`} onClick={() => setSelectedId(model.id)} type="button"><div className="flex items-start justify-between gap-2"><div><p className="font-bold">{model.version}</p><p className="mt-1 text-xs text-zinc-500">{model.kind} · {model.sample_size} matches</p></div><Status status={model.evaluation_status} /></div></button>)}</div></aside>

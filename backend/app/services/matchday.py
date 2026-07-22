@@ -174,6 +174,7 @@ def list_matchday(
                 event=EventSummary(
                     id=event.id,
                     provider_event_key=event.provider_event_key,
+                    competition_id=competition.id,
                     competition=competition.name,
                     country=competition.country,
                     season=competition.season,

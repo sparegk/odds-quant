@@ -77,6 +77,7 @@ def list_events(
         EventSummary(
             id=event.id,
             provider_event_key=event.provider_event_key,
+            competition_id=competition.id,
             competition=competition.name,
             country=competition.country,
             season=competition.season,
@@ -114,6 +115,7 @@ def get_event(session: Session, event_id: int) -> EventSummary | None:
     return EventSummary(
         id=event.id,
         provider_event_key=event.provider_event_key,
+        competition_id=competition.id,
         competition=competition.name,
         country=competition.country,
         season=competition.season,
