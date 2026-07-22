@@ -408,7 +408,7 @@ Copy `.env.example` to `.env` for local configuration. Never commit API keys, to
 
 OddsQuant now has a migrated point-in-time data layer, atomic odds and result ingestion, a leakage-safe versioned Poisson baseline, stored scoreline predictions, chronological calibration, gated explainable value and underdog signals, an independent tax-aware arbitrage service, correlated bet-builder quotes, timestamp-valid signal-return backtests, constrained bankroll research, connected dashboards, provider scheduling, CI, and prepared full-stack deployment. The next milestone is adequate permitted non-demo history, closing-price coverage, richer benchmarks, and independently validated player, lineup, coach, and tactical extensions. No current demo result is evidence of profitability.
 
-See [context.md](context.md), [ARCHITECTURE.md](ARCHITECTURE.md), [METHODOLOGY.md](METHODOLOGY.md), [ROADMAP.md](ROADMAP.md), and [AGENTS.md](AGENTS.md) for detailed decisions and operating rules.
+See [context.md](context.md), [ARCHITECTURE.md](ARCHITECTURE.md), [METHODOLOGY.md](METHODOLOGY.md), [ROADMAP.md](ROADMAP.md), [DATA_IMPORTS.md](DATA_IMPORTS.md), and [AGENTS.md](AGENTS.md) for detailed decisions and operating rules.
 
 Data-source, freshness, lineup, player, and tactical requirements are documented in [DATA_SOURCES.md](DATA_SOURCES.md).
 
