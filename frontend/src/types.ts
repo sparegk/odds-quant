@@ -332,6 +332,12 @@ export interface ArbitrageOpportunity {
   legs: ArbitrageLeg[]
 }
 
+export interface ArbitrageBatch {
+  event_id: number
+  calculated_at: string
+  opportunities: ArbitrageOpportunity[]
+}
+
 export interface PriceComparison {
   selection_code: string
   selection_name: string

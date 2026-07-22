@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   createBuilderQuote,
+  calculateArbitrage,
   loadComparison,
   loadDashboard,
   loadMatchday,
@@ -134,5 +135,20 @@ describe('API client', () => {
     const requestBody = fetchMock.mock.calls[1]?.[1]?.body
     expect(typeof requestBody).toBe('string')
     if (typeof requestBody === 'string') expect(requestBody).toContain('prediction_output_id')
+  })
+
+  it('submits protected arbitrage controls without persisting the admin key', async () => {
+    const fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => {
+      void input
+      void init
+      return Promise.resolve(new Response(JSON.stringify({ event_id: 42, calculated_at: '2026-07-19T12:00:00Z', opportunities: [] }), { status: 201 }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    await calculateArbitrage({ event_id: 42, budget: 100, currency: 'EUR', odds_stale_after_seconds: 300, tax_max_age_days: 365, constraint_max_age_minutes: 1440 }, 'secret')
+    const request = fetchMock.mock.calls[0]
+    const requestUrl = request?.[0]
+    expect(typeof requestUrl === 'string' ? requestUrl : requestUrl instanceof Request ? requestUrl.url : requestUrl?.href).toContain('/api/v1/arbitrage/calculate')
+    expect(request?.[1]?.method).toBe('POST')
+    expect(request?.[1]?.headers).toMatchObject({ 'X-Admin-Key': 'secret' })
   })
 })

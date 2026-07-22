@@ -1,5 +1,6 @@
 import type {
   ArbitrageOpportunity,
+  ArbitrageBatch,
   BankrollSimulation,
   BetBuilderQuote,
   CreateBetBuilderQuote,
@@ -37,7 +38,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { Accept: 'application/json', ...init?.headers },
   })
   if (!response.ok) {
-    throw new ApiError(`API request failed: ${response.status}`, response.status)
+    let detail = ''
+    try {
+      const body: unknown = await response.json()
+      if (typeof body === 'object' && body !== null && 'detail' in body && typeof body.detail === 'string') detail = ` — ${body.detail}`
+    } catch {
+      // Non-JSON failures still retain their HTTP status.
+    }
+    throw new ApiError(`API request failed: ${response.status}${detail}`, response.status)
   }
   return (await response.json()) as T
 }
@@ -101,6 +109,24 @@ export async function loadDashboard(): Promise<DashboardData> {
 
 export function loadComparison(eventId: number): Promise<MarketComparison[]> {
   return request<MarketComparison[]>(`/api/v1/odds/comparison?event_id=${eventId}`)
+}
+
+export function calculateArbitrage(payload: {
+  event_id: number
+  budget: number
+  currency: string
+  odds_stale_after_seconds: number
+  tax_max_age_days: number
+  constraint_max_age_minutes: number
+}, adminKey?: string): Promise<ArbitrageBatch> {
+  return request<ArbitrageBatch>('/api/v1/arbitrage/calculate', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(adminKey ? { 'X-Admin-Key': adminKey } : {}),
+    },
+    body: JSON.stringify(payload),
+  })
 }
 
 export function loadPredictions(eventId: number): Promise<ModelOutput[]> {

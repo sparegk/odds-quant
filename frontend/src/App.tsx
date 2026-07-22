@@ -17,8 +17,9 @@ import {
   TrendingUp,
 } from 'lucide-react'
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+import type { FormEvent } from 'react'
 
-import { API_BASE_URL, loadComparison, loadDashboard } from './api/client'
+import { API_BASE_URL, calculateArbitrage, loadComparison, loadDashboard } from './api/client'
 import { FreshnessBadge } from './components/FreshnessBadge'
 import { BetBuilderLab } from './components/BetBuilderLab'
 import { BankrollResearch } from './components/BankrollResearch'
@@ -578,32 +579,56 @@ export function SignalResearch({ dashboard, mode }: { dashboard: DashboardData; 
 }
 
 export function ArbitrageResearch({ dashboard }: { dashboard: DashboardData }) {
-  const executable = dashboard.arbitrage.filter((opportunity) => opportunity.status === 'executable')
-  const blocked = dashboard.arbitrage.filter((opportunity) => opportunity.status !== 'executable')
+  const [eventId, setEventId] = useState(String(dashboard.events[0]?.id ?? ''))
+  const [budget, setBudget] = useState('100')
+  const [currency, setCurrency] = useState('EUR')
+  const [staleSeconds, setStaleSeconds] = useState('300')
+  const [adminKey, setAdminKey] = useState('')
+  const [calculated, setCalculated] = useState<typeof dashboard.arbitrage | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [calculationError, setCalculationError] = useState<string | null>(null)
+  const opportunities = calculated ?? dashboard.arbitrage
+  const executable = opportunities.filter((opportunity) => opportunity.status === 'executable')
+  const blocked = opportunities.filter((opportunity) => opportunity.status !== 'executable')
   const bestExecutable = executable.reduce(
     (best, opportunity) => best === null || opportunity.net_profit > best.net_profit ? opportunity : best,
     null as (typeof executable)[number] | null,
   )
 
-  if (!dashboard.arbitrage.length) {
-    return (
-      <div className="space-y-5">
-        <EmptyState
-          title="No stored arbitrage calculations"
-          detail="Run the protected calculation workflow for a complete compatible market to populate this research view."
-        />
-        <div className="border-l-4 border-amber-400 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
-          Gross inverse-sum opportunities are insufficient. Missing or stale tax rules, stake limits, prices, or settlement compatibility must block execution.
-        </div>
-      </div>
-    )
+  const submitCalculation = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setSubmitting(true)
+    setCalculationError(null)
+    try {
+      const result = await calculateArbitrage({
+        event_id: Number(eventId), budget: Number(budget), currency,
+        odds_stale_after_seconds: Number(staleSeconds), tax_max_age_days: 365,
+        constraint_max_age_minutes: 1440,
+      }, adminKey || undefined)
+      setCalculated(result.opportunities)
+    } catch (caught) {
+      setCalculationError(caught instanceof Error ? caught.message : 'Unable to calculate arbitrage')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
     <div className="space-y-7">
       <SectionHeading eyebrow="Tax and constraint aware" title="Stored arbitrage calculations" />
+      <form className="border-y border-zinc-200 bg-white p-5" onSubmit={(event) => void submitCalculation(event)}>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <label><span className="mb-1.5 block text-xs font-semibold uppercase text-zinc-500">Event</span><select aria-label="Arbitrage event" className="h-10 w-full border border-zinc-300 bg-white px-3 text-sm" required value={eventId} onChange={(event) => setEventId(event.target.value)}><option disabled value="">Select event</option>{dashboard.events.map((item) => <option key={item.id} value={item.id}>{item.home_team} vs {item.away_team}</option>)}</select></label>
+          <label><span className="mb-1.5 block text-xs font-semibold uppercase text-zinc-500">Research budget</span><input aria-label="Research budget" className="h-10 w-full border border-zinc-300 px-3 text-sm" min="0.01" required step="0.01" type="number" value={budget} onChange={(event) => setBudget(event.target.value)} /></label>
+          <label><span className="mb-1.5 block text-xs font-semibold uppercase text-zinc-500">Currency</span><input aria-label="Currency" className="h-10 w-full border border-zinc-300 px-3 text-sm uppercase" maxLength={3} minLength={3} required value={currency} onChange={(event) => setCurrency(event.target.value.toUpperCase())} /></label>
+          <label><span className="mb-1.5 block text-xs font-semibold uppercase text-zinc-500">Price max age (seconds)</span><input aria-label="Price max age (seconds)" className="h-10 w-full border border-zinc-300 px-3 text-sm" min="1" required type="number" value={staleSeconds} onChange={(event) => setStaleSeconds(event.target.value)} /></label>
+          <label><span className="mb-1.5 block text-xs font-semibold uppercase text-zinc-500">Admin key (memory only)</span><input aria-label="Admin key" autoComplete="off" className="h-10 w-full border border-zinc-300 px-3 text-sm" type="password" value={adminKey} onChange={(event) => setAdminKey(event.target.value)} /></label>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-3"><button className="rounded-[5px] bg-zinc-900 px-4 py-2 text-sm font-bold text-white disabled:opacity-50" disabled={submitting || !eventId} type="submit">{submitting ? 'Calculating…' : 'Calculate stored markets'}</button><p className="text-xs text-zinc-500">The key is sent only with this request and is not persisted. Local development may leave it blank.</p></div>
+        {calculationError ? <div className="mt-4 border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900" role="alert">{calculationError}</div> : null}
+      </form>
       <section className="grid grid-cols-2 border border-zinc-200 bg-white md:grid-cols-4">
-        <Metric label="Calculations" value={dashboard.arbitrage.length.toString()} />
+        <Metric label="Calculations" value={opportunities.length.toString()} />
         <Metric label="Executable" value={executable.length.toString()} />
         <Metric label="Blocked" value={blocked.length.toString()} tone={blocked.length ? 'amber' : 'default'} />
         <Metric
@@ -613,7 +638,8 @@ export function ArbitrageResearch({ dashboard }: { dashboard: DashboardData }) {
       </section>
 
       <div className="space-y-5">
-        {dashboard.arbitrage.map((opportunity) => {
+        {!opportunities.length ? <EmptyState title="No stored arbitrage calculations" detail="Choose an event and run the protected calculation against its complete compatible market snapshots." /> : null}
+        {opportunities.map((opportunity) => {
           const event = dashboard.events.find((candidate) => candidate.id === opportunity.event_id)
           return (
             <article key={opportunity.id} className="border border-zinc-200 bg-white">
@@ -668,6 +694,8 @@ export function ArbitrageResearch({ dashboard }: { dashboard: DashboardData }) {
           )
         })}
       </div>
+
+      {!opportunities.length ? <div className="border-l-4 border-amber-400 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">Gross inverse-sum opportunities are insufficient. Missing or stale tax rules, stake limits, prices, or settlement compatibility must block execution.</div> : null}
 
       <div className="border-l-4 border-rose-500 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-950">
         “Executable” means the stored calculation passed configured checks at its cutoff. It is never a guarantee that every bookmaker leg will be accepted and honoured.
