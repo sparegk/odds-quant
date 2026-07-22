@@ -33,6 +33,7 @@ Accepted files preserve their SHA-256 digest and normalized payload in `raw_inge
 - at least 200 permitted final results;
 - timestamped permitted odds snapshots; and
 - permitted closing snapshots observed strictly before kickoff.
+- bookmaker-specific coverage for Allwyn's Greek ΠΑΜΕ ΣΤΟΙΧΗΜΑ/Pamestoixima channel, Novibet, and bet365.
 
 The audit is an evidence-availability gate, not proof that a source is licensed, representative, unbiased, or suitable for production. Source terms and the provider registry remain authoritative. A passing audit also does not promote a model; chronological evaluation, calibration, benchmark, and promotion-policy requirements still apply.
 

@@ -16,6 +16,11 @@ from app.db.models import (
 from app.schemas.api import CompetitionDataCoverage, DataCoverageView
 
 MINIMUM_EVALUATION_RESULTS = 200
+REQUIRED_BOOKMAKERS = {
+    "pamestoixima": "Allwyn / Pamestoixima",
+    "novibet": "Novibet",
+    "bet365": "bet365",
+}
 
 
 def data_coverage(session: Session) -> DataCoverageView:
@@ -28,6 +33,7 @@ def data_coverage(session: Session) -> DataCoverageView:
     rows = [_competition_coverage(session, competition) for competition in competitions]
     return DataCoverageView(
         minimum_evaluation_results=MINIMUM_EVALUATION_RESULTS,
+        required_bookmakers=list(REQUIRED_BOOKMAKERS.values()),
         total_events=_count(session, select(func.count(Event.id))),
         permitted_events=sum(row.permitted_events for row in rows),
         permitted_final_results=sum(row.permitted_final_results for row in rows),
@@ -70,6 +76,8 @@ def _competition_coverage(
             permitted_final_results=0,
             permitted_odds_snapshots=0,
             permitted_closing_snapshots=0,
+            covered_required_bookmakers=[],
+            missing_required_bookmakers=list(REQUIRED_BOOKMAKERS.values()),
             first_result_kickoff_at=None,
             last_result_kickoff_at=None,
             closing_event_coverage=0,
@@ -79,6 +87,7 @@ def _competition_coverage(
                 "fewer_than_200_final_results",
                 "no_timestamped_odds",
                 "no_closing_prices",
+                "missing_required_bookmakers",
             ],
         )
 
@@ -123,6 +132,27 @@ def _competition_coverage(
             Bookmaker.is_demo.is_(False),
         ),
     )
+    covered_slugs = set(
+        session.scalars(
+            select(Bookmaker.slug)
+            .join(OddsSnapshot, OddsSnapshot.bookmaker_id == Bookmaker.id)
+            .join(Market, Market.id == OddsSnapshot.market_id)
+            .join(Provider, Provider.id == OddsSnapshot.provider_id)
+            .where(
+                Market.event_id.in_(permitted_event_ids),
+                Provider.is_demo.is_(False),
+                Bookmaker.is_demo.is_(False),
+                Bookmaker.slug.in_(REQUIRED_BOOKMAKERS),
+            )
+            .distinct()
+        ).all()
+    )
+    covered_bookmakers = [
+        label for slug, label in REQUIRED_BOOKMAKERS.items() if slug in covered_slugs
+    ]
+    missing_bookmakers = [
+        label for slug, label in REQUIRED_BOOKMAKERS.items() if slug not in covered_slugs
+    ]
     blockers: list[str] = []
     if result_count < MINIMUM_EVALUATION_RESULTS:
         blockers.append("fewer_than_200_final_results")
@@ -130,6 +160,8 @@ def _competition_coverage(
         blockers.append("no_timestamped_odds")
     if closing_count == 0:
         blockers.append("no_closing_prices")
+    if missing_bookmakers:
+        blockers.append("missing_required_bookmakers")
     return CompetitionDataCoverage(
         competition_id=competition.id,
         competition=competition.name,
@@ -141,6 +173,8 @@ def _competition_coverage(
         permitted_final_results=result_count,
         permitted_odds_snapshots=odds_count,
         permitted_closing_snapshots=closing_count,
+        covered_required_bookmakers=covered_bookmakers,
+        missing_required_bookmakers=missing_bookmakers,
         first_result_kickoff_at=first_result,
         last_result_kickoff_at=last_result,
         closing_event_coverage=closing_events / len(permitted_event_ids),

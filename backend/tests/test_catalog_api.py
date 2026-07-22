@@ -72,11 +72,22 @@ def test_data_coverage_fails_closed_for_demo_and_reports_permitted_gaps(
     assert demo.json()["total_events"] == 4
     assert demo.json()["permitted_events"] == 0
     assert demo.json()["permitted_final_results"] == 0
+    assert demo.json()["required_bookmakers"] == [
+        "Allwyn / Pamestoixima",
+        "Novibet",
+        "bet365",
+    ]
+    assert demo.json()["competitions"][0]["missing_required_bookmakers"] == [
+        "Allwyn / Pamestoixima",
+        "Novibet",
+        "bet365",
+    ]
     assert demo.json()["competitions"][0]["blockers"] == [
         "no_permitted_events",
         "fewer_than_200_final_results",
         "no_timestamped_odds",
         "no_closing_prices",
+        "missing_required_bookmakers",
     ]
 
     for provider in session.scalars(select(Provider)).all():
@@ -96,7 +107,10 @@ def test_data_coverage_fails_closed_for_demo_and_reports_permitted_gaps(
     assert permitted["permitted_odds_snapshots"] == 8
     assert permitted["permitted_closing_snapshots"] == 1
     assert competition["closing_event_coverage"] == pytest.approx(0.25)
-    assert competition["blockers"] == ["fewer_than_200_final_results"]
+    assert competition["blockers"] == [
+        "fewer_than_200_final_results",
+        "missing_required_bookmakers",
+    ]
 
 
 def test_odds_comparison_calculates_devig_and_best_prices(

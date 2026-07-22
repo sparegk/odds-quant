@@ -264,6 +264,8 @@ export interface CompetitionDataCoverage {
   permitted_final_results: number
   permitted_odds_snapshots: number
   permitted_closing_snapshots: number
+  covered_required_bookmakers: string[]
+  missing_required_bookmakers: string[]
   first_result_kickoff_at: string | null
   last_result_kickoff_at: string | null
   closing_event_coverage: number
@@ -273,6 +275,7 @@ export interface CompetitionDataCoverage {
 
 export interface DataCoverage {
   minimum_evaluation_results: number
+  required_bookmakers: string[]
   total_events: number
   permitted_events: number
   permitted_final_results: number

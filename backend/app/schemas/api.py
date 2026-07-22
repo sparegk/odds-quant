@@ -59,6 +59,8 @@ class CompetitionDataCoverage(BaseModel):
     permitted_final_results: int
     permitted_odds_snapshots: int
     permitted_closing_snapshots: int
+    covered_required_bookmakers: list[str]
+    missing_required_bookmakers: list[str]
     first_result_kickoff_at: datetime | None
     last_result_kickoff_at: datetime | None
     closing_event_coverage: float
@@ -68,6 +70,7 @@ class CompetitionDataCoverage(BaseModel):
 
 class DataCoverageView(BaseModel):
     minimum_evaluation_results: int
+    required_bookmakers: list[str]
     total_events: int
     permitted_events: int
     permitted_final_results: int
