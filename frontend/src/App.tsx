@@ -26,6 +26,7 @@ import { BankrollResearch } from './components/BankrollResearch'
 import { MatchdayResearch } from './components/MatchdayResearch'
 import { UnderdogScanner } from './components/UnderdogScanner'
 import { ValueOpportunities } from './components/ValueOpportunities'
+import { EventMarkets } from './components/EventMarkets'
 import { QuantPriceTable } from './components/QuantPriceTable'
 import { formatDateTime, humanizeCode } from './lib/format'
 import type { DashboardData, EvaluationRun, EventSummary, MarketComparison, ValueSignal } from './types'
@@ -280,7 +281,7 @@ function ActiveView(props: ActiveViewProps) {
     case 'matchday':
       return <MatchdayResearch onSelectEvent={props.onSelectEvent} />
     case 'event':
-      return <EventMarkets {...props} />
+      return <EventMarkets dashboard={props.dashboard} events={props.dashboard.events} selectedEventId={props.selectedEventId} markets={props.markets} loading={props.comparisonLoading} error={props.comparisonError} onSelectEvent={props.onSelectEvent} onOpenComparison={() => navigateTo('comparison')} />
     case 'comparison':
       return <OddsComparison {...props} />
     case 'data':
@@ -785,51 +786,6 @@ function EventSelector({ events, selectedEventId, onSelectEvent }: Pick<ActiveVi
         ))}
       </select>
     </label>
-  )
-}
-
-function EventMarkets(props: ActiveViewProps) {
-  const event = props.dashboard.events.find((candidate) => candidate.id === props.selectedEventId)
-  return (
-    <div className="space-y-6">
-      <EventSelector events={props.dashboard.events} onSelectEvent={props.onSelectEvent} selectedEventId={props.selectedEventId} />
-      {event ? (
-        <section className="border-y border-zinc-200 bg-white">
-          <div className="grid gap-4 border-b border-zinc-200 px-5 py-5 md:grid-cols-[1fr_auto]">
-            <div>
-              <p className="text-xs font-semibold uppercase text-zinc-500">{event.competition} / {event.season}</p>
-              <h2 className="mt-1 text-xl font-bold">{event.home_team} vs {event.away_team}</h2>
-              <p className="mt-1 text-sm text-zinc-500">{formatDateTime(event.kickoff_at)}</p>
-            </div>
-            <span className="self-start rounded-[4px] border border-zinc-300 px-2 py-1 text-xs font-semibold">{event.is_demo ? 'DEMO EVENT' : event.status.toUpperCase()}</span>
-          </div>
-          {props.comparisonLoading ? <InlineLoading text="Loading event markets" /> : null}
-          {!props.comparisonLoading && props.comparisonError ? <InlineError message={props.comparisonError} /> : null}
-          {!props.comparisonLoading && !props.comparisonError && props.markets.length ? (
-            props.markets.map((market) => (
-              <div key={market.market_id} className="grid gap-4 border-b border-zinc-100 px-5 py-4 last:border-0 md:grid-cols-[1fr_auto]">
-                <div>
-                  <h3 className="font-semibold">{humanizeCode(market.market_type)} {market.line === null ? '' : market.line}</h3>
-                  <p className="mt-1 text-xs text-zinc-500">{market.period} / {market.settlement_rule_key} / {market.currency}</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {market.best_prices.map((price) => (
-                    <span key={price.selection_code} className="rounded-[4px] border border-zinc-200 bg-zinc-50 px-2.5 py-1.5 text-xs">
-                      <strong>{price.selection_name}</strong> {price.decimal_odds.toFixed(2)}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))
-          ) : null}
-          {!props.comparisonLoading && !props.comparisonError && !props.markets.length ? (
-            <EmptyRow text="No complete market snapshots are available for this event." />
-          ) : null}
-        </section>
-      ) : (
-        <EmptyState title="No event selected" detail="Import an event and coherent odds snapshot to inspect its markets." />
-      )}
-    </div>
   )
 }
 
