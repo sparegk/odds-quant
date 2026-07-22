@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { DashboardData, ValueSignal } from './types'
 import { ArbitrageResearch, BacktestResearch, InlineError, InlineLoading, ResourceErrors, SignalResearch } from './App'
 import { UnderdogScanner } from './components/UnderdogScanner'
+import { ValueOpportunities } from './components/ValueOpportunities'
 
 afterEach(cleanup)
 
@@ -120,6 +121,23 @@ describe('UnderdogScanner', () => {
     fireEvent.change(screen.getByLabelText('Minimum confidence (%)'), { target: { value: '90' } })
     expect(screen.getByText('No underdogs match these filters')).toBeInTheDocument()
     expect(screen.getByText('0 of 1 shown')).toBeInTheDocument()
+  })
+})
+
+describe('ValueOpportunities', () => {
+  it('shows conservative value evidence and immutable provenance', () => {
+    render(<ValueOpportunities dashboard={dashboard} onOpenEvent={() => undefined} />)
+
+    expect(screen.getByText('Value opportunity research')).toBeInTheDocument()
+    expect(screen.getAllByText('+5.4%')).toHaveLength(2)
+    fireEvent.click(screen.getByText('Full evidence'))
+    expect(screen.getByText(/Prediction #13 · snapshot #29/)).toBeInTheDocument()
+  })
+
+  it('shows a distinct filtered empty state', () => {
+    render(<ValueOpportunities dashboard={dashboard} onOpenEvent={() => undefined} />)
+    fireEvent.change(screen.getByLabelText('Minimum lower EV (%)'), { target: { value: '10' } })
+    expect(screen.getByText('No opportunities match these filters')).toBeInTheDocument()
   })
 })
 

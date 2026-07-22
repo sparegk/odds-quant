@@ -24,6 +24,7 @@ import { BetBuilderLab } from './components/BetBuilderLab'
 import { BankrollResearch } from './components/BankrollResearch'
 import { MatchdayResearch } from './components/MatchdayResearch'
 import { UnderdogScanner } from './components/UnderdogScanner'
+import { ValueOpportunities } from './components/ValueOpportunities'
 import { QuantPriceTable } from './components/QuantPriceTable'
 import { formatDateTime, humanizeCode } from './lib/format'
 import type { DashboardData, EvaluationRun, EventSummary, MarketComparison, ValueSignal } from './types'
@@ -286,7 +287,7 @@ function ActiveView(props: ActiveViewProps) {
     case 'methodology':
       return <Methodology />
     case 'opportunities':
-      return <SignalResearch dashboard={props.dashboard} mode="value" />
+      return <ValueOpportunities dashboard={props.dashboard} onOpenEvent={(eventId) => { props.onSelectEvent(eventId); navigateTo('event') }} />
     case 'underdogs':
       return <UnderdogScanner dashboard={props.dashboard} onOpenEvent={(eventId) => { props.onSelectEvent(eventId); navigateTo('event') }} />
     case 'arbitrage':
