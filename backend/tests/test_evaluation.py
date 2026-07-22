@@ -92,6 +92,17 @@ def test_walk_forward_evaluation_persists_immutable_demo_evidence(
     assert isinstance(brier_score, (int, float)) and brier_score >= 0
     assert isinstance(log_loss, (int, float)) and log_loss >= 0
     assert run.benchmarks["uniform"]["brier_score"] == pytest.approx(2 / 3)
+    assert run.benchmarks["elo"]["observations"] == 8
+    assert isinstance(run.benchmarks["elo"]["brier_score"], float)
+    assert isinstance(run.benchmarks["elo"]["log_loss"], float)
+    assert run.config["elo_benchmark"] == {
+        "version": "davidson-elo-v1",
+        "initial_rating": 1500.0,
+        "k_factor": 20.0,
+        "scale": 400.0,
+        "home_advantage": 75.0,
+        "draw_probability_at_even_strength": 0.26,
+    }
     assert len(run.calibration) > 0
     session.refresh(model)
     assert model.evaluation_status == "unvalidated"

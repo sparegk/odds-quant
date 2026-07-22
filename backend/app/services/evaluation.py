@@ -20,6 +20,7 @@ from app.db.models import (
     OddsSnapshot,
     Selection,
 )
+from app.quant.elo import EloConfig, EloMatchResult, elo_probabilities_as_of
 from app.quant.evaluation import (
     OUTCOMES,
     CalibrationBucket,
@@ -63,6 +64,7 @@ class _ReplayObservation:
     actual_outcome: str
     brier_score: float
     log_loss: float
+    elo_probabilities: dict[str, float]
     market_snapshot_ids: list[int]
     market_probabilities: dict[str, float] | None
     market_brier_score: float | None
@@ -122,6 +124,18 @@ def evaluate_model(
             )
             for training_result, training_event in training_rows
         ]
+        elo_history = [
+            EloMatchResult(
+                event_id=training_event.id,
+                home_team_id=training_event.home_team_id,
+                away_team_id=training_event.away_team_id,
+                kickoff_at=_utc(training_event.kickoff_at),
+                observed_at=_utc(training_result.observed_at),
+                home_goals=training_result.home_goals,
+                away_goals=training_result.away_goals,
+            )
+            for training_result, training_event in training_rows
+        ]
         fitted = fit_poisson_team_strength(scores, shrinkage_matches=shrinkage_matches)
         home = fitted.teams.get(event.home_team_id)
         away = fitted.teams.get(event.away_team_id)
@@ -134,6 +148,12 @@ def evaluate_model(
 
         home_lambda, away_lambda = fitted.expected_goals(event.home_team_id, event.away_team_id)
         probabilities = derive_market(score_matrix(home_lambda, away_lambda), "MATCH_RESULT")
+        elo_probabilities = elo_probabilities_as_of(
+            elo_history,
+            home_team_id=event.home_team_id,
+            away_team_id=event.away_team_id,
+            as_of=predicted_at,
+        ).probabilities
         actual_outcome = _actual_outcome(result)
         market_snapshot_ids, market_probabilities = _market_consensus(
             session, event.id, predicted_at
@@ -149,6 +169,7 @@ def evaluate_model(
                 actual_outcome=actual_outcome,
                 brier_score=multiclass_brier(probabilities, actual_outcome),
                 log_loss=multiclass_log_loss(probabilities, actual_outcome),
+                elo_probabilities=elo_probabilities,
                 market_snapshot_ids=market_snapshot_ids,
                 market_probabilities=market_probabilities,
                 market_brier_score=(
@@ -185,6 +206,10 @@ def evaluate_model(
         ({outcome: 1 / 3 for outcome in OUTCOMES}, actual) for _, actual in probability_rows
     ]
     uniform_metrics, _ = summarize_probabilities(uniform_rows, bins=request.calibration_bins)
+    elo_rows = [
+        (observation.elo_probabilities, observation.actual_outcome) for observation in replayed
+    ]
+    elo_metrics, _ = summarize_probabilities(elo_rows, bins=request.calibration_bins)
     market_rows = [
         (observation.market_probabilities, observation.actual_outcome)
         for observation in replayed
@@ -229,6 +254,10 @@ def evaluate_model(
         "outcomes": list(OUTCOMES),
         "brier_definition": "sum_squared_error_over_three_outcomes_range_0_to_2",
         "market_benchmark": "mean_proportional_devig_of_latest_compatible_snapshot_per_bookmaker",
+        "elo_benchmark": {
+            "version": "davidson-elo-v1",
+            **EloConfig().__dict__,
+        },
     }
     run = BacktestRun(
         model_version_id=model.id,
@@ -278,6 +307,7 @@ def evaluate_model(
         run_id=run.id,
         metrics=metrics,
         uniform_metrics=uniform_metrics,
+        elo_metrics=elo_metrics,
         market_metrics=market_metrics,
         buckets=buckets,
     )
@@ -484,6 +514,7 @@ def _persist_results(
     run_id: int,
     metrics: dict[str, object],
     uniform_metrics: dict[str, object],
+    elo_metrics: dict[str, object],
     market_metrics: dict[str, object] | None,
     buckets: list[CalibrationBucket],
 ) -> None:
@@ -494,6 +525,15 @@ def _persist_results(
             dimension="overall",
             dimension_value="all",
             metrics=metrics,
+        )
+    )
+    session.add(
+        BacktestResult(
+            run_id=run_id,
+            benchmark="elo",
+            dimension="overall",
+            dimension_value="all",
+            metrics=elo_metrics,
         )
     )
     session.add(
@@ -583,6 +623,7 @@ def _evaluation_fingerprint(
                 "predicted_at": row.predicted_at.isoformat(),
                 "training_fingerprint": row.training_fingerprint,
                 "probabilities": row.probabilities,
+                "elo_probabilities": row.elo_probabilities,
                 "market_snapshot_ids": row.market_snapshot_ids,
             }
             for row in replayed
