@@ -6,11 +6,12 @@
 
 ## Phase 1: Runnable Football MVP
 
-Completed slices: Alembic schema lifecycle, labelled demo odds and results, atomic CSV ingestion, stored-data API, connected React research dashboards, a local-date Matchday workspace, scheduled-provider boundary, full-stack deployment configuration, backend/frontend CI, a versioned leakage-safe Poisson baseline, stored scoreline predictions, scoreline-based bet builders, signal-return backtests, and bankroll research. Live deployment has not been claimed or tested.
+Completed slices: Alembic schema lifecycle, labelled demo odds and results, atomic CSV ingestion, stored-data API, connected React research dashboards, a local-date Matchday workspace, scheduled-provider boundary, full-stack deployment configuration, backend/frontend CI, a versioned leakage-safe Poisson baseline, stored scoreline predictions, scoreline-based bet builders, signal-return backtests, bankroll research, and browser-tested write workflows. Live deployment has not been claimed or tested.
 
 - Alembic migration and deterministic labelled demo dataset.
 - Timestamped team, player, coach, roster, appearance, availability, lineup, formation, tactical, and matchup data contracts.
 - Atomic CSV odds import and manual coherent-market entry.
+- Completed: dashboard-driven atomic odds/result/player-availability imports and full timestamped football-intelligence bundle ingestion.
 - Completed: tax-aware football arbitrage engine for complete 1X2, over/under, and BTTS markets, including best-price selection, per-leg taxes/fees, rounded stake optimization, provenance fingerprints, conservative net-profit ranking, and execution-risk warnings.
 - Completed: leakage-safe Poisson training, sampling intervals, immutable versions, and scoreline-derived predictions.
 - Completed: expanding-window chronological evaluation, immutable replay evidence, Brier/log-loss/ECE metrics, calibration buckets, uniform and optional market benchmarks, and a non-demo promotion policy.
@@ -18,11 +19,14 @@ Completed slices: Alembic schema lifecycle, labelled demo odds and results, atom
 - Remaining: adequate permitted evaluation history, richer model benchmarks, and independently validated confidence thresholds.
 - Recency-weighted player and lineup strength, coach-regime handling, tactical matchup features, scenario sensitivity, and walk-forward ablation tests.
 - Completed: value, underdog, arbitrage, bet-builder, backtesting, and bankroll dashboard pages with typed API integration and partial-resource failure states.
+- Completed: protected model operations for training, evaluation, prediction, and signal generation; sourced tax/constraint management; per-tab readiness; automatic post-write synchronization; preserved event context; and success notifications.
 - Completed: Matchday API and dashboard with featured-league grouping, timezone-correct day boundaries, pre-cutoff team form, selection-specific best prices, model/signal separation, and fail-closed player and builder states.
 - Completed: reproducible scoreline-based bet-builder quote APIs with correlated joint probability, uncertainty, manual offered-price provenance, and immutable prediction/model fingerprints.
 - Completed: expanding-window probability replay plus timestamp-valid stored-signal return backtests and flat, percentage, and capped fractional-Kelly bankroll simulation with exposure limits.
 - Remaining: adequate permitted signal/result history, timestamped closing prices for CLV coverage, richer benchmarks, and independently validated staking/confidence thresholds. Demo backtests remain software evidence only.
 - Connected React dashboard, Docker Compose, CI, and deployment configuration.
+- Completed: Playwright Chromium workflows for ingestion-to-signals, sourced arbitrage calculation, and backtest-to-bankroll, alongside the Vitest component/API suite.
+- Next quantitative slice: timestamp-valid closing-price coverage and closing-line-value reporting without feeding post-kickoff information into predictions or signals.
 
 ## Later Phases
 

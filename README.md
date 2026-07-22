@@ -159,7 +159,7 @@ Stored matchdays, event detail, odds comparison, provider/import status, freshne
 - APScheduler
 - pytest, Ruff, and mypy
 - React, TypeScript, Vite, and Tailwind CSS
-- Recharts, Vitest, and Testing Library
+- Recharts, Vitest, Testing Library, and Playwright
 - Docker Compose and GitHub Actions
 
 ## Build Plan
@@ -212,6 +212,10 @@ The repository is in the **Phase 1 research-workflow milestone**. It includes:
 - Immutable bet-builder prediction, cutoff, feature, input-fingerprint, uncertainty, and optional manual offered-price provenance.
 - Stored-signal return backtests that enforce pre-kickoff prediction/price availability, settle against results known by the evaluation cutoff, and report unit profit, ROI, yield, hit rate, profit factor, and drawdown.
 - Flat, percentage, and capped fractional-Kelly bankroll research using the stored lower probability bound, per-bet caps, daily exposure limits, and deterministic simulation fingerprints.
+- Protected dashboard operations for atomic odds/results/availability imports, full football-intelligence JSON bundles, Poisson training, chronological evaluation, prediction persistence, and signal generation.
+- Source-provenance forms for bookmaker tax profiles and observed stake constraints, followed by explicit arbitrage calculation against stored markets.
+- Per-tab workflow-readiness gates, automatic dashboard synchronization after writes, preserved event context, and dismissible success notifications.
+- Chromium end-to-end tests covering odds import through signal generation, arbitrage evidence through calculation, and signal backtest through bankroll simulation.
 
 The backend now supports expanding-window chronological evaluation with immutable per-match training fingerprints, 1X2 Brier score, log loss, one-vs-rest calibration buckets, coverage accounting, uniform and optional market benchmarks, and an explicit promotion policy.
 
@@ -293,6 +297,8 @@ python -m app.cli import-results path/to/results.csv
 
 The same workflows are available at `POST /api/v1/imports/odds` and `POST /api/v1/imports/results` as multipart uploads. Development permits local uploads without a key. Set `ODDSQUANT_ADMIN_API_KEY` and send it as `X-Admin-Key` for protected environments; production fails closed when the key is unset.
 
+Timestamped player-availability CSVs can be uploaded at `POST /api/v1/imports/intelligence/availability`. Complete JSON intelligence bundles use `POST /api/v1/imports/intelligence`; they preserve original publication and observation timestamps for player, lineup, availability, coach, and tactical evidence. The dashboard exposes both operations and rejects the whole import when its point-in-time contracts fail.
+
 Required columns are `provider_event_key`, `competition`, `country`, `season`, `kickoff_at`, `home_team`, `away_team`, `bookmaker`, `market_type`, `selection_code`, `selection_name`, `decimal_odds`, and `observed_at`. Optional columns are `line`, `source_updated_at`, `period`, `currency`, `settlement_rule_key`, and `is_closing`. Timestamps must include a UTC offset. Imports reject the entire file if an event identity conflicts or a bookmaker snapshot lacks the exact outcome set required by its market.
 
 Result CSVs require `provider_event_key`, `competition`, `country`, `season`, `kickoff_at`, `home_team`, `away_team`, `home_goals`, `away_goals`, `settled_at`, and `observed_at`; `source_updated_at` is optional. Results must be final and observed no earlier than settlement. Later corrected scores append a superseding observation rather than rewriting history.
@@ -317,6 +323,7 @@ curl http://127.0.0.1:8000/health
 Current stored-data routes include:
 
 - `GET /api/v1/matchdays?date={YYYY-MM-DD}&timezone={IANA timezone}`
+- `GET /api/v1/readiness`
 - `GET /api/v1/matchdays/events/{event_id}`
 - `GET /api/v1/events` and `GET /api/v1/events/{event_id}`
 - `GET /api/v1/providers`
@@ -324,6 +331,8 @@ Current stored-data routes include:
 - `GET /api/v1/imports` and `GET /api/v1/imports/{job_id}`
 - `POST /api/v1/imports/odds`
 - `POST /api/v1/imports/results`
+- `POST /api/v1/imports/intelligence`
+- `POST /api/v1/imports/intelligence/availability`
 - `GET /api/v1/odds/comparison?event_id={event_id}`
 - `GET /api/v1/models` and `GET /api/v1/models/{model_id}`
 - `POST /api/v1/models/train`
@@ -334,6 +343,9 @@ Current stored-data routes include:
 - `GET /api/v1/signals` and `GET /api/v1/signals/underdogs`
 - `POST /api/v1/arbitrage/calculate`
 - `GET /api/v1/arbitrage/opportunities?event_id={event_id}`
+- `GET /api/v1/arbitrage/settings`
+- `POST /api/v1/arbitrage/settings/tax-profiles`
+- `POST /api/v1/arbitrage/settings/constraints`
 - `GET /api/v1/events/{event_id}/predictions`
 - `POST /api/v1/bet-builder/quotes`
 - `GET /api/v1/bet-builder/quotes?event_id={event_id}`
@@ -351,6 +363,17 @@ python -m ruff check .
 python -m ruff format --check .
 python -m mypy app tests
 ```
+
+Run the frontend checks from `frontend`:
+
+```bash
+npm run test
+npm run test:e2e
+npm run lint
+npm run build
+```
+
+The Playwright suite starts or reuses the Vite development server and mocks the API boundary with deterministic, provenance-complete responses. Install its browser once with `npx playwright install chromium` when setting up a new machine.
 
 Copy `.env.example` to `.env` for local configuration. Never commit API keys, tokens, bookmaker credentials, cookies, or proprietary data.
 
