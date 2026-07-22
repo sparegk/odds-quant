@@ -19,7 +19,7 @@ import {
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 
-import { API_BASE_URL, calculateArbitrage, loadComparison, loadDashboard } from './api/client'
+import { API_BASE_URL, calculateArbitrage, loadComparison, loadDashboard, runSignalBacktest } from './api/client'
 import { FreshnessBadge } from './components/FreshnessBadge'
 import { BetBuilderLab } from './components/BetBuilderLab'
 import { BankrollResearch } from './components/BankrollResearch'
@@ -473,18 +473,29 @@ function EvaluationPerformance({ evaluations }: { evaluations: EvaluationRun[] }
 }
 
 export function BacktestResearch({ dashboard }: { dashboard: DashboardData }) {
+  const [modelId, setModelId] = useState(String(dashboard.models[0]?.id ?? ''))
+  const [evaluationStart, setEvaluationStart] = useState(toDateTimeInput(dashboard.models[0]?.training_start))
+  const [evaluationEnd, setEvaluationEnd] = useState(toDateTimeInput(dashboard.models[0]?.training_end))
+  const [signalTypes, setSignalTypes] = useState<string[]>(['VALUE'])
+  const [adminKey, setAdminKey] = useState('')
+  const [createdRun, setCreatedRun] = useState<DashboardData['backtests'][number] | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [runError, setRunError] = useState<string | null>(null)
+  const runs = createdRun ? [createdRun, ...dashboard.backtests.filter((run) => run.id !== createdRun.id)] : dashboard.backtests
+  const toggleSignalType = (signalType: string) => setSignalTypes((current) => current.includes(signalType) ? current.filter((item) => item !== signalType) : [...current, signalType])
+  const submitBacktest = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); setSubmitting(true); setRunError(null)
+    try {
+      const run = await runSignalBacktest({ model_version_id: Number(modelId), evaluation_start: new Date(evaluationStart).toISOString(), evaluation_end: new Date(evaluationEnd).toISOString(), signal_types: signalTypes }, adminKey || undefined)
+      setCreatedRun(run)
+    } catch (caught) { setRunError(caught instanceof Error ? caught.message : 'Unable to run signal backtest') } finally { setSubmitting(false) }
+  }
   return (
     <div className="space-y-10">
       <section>
         <SectionHeading eyebrow="Timestamped signal replay" title="Settled strategy backtests" />
-        {dashboard.backtests.length ? (
-          <div className="overflow-x-auto border-y border-zinc-200 bg-white">
-            <table className="w-full min-w-[900px] text-left text-sm">
-              <thead className="bg-zinc-50 text-xs uppercase text-zinc-500"><tr><th className="px-4 py-3">Run</th><th className="px-4 py-3">Evidence</th><th className="px-4 py-3 text-right">Bets</th><th className="px-4 py-3 text-right">Profit</th><th className="px-4 py-3 text-right">ROI</th><th className="px-4 py-3 text-right">Max drawdown</th><th className="px-4 py-3">Fingerprint</th></tr></thead>
-              <tbody>{dashboard.backtests.map((run) => <tr key={run.id} className="border-t border-zinc-100"><td className="px-4 py-3 font-semibold">#{run.id} / {run.model_version}</td><td className="px-4 py-3"><span className="rounded-[4px] border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800">{humanizeCode(run.evaluation_status)}</span></td><td className="px-4 py-3 text-right font-mono">{metricValue(run.metrics, 'bet_count') ?? 0}</td><td className="px-4 py-3 text-right font-mono">{formatScore(metricValue(run.metrics, 'net_profit_units'))}</td><td className="px-4 py-3 text-right font-mono">{formatSignedPercent(metricValue(run.metrics, 'roi') ?? 0)}</td><td className="px-4 py-3 text-right font-mono">{formatScore(metricValue(run.metrics, 'maximum_drawdown_units'))}</td><td className="px-4 py-3 font-mono text-xs">{run.fingerprint.slice(0, 12)}</td></tr>)}</tbody>
-            </table>
-          </div>
-        ) : <EmptyState title="No settled signal backtests" detail="Stored calibration runs remain below. Strategy returns require timestamp-valid signals and final results known by the evaluation cutoff." />}
+        <form className="mb-6 border-y border-zinc-200 bg-white p-5" onSubmit={(event) => void submitBacktest(event)}><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><label><span className="mb-1.5 block text-xs font-semibold uppercase text-zinc-500">Model version</span><select aria-label="Backtest model" className="h-10 w-full border border-zinc-300 bg-white px-3 text-sm" required value={modelId} onChange={(event) => setModelId(event.target.value)}><option disabled value="">Select model</option>{dashboard.models.map((model) => <option key={model.id} value={model.id}>{model.version}</option>)}</select></label><label><span className="mb-1.5 block text-xs font-semibold uppercase text-zinc-500">Evaluation start</span><input aria-label="Evaluation start" className="h-10 w-full border border-zinc-300 px-3 text-sm" required type="datetime-local" value={evaluationStart} onChange={(event) => setEvaluationStart(event.target.value)} /></label><label><span className="mb-1.5 block text-xs font-semibold uppercase text-zinc-500">Evaluation end</span><input aria-label="Evaluation end" className="h-10 w-full border border-zinc-300 px-3 text-sm" required type="datetime-local" value={evaluationEnd} onChange={(event) => setEvaluationEnd(event.target.value)} /></label><fieldset><legend className="mb-1.5 text-xs font-semibold uppercase text-zinc-500">Stored classifications</legend><div className="flex h-10 items-center gap-3">{['VALUE', 'WATCH', 'PASS'].map((item) => <label key={item} className="flex items-center gap-1 text-xs font-semibold"><input checked={signalTypes.includes(item)} onChange={() => toggleSignalType(item)} type="checkbox" />{item}</label>)}</div></fieldset><label><span className="mb-1.5 block text-xs font-semibold uppercase text-zinc-500">Admin key (memory only)</span><input aria-label="Backtest admin key" autoComplete="off" className="h-10 w-full border border-zinc-300 px-3 text-sm" type="password" value={adminKey} onChange={(event) => setAdminKey(event.target.value)} /></label></div><div className="mt-4 flex items-center gap-3"><button className="rounded-[5px] bg-zinc-900 px-4 py-2 text-sm font-bold text-white disabled:opacity-50" disabled={submitting || !modelId || !evaluationStart || !evaluationEnd || !signalTypes.length} type="submit">{submitting ? 'Running replay…' : 'Run signal backtest'}</button><p className="text-xs text-zinc-500">Only predictions, prices, and signals timestamped before kickoff are eligible.</p></div>{runError ? <div className="mt-4 border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900" role="alert">{runError}</div> : null}</form>
+        {runs.length ? <div className="space-y-4">{runs.map((run) => <BacktestRunCard key={run.id} run={run} />)}</div> : <EmptyState title="No settled signal backtests" detail="Stored calibration runs remain below. Strategy returns require timestamp-valid signals and final results known by the evaluation cutoff." />}
       </section>
       <section>
         <EvaluationPerformance evaluations={dashboard.evaluations} />
@@ -492,6 +503,13 @@ export function BacktestResearch({ dashboard }: { dashboard: DashboardData }) {
     </div>
   )
 }
+
+function BacktestRunCard({ run }: { run: DashboardData['backtests'][number] }) {
+  return <article className="border border-zinc-200 bg-white"><div className="grid gap-4 p-5 md:grid-cols-[1fr_repeat(4,110px)] md:items-center"><div><p className="font-bold">#{run.id} / {run.model_version}</p><p className="mt-1 text-xs text-zinc-500">{formatDateTime(run.evaluation_start)} to {formatDateTime(run.evaluation_end)} · {run.is_demo ? 'DEMO ONLY' : 'EXTERNAL HISTORY'}</p><p className="mt-1 font-mono text-xs text-zinc-400">{run.fingerprint}</p></div><BacktestMetric label="Bets" value={String(metricValue(run.metrics, 'bet_count') ?? 0)} /><BacktestMetric label="Profit" value={formatScore(metricValue(run.metrics, 'net_profit_units'))} /><BacktestMetric label="ROI" value={formatSignedPercent(metricValue(run.metrics, 'roi') ?? 0)} /><BacktestMetric label="Drawdown" value={formatScore(metricValue(run.metrics, 'maximum_drawdown_units'))} /></div><div className="border-t border-zinc-200 bg-zinc-50 px-5 py-3"><span className="rounded-[4px] border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800">{humanizeCode(run.evaluation_status)}</span><span className="ml-2 text-xs text-zinc-500">Created {formatDateTime(run.created_at)}</span></div>{run.observations.length ? <details className="border-t border-zinc-200"><summary className="cursor-pointer px-5 py-3 text-sm font-bold">Inspect {run.observations.length} settled observations</summary><div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left text-xs"><thead className="bg-zinc-50 uppercase text-zinc-500"><tr><th className="px-4 py-3">Event / selection</th><th className="px-4 py-3">Prediction</th><th className="px-4 py-3">Price snapshot</th><th className="px-4 py-3 text-right">Odds</th><th className="px-4 py-3 text-right">Model / lower</th><th className="px-4 py-3">Settlement</th><th className="px-4 py-3 text-right">Profit</th></tr></thead><tbody>{run.observations.map((item) => <tr key={item.id} className="border-t border-zinc-100"><td className="px-4 py-3">Event #{item.event_id} · {humanizeCode(item.selection_code)}</td><td className="px-4 py-3">#{item.prediction_id}<br />{formatDateTime(item.predicted_at)}</td><td className="px-4 py-3">#{item.odds_snapshot_id}</td><td className="px-4 py-3 text-right font-mono">{item.decimal_odds.toFixed(2)}</td><td className="px-4 py-3 text-right font-mono">{(item.model_probability * 100).toFixed(1)}% / {(item.lower_probability * 100).toFixed(1)}%</td><td className="px-4 py-3">{humanizeCode(item.settlement)}<br />{formatDateTime(item.settled_at)}</td><td className="px-4 py-3 text-right font-mono">{item.profit_units >= 0 ? '+' : ''}{item.profit_units.toFixed(2)}</td></tr>)}</tbody></table></div></details> : <p className="border-t border-zinc-200 px-5 py-3 text-xs text-zinc-500">No eligible settled observations were included in this run.</p>}</article>
+}
+
+function BacktestMetric({ label, value }: { label: string; value: string }) { return <div><p className="text-xs font-semibold uppercase text-zinc-500">{label}</p><p className="mt-1 font-mono font-bold">{value}</p></div> }
+function toDateTimeInput(value: string | undefined): string { return value ? new Date(value).toISOString().slice(0, 16) : '' }
 
 export function SignalResearch({ dashboard, mode }: { dashboard: DashboardData; mode: 'value' | 'underdog' }) {
   const signals = mode === 'underdog' ? dashboard.underdogs : dashboard.signals

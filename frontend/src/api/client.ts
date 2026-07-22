@@ -166,4 +166,17 @@ export function simulateBankroll(payload: {
   })
 }
 
+export function runSignalBacktest(payload: {
+  model_version_id: number
+  evaluation_start: string
+  evaluation_end: string
+  signal_types: string[]
+}, adminKey?: string): Promise<SignalBacktest> {
+  return request<SignalBacktest>('/api/v1/backtests/signals', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(adminKey ? { 'X-Admin-Key': adminKey } : {}) },
+    body: JSON.stringify(payload),
+  })
+}
+
 export { API_BASE_URL }

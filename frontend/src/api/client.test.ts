@@ -8,6 +8,7 @@ import {
   loadMatchday,
   loadMatchdayEvent,
   loadPredictions,
+  runSignalBacktest,
 } from './client'
 
 afterEach(() => {
@@ -150,5 +151,15 @@ describe('API client', () => {
     expect(typeof requestUrl === 'string' ? requestUrl : requestUrl instanceof Request ? requestUrl.url : requestUrl?.href).toContain('/api/v1/arbitrage/calculate')
     expect(request?.[1]?.method).toBe('POST')
     expect(request?.[1]?.headers).toMatchObject({ 'X-Admin-Key': 'secret' })
+  })
+
+  it('submits an exact chronological signal replay', async () => {
+    const fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => { void input; void init; return Promise.resolve(new Response('{}', { status: 201 })) })
+    vi.stubGlobal('fetch', fetchMock)
+    await runSignalBacktest({ model_version_id: 3, evaluation_start: '2026-01-01T00:00:00Z', evaluation_end: '2026-06-01T00:00:00Z', signal_types: ['VALUE'] }, 'secret')
+    const init = fetchMock.mock.calls[0]?.[1]
+    expect(init?.method).toBe('POST')
+    expect(init?.body).toContain('evaluation_start')
+    expect(init?.headers).toMatchObject({ 'X-Admin-Key': 'secret' })
   })
 })
