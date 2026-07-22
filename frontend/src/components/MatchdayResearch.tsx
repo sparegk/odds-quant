@@ -457,9 +457,11 @@ function TeamFormCard({ form }: { form: TeamForm }) {
   return (
     <div className="border border-zinc-200 p-4">
       <div className="flex items-start justify-between gap-3"><div><h4 className="font-bold">{form.team}</h4><p className="mt-0.5 text-xs text-zinc-500">Last {form.sample_size} stored finals</p></div><p className="font-mono text-sm font-bold">{form.points_per_game === null ? '—' : `${form.points_per_game.toFixed(2)} PPG`}</p></div>
+      {form.sample_size === 0 ? <div className="mt-3 border border-amber-200 bg-amber-50 px-3 py-4 text-sm text-amber-900">Team form unavailable ? no timestamp-valid prior final results are stored.</div> : <>
       <div className="mt-3 grid grid-cols-3 border-y border-zinc-100 py-2 text-center text-xs"><div><strong className="block text-base text-emerald-700">{form.wins}</strong>W</div><div><strong className="block text-base">{form.draws}</strong>D</div><div><strong className="block text-base text-rose-700">{form.losses}</strong>L</div></div>
       <p className="mt-3 text-xs text-zinc-500">Goals {form.goals_for}–{form.goals_against} / {form.clean_sheets} clean sheets</p>
       <div className="mt-3 flex flex-wrap gap-1.5">{form.results.map((result) => <span className={`grid h-7 w-7 place-items-center rounded-full text-xs font-bold ${result.outcome === 'W' ? 'bg-emerald-100 text-emerald-800' : result.outcome === 'D' ? 'bg-zinc-200 text-zinc-700' : 'bg-rose-100 text-rose-800'}`} key={result.event_id} title={`${result.venue} vs ${result.opponent}, ${result.goals_for}-${result.goals_against}`}>{result.outcome}</span>)}</div>
+      </>}
       {form.warnings.map((warning) => <p className="mt-2 text-xs text-amber-700" key={warning}>{warning}</p>)}
     </div>
   )

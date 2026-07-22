@@ -482,6 +482,15 @@ def _team_form(
             )
         )
     sample_size = len(recent)
+    warnings: list[str] = []
+    if sample_size == 0:
+        warnings.append("No timestamp-valid prior final results are stored for this team.")
+    elif sample_size < limit:
+        warnings.append(
+            f"Only {sample_size} timestamp-valid prior finals are stored (target {limit})."
+        )
+    if conflicted:
+        warnings.append("Conflicting provider scores were excluded from this form sample.")
     return TeamFormView(
         team_id=team_id,
         team=team_name,
@@ -494,9 +503,5 @@ def _team_form(
         clean_sheets=clean_sheets,
         points_per_game=(round((wins * 3 + draws) / sample_size, 3) if sample_size else None),
         results=recent,
-        warnings=(
-            ["Conflicting provider scores were excluded from this form sample."]
-            if conflicted
-            else []
-        ),
+        warnings=warnings,
     )

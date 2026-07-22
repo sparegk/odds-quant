@@ -70,16 +70,16 @@ const detail: MatchdayEventDetail = {
     {
       team_id: 1,
       team: 'Northbridge FC',
-      sample_size: 2,
-      wins: 1,
-      draws: 1,
+      sample_size: 0,
+      wins: 0,
+      draws: 0,
       losses: 0,
-      goals_for: 3,
-      goals_against: 1,
-      clean_sheets: 1,
-      points_per_game: 2,
+      goals_for: 0,
+      goals_against: 0,
+      clean_sheets: 0,
+      points_per_game: null,
       results: [],
-      warnings: [],
+      warnings: ['No timestamp-valid prior final results are stored for this team.'],
     },
     {
       team_id: 2,
@@ -204,6 +204,7 @@ describe('MatchdayResearch', () => {
     expect(screen.getByText('Margin')).toBeInTheDocument()
     expect(screen.getByText('Fair probability')).toBeInTheDocument()
     expect(screen.getByText('39.7%')).toBeInTheDocument()
+    expect(screen.getByText(/Team form unavailable/)).toBeInTheDocument()
     expect(screen.getByText('Player markets remain research-only')).toBeInTheDocument()
     expect(screen.getByText('No verified builder value')).toBeInTheDocument()
     expect(selectEvent).toHaveBeenCalledWith(42)
