@@ -30,6 +30,30 @@ Rows are grouped into bookmaker snapshots by event, market, line, period, curren
 
 Accepted files preserve their SHA-256 digest and normalized payload in `raw_ingestions`. Rejected files create an auditable import job but cannot partially create football or odds records. Re-importing an identical snapshot is idempotent; reusing the same identity with changed prices is rejected rather than rewriting history.
 
+## Bet-Builder Market Onboarding
+
+Odds-API.io exposes event odds through the same authenticated odds endpoints used by the
+collector. Its documented market vocabulary includes `Corners Totals` and a broad
+`Player Props` family; football examples include player shots. Provider availability is
+not sufficient for ingestion.
+
+Before a new team market is enabled, record its exact provider market name, complete outcome
+set, line semantics, period, source timestamp, currency, and settlement rule. Reject missing
+or ambiguous fields and keep it separate from full-time match-result odds.
+
+Player shots, player shots on target, and every other player prop remain discovery-only until
+all of the following are independently validated:
+
+- stable provider player identity mapped to the stored player registry;
+- a licensed, timestamped player-level result target;
+- explicit void, substitution, starting-status, extra-time, abandoned-match, and correction
+  rules;
+- complete mutually exclusive outcomes for each player, line, period, and bookmaker; and
+- deterministic settlement and chronological evaluation tests.
+
+Do not infer player identity from display names, treat a bookmaker label as a validated
+target, or reuse team-market settlement for a player prop.
+
 ## Permitted Coverage Audit
 
 `GET /api/v1/data/coverage` and the Data Operations dashboard audit count only records whose event provider and, for prices, bookmaker are non-demo. They report coverage separately by competition so volume in one league cannot conceal a gap in another. The current evaluation readiness gate requires:
