@@ -333,12 +333,18 @@ The bookmaker target set is Allwyn's ΠΑΜΕ ΣΤΟΙΧΗΜΑ/Pamestoixima chan
 
 ```bash
 python -m app.cli probe-target-bookmakers
+python -m app.cli probe-bet-builder-markets
 ```
 
 The probe checks the bookmakers selected for the authenticated account, not merely the
 provider's global catalog. Require `complete: true` before collection. It does not ingest
 prices, and a successful response does not prove adequate event, market, freshness, or
 historical closing coverage.
+
+The second command reports only aggregate corner/shot/player market metadata. It does not
+print player labels or prices and does not ingest player props. The collector currently
+supports upcoming Premier League, Champions League, and Conference League events (including
+qualifiers), complete full-time 1X2, and validated Novibet full-time corner totals.
 
 Train and apply the baseline after results and target-event odds exist:
 

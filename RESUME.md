@@ -1,47 +1,55 @@
-# Resume Odds Data Onboarding
+# Resume UEFA And Bet-Builder Coverage
 
 ## Current checkpoint
 
-- Branch: `main`; the working tree was clean at this checkpoint.
-- Required bookmakers: Allwyn's Greek ΠΑΜΕ ΣΤΟΙΧΗΜΑ/Pamestoixima channel and Novibet.
-- The API and Data Operations coverage audit fail closed until both bookmakers have permitted odds for a competition.
-- The replacement Odds-API.io key is configured in the ignored root `.env`.
-- The authenticated provider selection contains both required bookmakers.
-- A credentialed Premier League collector is implemented and scheduler-registered. It
-  accepts only complete timestamped pre-kickoff full-time 1X2 snapshots and fails closed
-  before event requests while a target bookmaker is not selected.
-- The local ignored database contains 1,140 permitted Premier League results: 380 each for 2022/23, 2023/24, and 2024/25.
-- Pinned CC0 source files are retained under the ignored `backend/data/imports/openfootball/` directory. Public hashes and source commits are recorded in `DATA_IMPORTS.md`.
-- `python -m app.cli probe-target-bookmakers` safely checks the authenticated account's
-  selected bookmakers, rather than the provider's global bookmaker catalog.
-- One atomic live import completed with 30 prices across 10 complete Pamestoixima 1X2
-  snapshots for 10 upcoming 2026/27 Premier League events. The live window returned no
-  complete Novibet match-result snapshots and no explicit closing evidence.
-- The coverage audit recognizes Pamestoixima and remains blocked by missing Novibet odds,
-  no closing prices, and fewer than 200 final results for the 2026/27 competition.
+- Branch: `main`. Implementation checkpoints `4426763` and `22ca928` are pushed.
+- The replacement Odds-API.io key remains only in the ignored root `.env`.
+- Required bookmakers are Allwyn/Pamestoixima and Novibet; the authenticated provider
+  selection contains both.
+- The collector covers the Premier League plus UEFA Champions League and Conference League
+  main/qualification feeds within 35 days, capped at the nearest 30 events per feed.
+- Complete source-timestamped pre-kickoff full-time 1X2 is accepted from either target
+  bookmaker. Complete Novibet `Corners Totals` is accepted as `TOTAL_CORNERS` with the
+  bookmaker-specific regulation-time settlement key.
+- A 2026-07-23 local atomic collection imported 173 prices across 67 snapshots: 11
+  Pamestoixima 1X2, 28 Novibet 1X2, and 28 Novibet corner-total snapshots.
+- The sanitized `python -m app.cli probe-bet-builder-markets` command checked 70 upcoming
+  events and found 28 timestamped Novibet `Corners Totals` markets. It observed no player
+  shots or shots-on-target markets in that window.
+- The probe returns aggregate counts and field names only. It cannot return player labels
+  or prices, and `player_props_ingestion_enabled` is always false.
+- Player shots, player shots on target, and other player props remain discovery-only. The
+  repository rule blocks ingestion until stable player identity, licensed player targets,
+  complete outcomes, bookmaker settlement/void rules, and deterministic chronological
+  settlement tests are independently validated.
+- No closing status is inferred. Coverage remains unsuitable for evaluation where final
+  result depth, both-bookmaker coverage, or explicit pre-kickoff closing evidence is absent.
 
 ## Next action
 
-Continue scheduled polling for complete Novibet match-result snapshots. Add closing
-snapshots only if the provider supplies explicit source-timestamped closing evidence before
-kickoff; do not infer it from the last observed price.
+Keep scheduled polling active for UEFA main-stage fixtures and newly appearing shot/player
+market metadata. Do not ingest player props when they first appear. First obtain and record
+stable provider player IDs, a licensed timestamped player result source, and explicit
+bookmaker settlement rules; then add deterministic settlement and chronological evaluation
+tests in a separate checkpoint.
 
-Keep the replacement key only in the ignored root `.env`. Never paste it into chat, logs,
-tests, documentation, commits, screenshots, or command arguments.
+Continue to add closing snapshots only when the provider supplies explicit source-timestamped
+closing evidence strictly before kickoff.
 
 ## Resume sequence
 
 From `backend`:
 
-1. Keep both target bookmakers selected and poll through the scheduler collector.
-2. Require complete timestamped Novibet 1X2 snapshots before counting Novibet coverage.
-3. Rerun the coverage audit after each accepted live batch.
-4. Add closing snapshots only when the feed supplies explicit timestamped closing evidence
-   strictly before kickoff. Never infer a closing flag from an untimestamped final price.
+1. Run `python -m app.cli probe-target-bookmakers` and require `complete: true`.
+2. Run `python -m app.cli probe-bet-builder-markets` for sanitized availability metadata.
+3. Poll through the registered scheduler collector for normal atomic imports.
+4. Rerun `GET /api/v1/data/coverage` after each accepted batch.
+5. Keep all secrets, raw licensed responses, and the local database unversioned.
 
 ## Verification and commit discipline
 
-After each completed checkbox, run the relevant tests, commit with a focused message, and push `main`. Before declaring the odds collector complete, run:
+After each completed checkbox, run the relevant tests, commit with a focused message, and
+push `main`. Before release, run:
 
 ```bash
 cd backend
@@ -57,4 +65,5 @@ npm run build
 npm run test:e2e
 ```
 
-Do not scrape bookmaker websites directly, weaken atomic ingestion, fabricate historical timestamps, or present demo/research results as profitable evidence.
+Do not scrape bookmaker websites, weaken atomic ingestion, fabricate historical timestamps,
+infer closing flags, or enable player props before their independent validation gates pass.

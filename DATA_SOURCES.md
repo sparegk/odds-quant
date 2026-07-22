@@ -13,11 +13,14 @@ A production Matchday should not pretend one feed covers every evidence layer. T
 - Fixtures, competition identity, status, and final results from a permitted football-data provider. [football-data.org's official v4 documentation](https://docs.football-data.org/general/v4/coding_client.html) exposes current-day and competition match resources and is suitable for an initial schedule/result adapter after plan, coverage, rate-limit, and terms review.
 - Deeper lineups, sidelined players, formations, events, and player/team statistics from a licensed detailed-data plan. [Sportmonks' official fixture documentation](https://docs.sportmonks.com/v3/endpoints-and-entities/endpoints/fixtures/get-all-fixtures) documents optional lineup, statistics, odds, expected-lineup, and related includes; actual availability depends on the subscribed plan and league coverage.
 - Multi-bookmaker prices from a licensed or expressly permitted odds feed. [The Odds API's official soccer coverage](https://the-odds-api.com/sports-odds-data/) includes the requested major leagues and UEFA competitions, but market and bookmaker coverage is region- and competition-dependent.
-- The implemented Odds-API.io adapter is restricted to pending England Premier League
-  events and complete, timestamped, full-time 1X2 snapshots from the configured target
-  bookmakers. It checks the authenticated account's selected bookmakers before collection,
-  batches at most ten events per odds request, and rejects conflicting identity, incomplete
-  outcomes, missing source timestamps, and timestamps at or after kickoff.
+- The implemented Odds-API.io adapter covers pending England Premier League, UEFA Champions
+  League, and UEFA Conference League events, including qualification feeds. It accepts
+  complete timestamped full-time 1X2 snapshots from the configured target bookmakers and
+  Novibet `Corners Totals` under its documented regulation-time semantics. It checks the
+  authenticated account's selected bookmakers, caps each competition at the nearest 30
+  events, batches at most ten events per odds request, and rejects conflicting identity,
+  incomplete outcomes, duplicate lines, missing source timestamps, and timestamps at or
+  after kickoff.
 - Official club or competition publications for confirmed lineups and availability corrections when licensing permits storage and the original publication timestamp is retained.
 
 Provider selection is a deployment decision, not a hard-coded endorsement. Before registration, record the exact competitions, countries, bookmakers, historical depth, update latency, redistribution rights, retention terms, rate limits, and stable identity keys. Player-prop availability from an odds feed does not remove the independent target, settlement, and calibration gates.
@@ -74,6 +77,15 @@ Within the requested bet-builder families, the sample exposed only Novibet
 identity. No player shots, player shots-on-target, or other player-prop markets were observed.
 This receipt records market metadata only; it does not authorize player-prop ingestion or
 assert future availability.
+
+The repeatable sanitized command is:
+
+```bash
+python -m app.cli probe-bet-builder-markets
+```
+
+It returns aggregate market names, counts, timestamp coverage, and field names only. It
+never returns player labels or odds values and keeps player-prop ingestion disabled.
 
 ## Permitted Coverage Audit
 
