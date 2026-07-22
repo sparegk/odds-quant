@@ -7,7 +7,9 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from app.core.config import get_settings
 from app.db.session import SessionLocal
+from app.providers.odds_api_io import OddsApiIoClient, OddsApiIoError
 from app.providers.openfootball import (
     OPENFOOTBALL_LICENSE_URL,
     OpenFootballImportError,
@@ -54,6 +56,10 @@ def _parser() -> argparse.ArgumentParser:
     openfootball.add_argument("--timezone", required=True)
     openfootball.add_argument("--source-commit", required=True)
     openfootball.add_argument("--source-updated-at", required=True, type=datetime.fromisoformat)
+    commands.add_parser(
+        "probe-target-bookmakers",
+        help="verify configured odds-provider coverage for required bookmakers",
+    )
     train = commands.add_parser("train-poisson", help="train a versioned Poisson baseline")
     train.add_argument("competition_id", type=int)
     train.add_argument("training_start", type=datetime.fromisoformat)
@@ -127,6 +133,13 @@ def main() -> int:
                     provider_kind="open_data",
                     provider_terms_url=OPENFOOTBALL_LICENSE_URL,
                 )
+            elif args.command == "probe-target-bookmakers":
+                settings = get_settings()
+                with OddsApiIoClient(
+                    settings.odds_api_io_key or "",
+                    base_url=settings.odds_api_io_base_url,
+                ) as client:
+                    result = client.probe_target_bookmakers()
             elif args.command == "train-poisson":
                 result = train_poisson_model(
                     session,
@@ -173,6 +186,9 @@ def main() -> int:
         print(json.dumps({"status": "rejected", "job_id": exc.job_id, "errors": exc.errors}))
         return 2
     except OpenFootballImportError as exc:
+        print(json.dumps({"status": "rejected", "error": str(exc)}))
+        return 2
+    except OddsApiIoError as exc:
         print(json.dumps({"status": "rejected", "error": str(exc)}))
         return 2
     except (ModelingError, EvaluationError, SignalGenerationError) as exc:

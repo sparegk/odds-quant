@@ -15,10 +15,12 @@ class Settings(BaseSettings):
     seed_demo: bool = True
     odds_stale_after_seconds: int = Field(default=300, ge=1)
     provider_poll_seconds: int = Field(default=300, ge=30)
+    odds_api_io_key: str | None = None
+    odds_api_io_base_url: str = "https://api.odds-api.io/v3"
     matchday_timezone: str = "Europe/Athens"
     matchday_form_matches: int = Field(default=5, ge=1, le=20)
 
-    @field_validator("admin_api_key", mode="before")
+    @field_validator("admin_api_key", "odds_api_io_key", mode="before")
     @classmethod
     def empty_admin_key_is_unset(cls, value: object) -> object:
         return None if value == "" else value

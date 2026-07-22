@@ -329,6 +329,14 @@ Use the Data Operations coverage audit, or `GET /api/v1/data/coverage`, before t
 
 An upload may still be valid while the competition remains blocked for evaluation. Do not fill gaps with demo records, backfilled timestamps, inferred closing flags, or data acquired outside its licence or source terms.
 
+The initial bookmaker target set is Allwyn's ΠΑΜΕ ΣΤΟΙΧΗΜΑ/Pamestoixima channel, Novibet, and bet365. Configure a locally accepted Odds-API.io subscription with `ODDSQUANT_ODDS_API_IO_KEY`, then verify that the account exposes all three without printing the key:
+
+```bash
+python -m app.cli probe-target-bookmakers
+```
+
+The probe is a credential and coverage check only. It does not ingest prices, and a successful response does not prove adequate event, market, freshness, or historical closing coverage.
+
 Train and apply the baseline after results and target-event odds exist:
 
 ```bash
