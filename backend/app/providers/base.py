@@ -23,5 +23,6 @@ SUPPORTED_PROVIDER_KINDS = {
     "official_source",
     "csv_upload",
     "manual_entry",
+    "open_data",
     "demo_seed",
 }

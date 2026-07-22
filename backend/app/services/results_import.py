@@ -137,6 +137,8 @@ def import_results_csv(
     content: bytes,
     provider_slug: str = "user-results-csv",
     provider_name: str = "User results CSV import",
+    provider_kind: str = "csv_upload",
+    provider_terms_url: str | None = None,
     is_demo: bool = False,
     now: datetime | None = None,
 ) -> ResultImportSummary:
@@ -157,7 +159,14 @@ def import_results_csv(
         )
         session.add(job)
         session.flush()
-        provider = _provider(session, provider_slug, provider_name, is_demo)
+        provider = _provider(
+            session,
+            provider_slug,
+            provider_name,
+            provider_kind,
+            provider_terms_url,
+            is_demo,
+        )
         session.add(
             RawIngestion(
                 provider_id=provider.id,
@@ -329,15 +338,22 @@ def _record_rejected_job(
     return job.id
 
 
-def _provider(session: Session, slug: str, name: str, is_demo: bool) -> Provider:
+def _provider(
+    session: Session,
+    slug: str,
+    name: str,
+    kind: str,
+    terms_url: str | None,
+    is_demo: bool,
+) -> Provider:
     provider = _one_or_create(
         session,
         Provider,
         {
             "name": name,
-            "kind": "demo_seed" if is_demo else "csv_upload",
+            "kind": "demo_seed" if is_demo else kind,
             "is_demo": is_demo,
-            "terms_url": None,
+            "terms_url": terms_url,
             "capabilities": {"football_results": True},
         },
         slug=slug,
@@ -345,6 +361,11 @@ def _provider(session: Session, slug: str, name: str, is_demo: bool) -> Provider
     if provider.is_demo != is_demo:
         raise ResultImportError(
             [_error(None, "provider", "provider demo classification conflicts")]
+        )
+    expected_kind = "demo_seed" if is_demo else kind
+    if provider.kind != expected_kind or provider.terms_url != terms_url:
+        raise ResultImportError(
+            [_error(None, "provider", "provider provenance conflicts with stored metadata")]
         )
     return provider
 

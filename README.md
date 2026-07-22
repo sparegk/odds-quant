@@ -302,6 +302,14 @@ When running from `backend`, place licensed or proprietary input files under `da
 
 Header-only results and odds templates can also be downloaded from Data Operations. Populate them with permitted records without renaming columns; the templates intentionally contain no example results, prices, or fabricated evidence.
 
+Pinned [OpenFootball CC0](https://github.com/openfootball/football.json) result files can be imported without an API key. Supply the repository-relative dataset path, full source commit, actual file commit timestamp, competition identity, and the competition's IANA timezone:
+
+```bash
+python -m app.cli import-openfootball-results path/to/en.1.json --dataset-path 2024-25/en.1.json --competition "Premier League" --country England --season 2024/25 --timezone Europe/London --source-commit 6a225eabc8be1f7e354faa55befe790fea93332d --source-updated-at 2025-06-01T05:26:17Z
+```
+
+The adapter converts documented local kickoff times to UTC. It conservatively treats the pinned file commit as the settlement, observation, and source-update evidence for every included result, rather than guessing when individual scores first appeared. This supports future point-in-time training but does not claim that the current snapshot was available for earlier historical forecasts.
+
 The same workflows are available at `POST /api/v1/imports/odds` and `POST /api/v1/imports/results` as multipart uploads. Development permits local uploads without a key. Set `ODDSQUANT_ADMIN_API_KEY` and send it as `X-Admin-Key` for protected environments; production fails closed when the key is unset.
 
 Timestamped player-availability CSVs can be uploaded at `POST /api/v1/imports/intelligence/availability`. Complete JSON intelligence bundles use `POST /api/v1/imports/intelligence`; they preserve original publication and observation timestamps for player, lineup, availability, coach, and tactical evidence. The dashboard exposes both operations and rejects the whole import when its point-in-time contracts fail.

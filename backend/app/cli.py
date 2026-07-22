@@ -8,13 +8,22 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from app.db.session import SessionLocal
+from app.providers.openfootball import (
+    OPENFOOTBALL_LICENSE_URL,
+    OpenFootballImportError,
+    normalize_openfootball_results,
+)
 from app.schemas.models import EvaluateModelRequest, PredictEventRequest, TrainPoissonRequest
 from app.schemas.signals import GenerateSignalsRequest
 from app.services.demo_seed import seed_demo_data, seed_demo_results
 from app.services.evaluation import EvaluationError, evaluate_model
 from app.services.modeling import ModelingError, predict_event, train_poisson_model
 from app.services.odds_import import OddsImportError, import_odds_csv
-from app.services.results_import import ResultImportError, import_results_csv
+from app.services.results_import import (
+    ResultImportError,
+    import_results_csv,
+    serialize_result_rows_csv,
+)
 from app.services.signals import SignalGenerationError, generate_value_signals
 
 
@@ -33,6 +42,18 @@ def _parser() -> argparse.ArgumentParser:
         "import-results", help="import validated historical football results"
     )
     results_command.add_argument("path", type=Path)
+    openfootball = commands.add_parser(
+        "import-openfootball-results",
+        help="normalize and import a pinned CC0 OpenFootball JSON dataset",
+    )
+    openfootball.add_argument("path", type=Path)
+    openfootball.add_argument("--dataset-path", required=True)
+    openfootball.add_argument("--competition", required=True)
+    openfootball.add_argument("--country", required=True)
+    openfootball.add_argument("--season", required=True)
+    openfootball.add_argument("--timezone", required=True)
+    openfootball.add_argument("--source-commit", required=True)
+    openfootball.add_argument("--source-updated-at", required=True, type=datetime.fromisoformat)
     train = commands.add_parser("train-poisson", help="train a versioned Poisson baseline")
     train.add_argument("competition_id", type=int)
     train.add_argument("training_start", type=datetime.fromisoformat)
@@ -85,6 +106,27 @@ def main() -> int:
                     filename=path.name,
                     content=path.read_bytes(),
                 )
+            elif args.command == "import-openfootball-results":
+                path = args.path
+                rows = normalize_openfootball_results(
+                    path.read_bytes(),
+                    dataset_path=args.dataset_path,
+                    competition=args.competition,
+                    country=args.country,
+                    season=args.season,
+                    timezone=args.timezone,
+                    source_commit=args.source_commit,
+                    source_updated_at=args.source_updated_at,
+                )
+                result = import_results_csv(
+                    session,
+                    filename=f"openfootball-{args.season}-{args.source_commit[:12]}.csv",
+                    content=serialize_result_rows_csv(rows),
+                    provider_slug="openfootball-cc0",
+                    provider_name="OpenFootball CC0 results",
+                    provider_kind="open_data",
+                    provider_terms_url=OPENFOOTBALL_LICENSE_URL,
+                )
             elif args.command == "train-poisson":
                 result = train_poisson_model(
                     session,
@@ -129,6 +171,9 @@ def main() -> int:
                 )
     except (OddsImportError, ResultImportError) as exc:
         print(json.dumps({"status": "rejected", "job_id": exc.job_id, "errors": exc.errors}))
+        return 2
+    except OpenFootballImportError as exc:
+        print(json.dumps({"status": "rejected", "error": str(exc)}))
         return 2
     except (ModelingError, EvaluationError, SignalGenerationError) as exc:
         print(json.dumps({"status": "rejected", "error": str(exc)}))
