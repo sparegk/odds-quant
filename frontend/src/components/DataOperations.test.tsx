@@ -15,6 +15,8 @@ describe('DataOperations', () => {
     expect(screen.getByText('Odds snapshots')).toBeInTheDocument()
     expect(screen.getByText('Historical results')).toBeInTheDocument()
     expect(screen.getByText('Player availability')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Results CSV template' })).toHaveAttribute('href', '/templates/results.csv')
+    expect(screen.getByRole('link', { name: 'Odds CSV template' })).toHaveAttribute('href', '/templates/odds.csv')
     expect(screen.getByText('REJECTED')).toBeInTheDocument()
     expect(screen.getByText(/snapshot outcome set is incomplete/)).toBeInTheDocument()
   })

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertTriangle, CheckCircle2, Database, Upload } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Database, Download, Upload } from 'lucide-react'
 
 import { uploadCsv } from '../api/client'
 import { formatDateTime, humanizeCode } from '../lib/format'
@@ -18,7 +18,7 @@ export function DataOperations({ dashboard, onChanged }: { dashboard: DashboardD
   }
   return <div className="space-y-8">
     <div><p className="text-xs font-bold uppercase text-emerald-700">Atomic ingestion</p><h2 className="mt-1 text-lg font-bold">Data operations</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-zinc-500">Upload complete timestamped CSV feeds. Any identity, completeness, chronology, settlement, or publication-time failure rejects the entire file.</p></div>
-    <section className="border border-zinc-200 bg-white p-5"><label className="block max-w-md"><span className="mb-1.5 block text-xs font-semibold uppercase text-zinc-500">Admin key (memory only)</span><input aria-label="Import admin key" autoComplete="off" className="h-10 w-full border border-zinc-300 px-3 text-sm" type="password" value={adminKey} onChange={(event) => setAdminKey(event.target.value)} /></label><p className="mt-2 text-xs text-zinc-500">Sent only with upload requests and never persisted. Local development may leave it blank.</p></section>
+    <section className="border border-zinc-200 bg-white p-5"><label className="block max-w-md"><span className="mb-1.5 block text-xs font-semibold uppercase text-zinc-500">Admin key (memory only)</span><input aria-label="Import admin key" autoComplete="off" className="h-10 w-full border border-zinc-300 px-3 text-sm" type="password" value={adminKey} onChange={(event) => setAdminKey(event.target.value)} /></label><p className="mt-2 text-xs text-zinc-500">Sent only with upload requests and never persisted. Local development may leave it blank.</p><div className="mt-4 flex flex-wrap gap-2"><TemplateLink href="/templates/results.csv" label="Results CSV template" /><TemplateLink href="/templates/odds.csv" label="Odds CSV template" /></div><p className="mt-2 text-xs text-zinc-500">Templates contain headers only. Add permitted source records without changing column names.</p></section>
     <DataCoverageAudit refreshVersion={coverageVersion} />
     <section className="grid gap-5 xl:grid-cols-3"><ImportPanel adminKey={adminKey} kind="odds" title="Odds snapshots" detail="Complete coherent bookmaker markets with event, settlement, price, and observed-at identity." onChanged={handleChanged} /><ImportPanel adminKey={adminKey} kind="results" title="Historical results" detail="Final scores observed no earlier than settlement; later corrections append rather than overwrite." onChanged={handleChanged} /><ImportPanel adminKey={adminKey} kind="availability" title="Player availability" detail="Timestamped availability evidence with original publication and observation times." onChanged={handleChanged} /></section>
     <IntelligenceBundleImport adminKey={adminKey} onChanged={handleChanged} />
@@ -36,6 +36,7 @@ function ImportPanel({ adminKey, kind, title, detail, onChanged }: { adminKey: s
 }
 
 function TextInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { return <label><span className="mb-1 block text-xs font-semibold uppercase text-zinc-500">{label}</span><input aria-label={label} className="h-9 w-full border border-zinc-300 px-3 text-sm" value={value} onChange={(event) => onChange(event.target.value)} /></label> }
+function TemplateLink({ href, label }: { href: string; label: string }) { return <a className="inline-flex items-center gap-2 rounded-[5px] border border-zinc-300 px-3 py-2 text-xs font-bold text-zinc-700 hover:border-zinc-500" download href={href}><Download aria-hidden="true" size={15} />{label}</a> }
 function Heading({ eyebrow, title }: { eyebrow: string; title: string }) { return <div className="mb-3"><p className="text-xs font-bold uppercase text-emerald-700">{eyebrow}</p><h3 className="mt-1 text-lg font-bold">{title}</h3></div> }
 function Badge({ status }: { status: string }) { const good = ['completed', 'external'].includes(status); const bad = ['failed', 'rejected'].includes(status); return <span className={`rounded-[4px] border px-2 py-1 text-xs font-bold ${good ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : bad ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>{status.toUpperCase()}</span> }
 function Empty({ text }: { text: string }) { return <div className="border-y border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-500">{text}</div> }

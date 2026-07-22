@@ -300,6 +300,8 @@ python -m app.cli import-results data/imports/results.csv
 
 When running from `backend`, place licensed or proprietary input files under `data/imports/`. That local intake directory is git-ignored; raw provider data must never be committed. Files may also remain outside the repository and be referenced by absolute path.
 
+Header-only results and odds templates can also be downloaded from Data Operations. Populate them with permitted records without renaming columns; the templates intentionally contain no example results, prices, or fabricated evidence.
+
 The same workflows are available at `POST /api/v1/imports/odds` and `POST /api/v1/imports/results` as multipart uploads. Development permits local uploads without a key. Set `ODDSQUANT_ADMIN_API_KEY` and send it as `X-Admin-Key` for protected environments; production fails closed when the key is unset.
 
 Timestamped player-availability CSVs can be uploaded at `POST /api/v1/imports/intelligence/availability`. Complete JSON intelligence bundles use `POST /api/v1/imports/intelligence`; they preserve original publication and observation timestamps for player, lineup, availability, coach, and tactical evidence. The dashboard exposes both operations and rejects the whole import when its point-in-time contracts fail.
