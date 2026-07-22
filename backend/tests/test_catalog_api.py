@@ -289,10 +289,17 @@ def test_results_training_and_prediction_api_are_connected(
     assert evaluation.json()["benchmarks"]["elo"]["observations"] == 8
     assert evaluation.json()["benchmarks"]["elo"]["brier_score"] >= 0
     assert evaluation.json()["benchmarks"]["elo"]["log_loss"] >= 0
+    assert evaluation.json()["benchmarks"]["dixon_coles"]["observations"] == 8
+    assert evaluation.json()["benchmarks"]["dixon_coles"]["brier_score"] >= 0
+    assert evaluation.json()["benchmarks"]["dixon_coles"]["log_loss"] >= 0
     evaluations = client.get("/api/v1/evaluations")
     assert evaluations.status_code == 200
     assert evaluations.json()[0]["id"] == evaluation.json()["id"]
     assert evaluations.json()[0]["benchmarks"]["elo"] == evaluation.json()["benchmarks"]["elo"]
+    assert (
+        evaluations.json()[0]["benchmarks"]["dixon_coles"]
+        == evaluation.json()["benchmarks"]["dixon_coles"]
+    )
 
     prediction = client.post(
         f"/api/v1/models/{training.json()['id']}/predict",
