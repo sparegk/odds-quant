@@ -6,6 +6,7 @@ import {
   BookOpen,
   CalendarDays,
   CircleDollarSign,
+  CheckCircle2,
   Database,
   FlaskConical,
   Gauge,
@@ -15,6 +16,7 @@ import {
   ScanSearch,
   ShieldCheck,
   TrendingUp,
+  X,
 } from 'lucide-react'
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
@@ -33,7 +35,7 @@ import { ArbitrageSettings } from './components/ArbitrageSettings'
 import { WorkflowReadiness } from './components/WorkflowReadiness'
 import { QuantPriceTable } from './components/QuantPriceTable'
 import { formatDateTime, humanizeCode } from './lib/format'
-import { chooseDefaultEventId } from './lib/events'
+import { chooseDefaultEventId, preserveSelectedEventId } from './lib/events'
 import type { DashboardData, EvaluationRun, EventSummary, MarketComparison, ValueSignal } from './types'
 
 type ViewKey =
@@ -92,6 +94,7 @@ function App() {
   const [comparisonError, setComparisonError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -99,13 +102,18 @@ function App() {
     try {
       const loaded = await loadDashboard()
       setDashboard(loaded)
-      setSelectedEventId((current) => current ?? chooseDefaultEventId(loaded.events))
+      setSelectedEventId((current) => preserveSelectedEventId(loaded.events, current))
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to reach the OddsQuant API')
     } finally {
       setLoading(false)
     }
   }, [])
+
+  const synchronize = useCallback(async () => {
+    await refresh()
+    setNotice('Changes saved and dashboard resources synchronized.')
+  }, [refresh])
 
   useEffect(() => {
     let active = true
@@ -204,6 +212,7 @@ function App() {
       </aside>
 
       <div className="lg:pl-64">
+        {notice ? <SuccessNotice message={notice} onDismiss={() => setNotice(null)} /> : null}
         <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/95 backdrop-blur">
           <div className="flex h-16 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
             <div className="min-w-0">
@@ -254,7 +263,7 @@ function App() {
                 dashboard={dashboard}
                 markets={markets}
                 onSelectEvent={setSelectedEventId}
-                onRefresh={refresh}
+                onRefresh={synchronize}
                 selectedEventId={selectedEventId}
                 view={view}
               />
@@ -477,6 +486,10 @@ function EvaluationPerformance({ evaluations }: { evaluations: EvaluationRun[] }
       ) : null}
     </div>
   )
+}
+
+export function SuccessNotice({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  return <div className="fixed right-4 top-20 z-50 flex max-w-sm items-start gap-3 border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950 shadow-lg" role="status"><CheckCircle2 aria-hidden="true" className="mt-0.5 shrink-0" size={18} /><div className="flex-1"><p className="font-bold">Workflow updated</p><p className="mt-1">{message}</p></div><button aria-label="Dismiss notification" onClick={onDismiss} type="button"><X aria-hidden="true" size={17} /></button></div>
 }
 
 export function BacktestResearch({ dashboard, onChanged }: { dashboard: DashboardData; onChanged?: () => Promise<void> | void }) {

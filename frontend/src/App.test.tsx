@@ -1,9 +1,9 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { DashboardData, ValueSignal } from './types'
-import { ArbitrageResearch, BacktestResearch, InlineError, InlineLoading, ResourceErrors, SignalResearch } from './App'
-import { chooseDefaultEventId } from './lib/events'
+import { ArbitrageResearch, BacktestResearch, InlineError, InlineLoading, ResourceErrors, SignalResearch, SuccessNotice } from './App'
+import { chooseDefaultEventId, preserveSelectedEventId } from './lib/events'
 import { UnderdogScanner } from './components/UnderdogScanner'
 import { ValueOpportunities } from './components/ValueOpportunities'
 
@@ -113,6 +113,23 @@ describe('default event selection', () => {
       { ...event, id: 1, latest_odds_at: null },
       { ...event, id: 2, latest_odds_at: '2026-07-19T12:00:00Z' },
     ])).toBe(2)
+  })
+
+  it('preserves a selected event when refreshed data still contains it', () => {
+    const [event] = dashboard.events
+    if (!event) throw new Error('event fixture is required')
+    expect(preserveSelectedEventId([{ ...event, id: 7 }, { ...event, id: 8 }], 8)).toBe(8)
+    expect(preserveSelectedEventId([{ ...event, id: 7 }], 8)).toBe(7)
+  })
+})
+
+describe('SuccessNotice', () => {
+  it('announces synchronized writes and can be dismissed', () => {
+    const dismiss = vi.fn()
+    render(<SuccessNotice message="Changes saved and dashboard resources synchronized." onDismiss={dismiss} />)
+    expect(screen.getByRole('status')).toHaveTextContent('dashboard resources synchronized')
+    fireEvent.click(screen.getByLabelText('Dismiss notification'))
+    expect(dismiss).toHaveBeenCalledTimes(1)
   })
 })
 
