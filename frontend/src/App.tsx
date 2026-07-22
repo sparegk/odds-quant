@@ -254,6 +254,7 @@ function App() {
                 dashboard={dashboard}
                 markets={markets}
                 onSelectEvent={setSelectedEventId}
+                onRefresh={refresh}
                 selectedEventId={selectedEventId}
                 view={view}
               />
@@ -278,6 +279,7 @@ interface ActiveViewProps {
   comparisonError: string | null
   selectedEventId: number | null
   onSelectEvent: (eventId: number) => void
+  onRefresh: () => Promise<void>
 }
 
 function ActiveView(props: ActiveViewProps) {
@@ -291,7 +293,7 @@ function ActiveView(props: ActiveViewProps) {
     case 'comparison':
       return <OddsComparison {...props} />
     case 'data':
-      return <DataOperations dashboard={props.dashboard} />
+      return <DataOperations dashboard={props.dashboard} onChanged={props.onRefresh} />
     case 'methodology':
       return <Methodology />
     case 'opportunities':
@@ -299,13 +301,13 @@ function ActiveView(props: ActiveViewProps) {
     case 'underdogs':
       return <UnderdogScanner dashboard={props.dashboard} onOpenEvent={(eventId) => { props.onSelectEvent(eventId); navigateTo('event') }} />
     case 'arbitrage':
-      return <ArbitrageResearch dashboard={props.dashboard} />
+      return <ArbitrageResearch dashboard={props.dashboard} onChanged={props.onRefresh} />
     case 'builder':
       return <BetBuilderLab events={props.dashboard.events} onSelectEvent={props.onSelectEvent} selectedEventId={props.selectedEventId} />
     case 'models':
-      return <ModelPerformance dashboard={props.dashboard} />
+      return <ModelPerformance dashboard={props.dashboard} onChanged={props.onRefresh} />
     case 'backtests':
-      return <BacktestResearch dashboard={props.dashboard} />
+      return <BacktestResearch dashboard={props.dashboard} onChanged={props.onRefresh} />
     case 'bankroll':
       return <BankrollResearch backtests={props.dashboard.backtests} />
   }
@@ -477,7 +479,7 @@ function EvaluationPerformance({ evaluations }: { evaluations: EvaluationRun[] }
   )
 }
 
-export function BacktestResearch({ dashboard }: { dashboard: DashboardData }) {
+export function BacktestResearch({ dashboard, onChanged }: { dashboard: DashboardData; onChanged?: () => Promise<void> | void }) {
   const [modelId, setModelId] = useState(String(dashboard.models[0]?.id ?? ''))
   const [evaluationStart, setEvaluationStart] = useState(toDateTimeInput(dashboard.models[0]?.training_start))
   const [evaluationEnd, setEvaluationEnd] = useState(toDateTimeInput(dashboard.models[0]?.training_end))
@@ -493,6 +495,7 @@ export function BacktestResearch({ dashboard }: { dashboard: DashboardData }) {
     try {
       const run = await runSignalBacktest({ model_version_id: Number(modelId), evaluation_start: new Date(evaluationStart).toISOString(), evaluation_end: new Date(evaluationEnd).toISOString(), signal_types: signalTypes }, adminKey || undefined)
       setCreatedRun(run)
+      await onChanged?.()
     } catch (caught) { setRunError(caught instanceof Error ? caught.message : 'Unable to run signal backtest') } finally { setSubmitting(false) }
   }
   return (
@@ -569,7 +572,7 @@ export function SignalResearch({ dashboard, mode }: { dashboard: DashboardData; 
   )
 }
 
-export function ArbitrageResearch({ dashboard }: { dashboard: DashboardData }) {
+export function ArbitrageResearch({ dashboard, onChanged }: { dashboard: DashboardData; onChanged?: () => Promise<void> | void }) {
   const [eventId, setEventId] = useState(String(dashboard.events[0]?.id ?? ''))
   const [budget, setBudget] = useState('100')
   const [currency, setCurrency] = useState('EUR')
@@ -597,6 +600,7 @@ export function ArbitrageResearch({ dashboard }: { dashboard: DashboardData }) {
         constraint_max_age_minutes: 1440,
       }, adminKey || undefined)
       setCalculated(result.opportunities)
+      await onChanged?.()
     } catch (caught) {
       setCalculationError(caught instanceof Error ? caught.message : 'Unable to calculate arbitrage')
     } finally {
@@ -607,7 +611,7 @@ export function ArbitrageResearch({ dashboard }: { dashboard: DashboardData }) {
   return (
     <div className="space-y-7">
       <SectionHeading eyebrow="Tax and constraint aware" title="Stored arbitrage calculations" />
-      <ArbitrageSettings />
+      <ArbitrageSettings onChanged={onChanged} />
       <form className="border-y border-zinc-200 bg-white p-5" onSubmit={(event) => void submitCalculation(event)}>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <label><span className="mb-1.5 block text-xs font-semibold uppercase text-zinc-500">Event</span><select aria-label="Arbitrage event" className="h-10 w-full border border-zinc-300 bg-white px-3 text-sm" required value={eventId} onChange={(event) => setEventId(event.target.value)}><option disabled value="">Select event</option>{dashboard.events.map((item) => <option key={item.id} value={item.id}>{item.home_team} vs {item.away_team}</option>)}</select></label>

@@ -6,7 +6,7 @@ import type { DashboardData, EvaluationRun, ModelOutput, ModelVersion, SignalBat
 
 type Operation = 'train' | 'evaluate' | 'predict' | 'signals'
 
-export function ModelOperations({ dashboard }: { dashboard: DashboardData }) {
+export function ModelOperations({ dashboard, onChanged }: { dashboard: DashboardData; onChanged?: () => Promise<void> | void }) {
   const competitionOptions = useMemo(() => Array.from(new Map(dashboard.events.filter((event) => event.competition_id).map((event) => [event.competition_id as number, event.competition])).entries()), [dashboard.events])
   const [operation, setOperation] = useState<Operation>('train')
   const [adminKey, setAdminKey] = useState('')
@@ -35,6 +35,7 @@ export function ModelOperations({ dashboard }: { dashboard: DashboardData }) {
       } else {
         setResult(await generateSignals({ output_id: Number(outputId), ...(asOf ? { generated_at: iso(asOf) } : {}) }, adminKey || undefined))
       }
+      await onChanged?.()
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Operation failed') } finally { setBusy(false) }
   }
 

@@ -1,10 +1,10 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { DashboardData } from '../types'
 import { ModelOperations } from './ModelOperations'
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 const dashboard: DashboardData = {
   status: { phase: 'model_baseline', sports: ['football'], data_mode: 'user_supplied', automated_betting: false },
@@ -23,5 +23,16 @@ describe('ModelOperations', () => {
     expect(screen.getByLabelText('Target event')).toHaveValue('7')
     fireEvent.click(screen.getByText('4. Signals'))
     expect(screen.getByLabelText('Prediction output ID')).toBeInTheDocument()
+  })
+
+  it('refreshes shared dashboard resources after a successful write', async () => {
+    const changed = vi.fn(() => Promise.resolve())
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify(dashboard.models[0]), { status: 201 }))))
+    render(<ModelOperations dashboard={dashboard} onChanged={changed} />)
+    fireEvent.change(screen.getByLabelText('Training start'), { target: { value: '2026-01-01T00:00' } })
+    fireEvent.change(screen.getByLabelText('Training end'), { target: { value: '2026-06-01T00:00' } })
+    fireEvent.click(screen.getByText('Train model'))
+    expect(await screen.findByText(/train completed/)).toBeInTheDocument()
+    expect(changed).toHaveBeenCalledTimes(1)
   })
 })

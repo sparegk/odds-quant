@@ -5,13 +5,14 @@ import { createBookmakerConstraint, createTaxProfile, loadArbitrageSettings } fr
 import { formatDateTime } from '../lib/format'
 import type { ArbitrageSettings as SettingsData } from '../types'
 
-export function ArbitrageSettings() {
+export function ArbitrageSettings({ onChanged }: { onChanged?: () => Promise<void> | void }) {
   const [settings, setSettings] = useState<SettingsData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const load = useCallback(async () => { try { setSettings(await loadArbitrageSettings()); setError(null) } catch (caught) { setError(caught instanceof Error ? caught.message : 'Unable to load settings') } finally { setLoading(false) } }, [])
   useEffect(() => { void Promise.resolve().then(load) }, [load])
-  return <section className="border border-zinc-200 bg-white"><div className="border-b border-zinc-200 p-5"><div className="flex items-center gap-2"><Settings aria-hidden="true" size={18} /><h2 className="font-bold">Tax and stake evidence</h2></div><p className="mt-1 text-sm text-zinc-500">Record sourced, timestamped bookmaker terms. Unknown or stale evidence still blocks executable status.</p></div>{loading ? <p className="p-5 text-sm text-zinc-500">Loading bookmaker settings…</p> : error ? <p className="m-5 border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">{error}</p> : settings ? <SettingsWorkspace settings={settings} onSaved={load} /> : null}</section>
+  const saved = async () => { await load(); await onChanged?.() }
+  return <section className="border border-zinc-200 bg-white"><div className="border-b border-zinc-200 p-5"><div className="flex items-center gap-2"><Settings aria-hidden="true" size={18} /><h2 className="font-bold">Tax and stake evidence</h2></div><p className="mt-1 text-sm text-zinc-500">Record sourced, timestamped bookmaker terms. Unknown or stale evidence still blocks executable status.</p></div>{loading ? <p className="p-5 text-sm text-zinc-500">Loading bookmaker settings…</p> : error ? <p className="m-5 border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">{error}</p> : settings ? <SettingsWorkspace settings={settings} onSaved={saved} /> : null}</section>
 }
 
 export function SettingsWorkspace({ settings, onSaved }: { settings: SettingsData; onSaved: () => Promise<void> }) {
