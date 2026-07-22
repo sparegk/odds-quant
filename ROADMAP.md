@@ -16,8 +16,9 @@ Completed slices: Alembic schema lifecycle, labelled demo odds and results, atom
 - Completed: leakage-safe Poisson training, sampling intervals, immutable versions, and scoreline-derived predictions.
 - Completed: expanding-window chronological evaluation, immutable replay evidence, Brier/log-loss/ECE metrics, calibration buckets, uniform and optional market benchmarks, and a non-demo promotion policy.
 - Completed: point-in-time Davidson-style Elo forecasts and a persisted Poisson-versus-Elo proper-score comparison exposed in Model Performance.
+- Completed: time-decayed Dixon–Coles fitting with bounded low-score correction, chronological held-out replay, persisted proper scores, and dashboard comparison.
 - Completed: gated explainable value signals, best-price selection, compatible market consensus, lower-bound EV, freshness and movement checks, immutable calibration provenance, and positive-EV team-underdog ranking.
-- Remaining: adequate permitted evaluation history, Dixon-Coles and other richer model benchmarks, and independently validated confidence thresholds.
+- Remaining: adequate permitted evaluation history, further independently justified model benchmarks, and independently validated confidence thresholds.
 - Recency-weighted player and lineup strength, coach-regime handling, tactical matchup features, scenario sensitivity, and walk-forward ablation tests.
 - Completed: value, underdog, arbitrage, bet-builder, backtesting, and bankroll dashboard pages with typed API integration and partial-resource failure states.
 - Completed: protected model operations for training, evaluation, prediction, and signal generation; sourced tax/constraint management; per-tab readiness; automatic post-write synchronization; preserved event context; and success notifications.
@@ -32,6 +33,6 @@ Completed slices: Alembic schema lifecycle, labelled demo odds and results, atom
 
 ## Later Phases
 
-- Licensed live provider adapters, Dixon-Coles and comparison models, richer calibration, more competitions, and additional sports.
+- Licensed live provider adapters, independently justified comparison models, richer calibration, more competitions, and additional sports.
 - Fixture/result and multi-book odds adapters for the requested leagues after credentials, coverage, rate limits, retention, and terms are approved; then independently licensed player/lineup data and identity reconciliation.
 - No player props until reliable timestamped player targets, availability histories, settlement rules, and an independently calibrated player-level model exist.
