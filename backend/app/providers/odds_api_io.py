@@ -27,6 +27,17 @@ LEAGUE_COUNTRIES: Mapping[str, str] = {
     "international-clubs-uefa-conference-league": "International",
     "international-clubs-uefa-conference-league-qualification": "International",
 }
+LEAGUE_COMPETITION_NAMES: Mapping[str, str] = {
+    "england-premier-league": "Premier League",
+    "international-clubs-uefa-champions-league": "UEFA Champions League",
+    "international-clubs-uefa-champions-league-qualification": (
+        "UEFA Champions League Qualification"
+    ),
+    "international-clubs-uefa-conference-league": "UEFA Conference League",
+    "international-clubs-uefa-conference-league-qualification": (
+        "UEFA Conference League Qualification"
+    ),
+}
 TARGET_BOOKMAKERS: Mapping[str, str] = {
     "Allwyn / Pamestoixima": "Pamestoixima",
     "Novibet": "Novibet",
@@ -594,13 +605,11 @@ def _normalize_corner_totals(
 
 
 def _fixture_row(event: _Event, observed_at: datetime) -> FixtureImportRow:
-    country = LEAGUE_COUNTRIES.get(event.league.slug.casefold())
-    if country is None:
-        raise OddsApiIoError("odds provider returned an unsupported competition")
+    competition, country = _competition_identity(event.league.slug)
     try:
         return FixtureImportRow(
             provider_event_key=str(event.id),
-            competition=event.league.name,
+            competition=competition,
             country=country,
             season=_football_season(event.date),
             kickoff_at=event.date,
@@ -626,13 +635,11 @@ def _odds_row(
     line: Decimal | None = None,
     settlement_rule_key: str,
 ) -> OddsImportRow:
-    country = LEAGUE_COUNTRIES.get(event.league.slug.casefold())
-    if country is None:
-        raise OddsApiIoError("odds provider returned an unsupported competition")
+    competition, country = _competition_identity(event.league.slug)
     try:
         return OddsImportRow(
             provider_event_key=str(event.id),
-            competition=event.league.name,
+            competition=competition,
             country=country,
             season=_football_season(event.date),
             kickoff_at=event.date,
@@ -653,6 +660,15 @@ def _odds_row(
         )
     except (ArithmeticError, ValueError, ValidationError):
         raise OddsApiIoError(f"odds provider returned invalid {market_type} prices") from None
+
+
+def _competition_identity(league_slug: str) -> tuple[str, str]:
+    normalized = league_slug.casefold()
+    competition = LEAGUE_COMPETITION_NAMES.get(normalized)
+    country = LEAGUE_COUNTRIES.get(normalized)
+    if competition is None or country is None:
+        raise OddsApiIoError("odds provider returned an unsupported competition")
+    return competition, country
 
 
 def _require_prematch_market_timestamp(

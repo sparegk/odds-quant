@@ -21,7 +21,7 @@ OBSERVED_AT = datetime(2026, 7, 22, 10, 0, tzinfo=UTC)
 def _event(
     event_id: int = 123,
     *,
-    league_name: str = "Premier League",
+    league_name: str = "England - Premier League",
     league_slug: str = "england-premier-league",
 ) -> dict[str, object]:
     return {
@@ -209,6 +209,7 @@ def test_collects_complete_timestamped_prematch_match_result_rows() -> None:
     }
     assert {row.selection_code for row in rows} == {"HOME", "DRAW", "AWAY"}
     assert {row.provider_event_key for row in rows} == {"123"}
+    assert {row.competition for row in rows} == {"Premier League"}
     assert {row.season for row in rows} == {"2026/27"}
     assert {row.observed_at for row in rows} == {OBSERVED_AT}
     assert {row.source_updated_at for row in rows} == {datetime(2026, 7, 22, 9, 59, tzinfo=UTC)}
