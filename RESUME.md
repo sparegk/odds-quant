@@ -35,6 +35,13 @@
   `a13c7e9b4d20` reconciles the exact known 2026/27 aliases without fuzzy matching.
 - A local 1,520-match Premier League model and pre-kickoff prediction verified the pipeline.
   The model remains `unvalidated`; it is not performance or profitability evidence.
+- A separate immutable 2025/26 held-out replay evaluated 342 of 380 permitted fixtures at a
+  60-minute lead (90% coverage). Poisson recorded Brier `0.6191`, log loss `1.0306`, and ECE
+  `0.0707`, beating the uniform benchmark and satisfying the stored calibration policy. Elo
+  (`0.6154` Brier) and Dixon-Coles (`0.6182` Brier) were both marginally better. This calibrates
+  only the historical 2025/26 model version; it does not promote the separate 2026/27 model.
+  No compatible historical bookmaker or closing-price benchmark was available, and no
+  profitability conclusion is authorized.
 
 ## Next action
 
