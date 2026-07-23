@@ -137,6 +137,57 @@ def test_walk_forward_evaluation_persists_immutable_demo_evidence(
     )
 
 
+def test_walk_forward_evaluation_uses_prior_canonical_competition_seasons(
+    session: Session,
+) -> None:
+    prior_season = session.scalar(select(Competition))
+    assert prior_season is not None
+    current_season = Competition(
+        sport_id=prior_season.sport_id,
+        name=prior_season.name,
+        country=prior_season.country,
+        season="2027/2028",
+    )
+    session.add(current_season)
+    session.flush()
+    evaluation_start = AS_OF - timedelta(days=50)
+    current_events = session.scalars(
+        select(Event).where(Event.kickoff_at >= evaluation_start)
+    ).all()
+    assert current_events
+    for event in current_events:
+        event.competition_id = current_season.id
+    session.commit()
+
+    model_view = train_poisson_model(
+        session,
+        TrainPoissonRequest(
+            competition_id=current_season.id,
+            training_start=AS_OF - timedelta(days=150),
+            training_end=evaluation_start,
+            minimum_matches=20,
+            minimum_team_matches=3,
+            shrinkage_matches=5,
+        ),
+        now=AS_OF,
+    )
+    run = evaluate_model(
+        session,
+        model_view.id,
+        _request(),
+        now=AS_OF,
+    )
+
+    assert run.metrics["candidate_events"] == 12
+    assert run.metrics["evaluated_events"] == 8
+    assert run.config["competition_id"] == current_season.id
+    observations = session.scalars(select(BacktestObservation)).all()
+    assert observations
+    assert all(
+        observation.training_cutoff == observation.predicted_at for observation in observations
+    )
+
+
 def test_post_evaluation_correction_does_not_rewrite_existing_run(
     session: Session,
 ) -> None:

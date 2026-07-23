@@ -12,6 +12,7 @@ from app.db.models import (
     BacktestObservation,
     BacktestResult,
     BacktestRun,
+    Competition,
     Event,
     Market,
     MatchResult,
@@ -33,7 +34,7 @@ from app.quant.odds import devig_proportional
 from app.quant.poisson import derive_market, score_matrix
 from app.quant.team_strength import HistoricalScore, fit_poisson_team_strength
 from app.schemas.models import CalibrationBucketView, EvaluateModelRequest, EvaluationRunView
-from app.services.modeling import MODEL_KIND
+from app.services.modeling import MODEL_KIND, competition_family_ids
 
 MINIMUM_PROMOTION_OBSERVATIONS = 200
 MINIMUM_PROMOTION_COVERAGE = 0.90
@@ -421,11 +422,15 @@ def _training_observations(
     training_start: datetime,
     training_end: datetime,
 ) -> list[tuple[MatchResult, Event]]:
+    competition = session.get(Competition, competition_id)
+    if competition is None:
+        raise EvaluationError("competition not found")
+    competition_ids = competition_family_ids(session, competition)
     rows = session.execute(
         select(MatchResult, Event)
         .join(Event, Event.id == MatchResult.event_id)
         .where(
-            Event.competition_id == competition_id,
+            Event.competition_id.in_(competition_ids),
             Event.kickoff_at >= training_start,
             Event.kickoff_at < training_end,
             MatchResult.is_final.is_(True),

@@ -57,7 +57,7 @@ def train_poisson_model(
     competition = session.get(Competition, request.competition_id)
     if competition is None:
         raise ModelingError("competition not found")
-    training_competition_ids = _competition_family_ids(session, competition)
+    training_competition_ids = competition_family_ids(session, competition)
 
     observations = _training_observations(
         session,
@@ -250,7 +250,7 @@ def _training_observations(
     competition = session.get(Competition, competition_id)
     if competition is None:
         raise ModelingError("competition not found")
-    competition_ids = _competition_family_ids(session, competition)
+    competition_ids = competition_family_ids(session, competition)
     rows = session.execute(
         select(MatchResult, Event)
         .join(Event, Event.id == MatchResult.event_id)
@@ -285,7 +285,7 @@ def _training_observations(
     return sorted(canonical.values(), key=lambda row: (_utc(row[1].kickoff_at), row[1].id))
 
 
-def _competition_family_ids(session: Session, competition: Competition) -> list[int]:
+def competition_family_ids(session: Session, competition: Competition) -> list[int]:
     return list(
         session.scalars(
             select(Competition.id)
