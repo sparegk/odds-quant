@@ -6,7 +6,12 @@ from decimal import Decimal
 import httpx
 import pytest
 
-from app.providers.odds_api_io import LEAGUE_COUNTRIES, OddsApiIoClient, OddsApiIoError
+from app.providers.odds_api_io import (
+    LEAGUE_COUNTRIES,
+    OddsApiIoClient,
+    OddsApiIoError,
+    OddsApiIoProvider,
+)
 from app.schemas.odds import MarketType
 
 SECRET = "test-secret-that-must-not-escape"
@@ -93,6 +98,55 @@ def test_provider_error_never_exposes_the_api_key() -> None:
     assert SECRET not in str(caught.value)
 
 
+def test_rate_limit_response_retries_with_backoff_and_jitter() -> None:
+    requests = 0
+    delays: list[float] = []
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        nonlocal requests
+        requests += 1
+        if requests == 1:
+            return httpx.Response(429, headers={"Retry-After": "2"})
+        return httpx.Response(
+            200,
+            json={"bookmakers": ["Pamestoixima", "Novibet"], "count": 2},
+        )
+
+    with OddsApiIoClient(
+        SECRET,
+        transport=httpx.MockTransport(handler),
+        sleep=delays.append,
+        jitter=lambda: 0.25,
+    ) as client:
+        probe = client.probe_target_bookmakers()
+
+    assert probe.complete is True
+    assert requests == 2
+    assert delays == [2.25]
+
+
+def test_rate_limit_retries_are_bounded_and_fail_closed() -> None:
+    requests = 0
+    delays: list[float] = []
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        nonlocal requests
+        requests += 1
+        return httpx.Response(429)
+
+    with OddsApiIoClient(
+        SECRET,
+        transport=httpx.MockTransport(handler),
+        sleep=delays.append,
+        jitter=lambda: 0.0,
+    ) as client:
+        with pytest.raises(OddsApiIoError, match="HTTP 429"):
+            client.probe_target_bookmakers()
+
+    assert requests == 4
+    assert delays == [1.0, 2.0, 4.0]
+
+
 def test_collects_champions_league_fixtures_without_bookmaker_markets() -> None:
     league_slug = "international-clubs-uefa-champions-league-qualification"
     event = _event(
@@ -160,6 +214,39 @@ def test_collects_complete_timestamped_prematch_match_result_rows() -> None:
     assert {row.source_updated_at for row in rows} == {datetime(2026, 7, 22, 9, 59, tzinfo=UTC)}
     assert all(row.is_closing is False for row in rows)
     assert requested_leagues == list(LEAGUE_COUNTRIES)
+
+
+def test_provider_reuses_one_event_catalog_for_fixture_and_odds_collection() -> None:
+    requested_paths: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested_paths.append(request.url.path)
+        if request.url.path.endswith("/bookmakers/selected"):
+            return httpx.Response(
+                200,
+                json={"bookmakers": ["Pamestoixima", "Novibet"], "count": 2},
+            )
+        if request.url.path.endswith("/events"):
+            return httpx.Response(
+                200,
+                json=[_event()] if request.url.params["league"] == "england-premier-league" else [],
+            )
+        return httpx.Response(200, json=[_event_odds()])
+
+    provider = OddsApiIoProvider(
+        SECRET,
+        transport=httpx.MockTransport(handler),
+        clock=lambda: OBSERVED_AT,
+    )
+
+    fixtures = list(provider.collect_fixtures())
+    rows = list(provider.collect_odds())
+
+    assert len(fixtures) == 1
+    assert len(rows) == 6
+    assert requested_paths.count("/v3/bookmakers/selected") == 1
+    assert requested_paths.count("/v3/events") == len(LEAGUE_COUNTRIES)
+    assert requested_paths.count("/v3/odds/multi") == 1
 
 
 def test_collects_uefa_conference_league_corner_totals_from_novibet() -> None:

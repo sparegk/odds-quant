@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import random
+import time
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
@@ -16,6 +18,8 @@ from app.schemas.odds import MarketType, OddsImportRow
 ODDS_API_IO_TERMS_URL = "https://odds-api.io/terms"
 COLLECTION_HORIZON = timedelta(days=35)
 MAX_EVENTS_PER_LEAGUE = 30
+MAX_RATE_LIMIT_RETRIES = 3
+MAX_RETRY_DELAY_SECONDS = 30.0
 LEAGUE_COUNTRIES: Mapping[str, str] = {
     "england-premier-league": "England",
     "international-clubs-uefa-champions-league": "International",
@@ -133,10 +137,14 @@ class OddsApiIoClient:
         *,
         base_url: str = "https://api.odds-api.io/v3",
         transport: httpx.BaseTransport | None = None,
+        sleep: Callable[[float], None] = time.sleep,
+        jitter: Callable[[], float] = random.random,
     ) -> None:
         if not api_key.strip():
             raise OddsApiIoError("ODDSQUANT_ODDS_API_IO_KEY is not configured")
         self._api_key = api_key
+        self._sleep = sleep
+        self._jitter = jitter
         self._client = httpx.Client(
             base_url=base_url.rstrip("/"),
             timeout=20,
@@ -196,6 +204,30 @@ class OddsApiIoClient:
             missing = ", ".join(probe.missing_bookmakers)
             raise OddsApiIoError(f"required bookmakers are not selected: {missing}")
         events = self._pending_events(observed_at, horizon)
+        return self._collect_event_odds(events, observed_at)
+
+    def collect_prematch_batch(
+        self,
+        *,
+        observed_at: datetime,
+        horizon: timedelta = COLLECTION_HORIZON,
+    ) -> tuple[list[FixtureImportRow], list[OddsImportRow]]:
+        _require_aware(observed_at, "observation timestamp")
+        if horizon <= timedelta(0):
+            raise ValueError("collection horizon must be positive")
+        probe = self.probe_target_bookmakers()
+        if not probe.complete:
+            missing = ", ".join(probe.missing_bookmakers)
+            raise OddsApiIoError(f"required bookmakers are not selected: {missing}")
+        events = self._pending_events(observed_at, horizon)
+        fixtures = [_fixture_row(event, observed_at) for event in events]
+        return fixtures, self._collect_event_odds(events, observed_at)
+
+    def _collect_event_odds(
+        self,
+        events: list[_Event],
+        observed_at: datetime,
+    ) -> list[OddsImportRow]:
         rows: list[OddsImportRow] = []
         for offset in range(0, len(events), 10):
             batch = events[offset : offset + 10]
@@ -322,10 +354,17 @@ class OddsApiIoClient:
             "apiKey": self._api_key,
             **params,
         }
-        try:
-            response = self._client.get(path, params=request_params)
-        except httpx.HTTPError:
-            raise OddsApiIoError("odds provider request failed") from None
+        response: httpx.Response | None = None
+        for attempt in range(MAX_RATE_LIMIT_RETRIES + 1):
+            try:
+                response = self._client.get(path, params=request_params)
+            except httpx.HTTPError:
+                raise OddsApiIoError("odds provider request failed") from None
+            if response.status_code != 429 or attempt == MAX_RATE_LIMIT_RETRIES:
+                break
+            self._sleep(_rate_limit_delay(response, attempt, self._jitter()))
+        if response is None:
+            raise OddsApiIoError("odds provider request failed")
         if response.status_code != 200:
             raise OddsApiIoError(f"odds provider returned HTTP {response.status_code}")
         try:
@@ -353,24 +392,38 @@ class OddsApiIoProvider:
         self._base_url = base_url
         self._transport = transport
         self._clock = clock
+        self._cached_batch: tuple[list[FixtureImportRow], list[OddsImportRow]] | None = None
 
     def collect_fixtures(self) -> Iterable[FixtureImportRow]:
-        observed_at = self._clock()
-        with OddsApiIoClient(
-            self._api_key,
-            base_url=self._base_url,
-            transport=self._transport,
-        ) as client:
-            return client.collect_fixtures(observed_at=observed_at)
+        self._cached_batch = self._collect_batch()
+        return self._cached_batch[0]
 
     def collect_odds(self) -> Iterable[OddsImportRow]:
+        if self._cached_batch is not None:
+            _, rows = self._cached_batch
+            self._cached_batch = None
+            return rows
+        _, rows = self._collect_batch()
+        return rows
+
+    def _collect_batch(self) -> tuple[list[FixtureImportRow], list[OddsImportRow]]:
         observed_at = self._clock()
         with OddsApiIoClient(
             self._api_key,
             base_url=self._base_url,
             transport=self._transport,
         ) as client:
-            return client.collect_prematch_odds(observed_at=observed_at)
+            return client.collect_prematch_batch(observed_at=observed_at)
+
+
+def _rate_limit_delay(response: httpx.Response, attempt: int, jitter: float) -> float:
+    retry_after = response.headers.get("Retry-After", "")
+    try:
+        provider_delay = max(0.0, float(retry_after))
+    except ValueError:
+        provider_delay = 0.0
+    exponential_delay = float(2**attempt)
+    return min(MAX_RETRY_DELAY_SECONDS, max(exponential_delay, provider_delay) + max(0.0, jitter))
 
 
 def _validate_list[ModelT: BaseModel](
