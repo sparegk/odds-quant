@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.db.session import get_db
 from app.schemas.api import (
+    CollectionMonitoringView,
     DataCoverageView,
     EventDetail,
     EventSummary,
@@ -24,6 +25,7 @@ from app.services.catalog import (
     list_providers,
     odds_comparison,
 )
+from app.services.collection_monitoring import collection_monitoring
 from app.services.data_coverage import data_coverage
 from app.services.readiness import readiness_counts
 
@@ -39,6 +41,15 @@ def readiness(database: Database) -> ReadinessCounts:
 @router.get("/data/coverage", response_model=DataCoverageView, tags=["data"])
 def coverage(database: Database) -> DataCoverageView:
     return data_coverage(database)
+
+
+@router.get("/data/monitoring", response_model=CollectionMonitoringView, tags=["data"])
+def monitoring(database: Database) -> CollectionMonitoringView:
+    settings = get_settings()
+    return collection_monitoring(
+        database,
+        expected_poll_seconds=settings.provider_poll_seconds,
+    )
 
 
 @router.get("/events", response_model=list[EventSummary], tags=["events"])

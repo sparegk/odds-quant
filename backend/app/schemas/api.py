@@ -79,6 +79,32 @@ class DataCoverageView(BaseModel):
     competitions: list[CompetitionDataCoverage]
 
 
+class ProviderCollectionHealth(BaseModel):
+    provider_id: int
+    provider: str
+    provider_slug: str
+    latest_job_id: int | None
+    latest_job_status: str | None
+    latest_job_created_at: datetime | None
+    latest_job_finished_at: datetime | None
+    latest_success_at: datetime | None
+    consecutive_completed_jobs: int
+    failures_in_recent_window: int
+    running_job_age_seconds: int | None
+    latest_success_age_seconds: int | None
+    healthy: bool
+    blockers: list[str]
+
+
+class CollectionMonitoringView(BaseModel):
+    observed_at: datetime
+    expected_poll_seconds: int
+    recent_job_limit: int
+    healthy: bool
+    providers: list[ProviderCollectionHealth]
+    coverage: DataCoverageView
+
+
 class ImportJobView(BaseModel):
     id: int
     filename: str

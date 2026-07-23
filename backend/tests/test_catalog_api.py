@@ -10,7 +10,15 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Bookmaker, Competition, Event, MatchResult, OddsSnapshot, Provider
+from app.db.models import (
+    Bookmaker,
+    Competition,
+    Event,
+    MatchResult,
+    OddsSnapshot,
+    Provider,
+    ProviderJob,
+)
 from app.db.session import Base, get_db
 from app.main import app
 from app.services.demo_seed import build_demo_odds_csv, build_demo_results_csv, seed_demo_data
@@ -113,6 +121,66 @@ def test_data_coverage_fails_closed_for_demo_and_reports_permitted_gaps(
     assert competition["blockers"] == [
         "fewer_than_200_final_results",
         "missing_required_bookmakers",
+    ]
+
+
+def test_collection_monitoring_requires_two_fresh_completed_jobs(
+    api: tuple[TestClient, Session, datetime],
+) -> None:
+    client, session, as_of = api
+    provider = Provider(
+        slug="licensed-monitor",
+        name="Licensed Monitor",
+        kind="bookmaker_aggregator",
+        is_demo=False,
+        capabilities={"odds": True},
+    )
+    session.add(provider)
+    session.flush()
+    for offset in (2, 1):
+        finished_at = as_of - timedelta(minutes=offset)
+        session.add(
+            ProviderJob(
+                provider_id=provider.id,
+                job_type="collect_odds",
+                status="completed",
+                message="Imported sanitized prices",
+                created_at=finished_at - timedelta(seconds=2),
+                finished_at=finished_at,
+            )
+        )
+    session.commit()
+
+    response = client.get("/api/v1/data/monitoring")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["healthy"] is True
+    assert payload["expected_poll_seconds"] == 900
+    assert payload["coverage"]["permitted_events"] == 0
+    health = payload["providers"][0]
+    assert health["provider_slug"] == "licensed-monitor"
+    assert health["consecutive_completed_jobs"] == 2
+    assert health["failures_in_recent_window"] == 0
+    assert health["healthy"] is True
+    assert health["blockers"] == []
+
+    session.add(
+        ProviderJob(
+            provider_id=provider.id,
+            job_type="collect_odds",
+            status="failed",
+            message="Collection failed (ProviderError)",
+            created_at=as_of,
+            finished_at=as_of,
+        )
+    )
+    session.commit()
+    failed = client.get("/api/v1/data/monitoring").json()
+    assert failed["healthy"] is False
+    assert failed["providers"][0]["blockers"] == [
+        "latest_provider_job_not_completed",
+        "fewer_than_two_consecutive_completed_jobs",
     ]
 
 

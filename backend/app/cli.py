@@ -17,6 +17,7 @@ from app.providers.openfootball import (
 )
 from app.schemas.models import EvaluateModelRequest, PredictEventRequest, TrainPoissonRequest
 from app.schemas.signals import GenerateSignalsRequest
+from app.services.collection_monitoring import collection_monitoring
 from app.services.demo_seed import seed_demo_data, seed_demo_results
 from app.services.evaluation import EvaluationError, evaluate_model
 from app.services.modeling import ModelingError, predict_event, train_poisson_model
@@ -64,6 +65,11 @@ def _parser() -> argparse.ArgumentParser:
         "probe-bet-builder-markets",
         help="report sanitized corner/shot/player market metadata without ingesting props",
     )
+    monitor = commands.add_parser(
+        "monitor-collection",
+        help="report persisted provider-job health and permitted data coverage",
+    )
+    monitor.add_argument("--recent-job-limit", type=int, default=10)
     train = commands.add_parser("train-poisson", help="train a versioned Poisson baseline")
     train.add_argument("competition_id", type=int)
     train.add_argument("training_start", type=datetime.fromisoformat)
@@ -151,6 +157,13 @@ def main() -> int:
                     base_url=settings.odds_api_io_base_url,
                 ) as client:
                     result = client.probe_bet_builder_markets(observed_at=datetime.now(UTC))
+            elif args.command == "monitor-collection":
+                settings = get_settings()
+                result = collection_monitoring(
+                    session,
+                    expected_poll_seconds=settings.provider_poll_seconds,
+                    recent_job_limit=args.recent_job_limit,
+                )
             elif args.command == "train-poisson":
                 result = train_poisson_model(
                     session,
