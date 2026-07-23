@@ -2,12 +2,12 @@
 
 ## Current checkpoint
 
-- Branch: `main`. Security, polling, cross-season modeling, and canonical competition
-  checkpoints through `cb736b5` are pushed and passing CI.
+- Branch: `main`. Security, polling, cross-season modeling, canonical competition, and
+  historical evaluation checkpoints through `83acb30` are pushed and passing CI.
 - The prior Odds-API.io key was exposed through local `httpx` URL logging. The ignored logs
-  were removed, credential query logging is now redacted, and the scheduler is stopped.
-  Regenerate the key after the provider cooldown, replace it only in the ignored root `.env`,
-  and do not paste it into chat or tracked files.
+  were removed, the key was regenerated only in the ignored root `.env`, credential query
+  logging is redacted, and the scheduler is restored. Never paste the replacement key into
+  chat or tracked files.
 - Required bookmakers are Allwyn/Pamestoixima and Novibet; the authenticated provider
   selection contains both.
 - The collector covers the Premier League plus UEFA Champions League and Conference League
@@ -42,19 +42,21 @@
   only the historical 2025/26 model version; it does not promote the separate 2026/27 model.
   No compatible historical bookmaker or closing-price benchmark was available, and no
   profitability conclusion is authorized.
+- On 2026-07-24, the target-bookmaker probe returned `complete: true`, while the sanitized
+  bet-builder probe checked 70 events without returning raw values or enabling player props.
+  Scheduler jobs `11` through `19` then completed consecutively at the configured 15-minute
+  interval without throttling or failures. Coverage reached 512 permitted snapshots: 150
+  Premier League, 45 Champions League qualification, and 317 Conference League qualification.
+  Only Conference League qualification currently covers both required bookmakers, and no
+  competition has explicit closing snapshots.
 
 ## Next action
 
-After the provider cooldown, regenerate the Odds-API.io key, replace it in the ignored root
-`.env`, run the sanitized target-bookmaker probe, and restart the scheduler at the configured
-15-minute interval. Require multiple consecutive completed provider jobs before treating the
-worker as restored. The client now reuses one event catalog per cycle and applies bounded
-exponential backoff with jitter to HTTP 429 responses.
-
-After polling is restored, keep collecting UEFA fixtures and supported team markets. Do not
-ingest player props when they first appear. First obtain stable provider player IDs, a licensed
-timestamped player result source, and explicit bookmaker settlement rules; then add
-deterministic settlement and chronological evaluation tests in a separate checkpoint.
+Keep the restored scheduler collecting UEFA fixtures and supported team markets, and monitor
+provider jobs for renewed throttling or coverage regressions. Do not ingest player props when
+they first appear. First obtain stable provider player IDs, a licensed timestamped player
+result source, and explicit bookmaker settlement rules; then add deterministic settlement and
+chronological evaluation tests in a separate checkpoint.
 
 Continue to add closing snapshots only when the provider supplies explicit source-timestamped
 closing evidence strictly before kickoff.
