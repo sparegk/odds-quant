@@ -58,7 +58,7 @@ def normalize_openfootball_results(
             home_team = _required_text(match, "team1")
             away_team = _required_text(match, "team2")
             score = match["score"]
-            full_time = score["ft"] if isinstance(score, dict) else None
+            full_time = score.get("ft") if isinstance(score, dict) else score
             if (
                 not isinstance(full_time, list)
                 or len(full_time) != 2

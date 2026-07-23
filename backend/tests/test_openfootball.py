@@ -63,6 +63,43 @@ def test_rejects_a_fixture_after_the_pinned_publication_timestamp() -> None:
         )
 
 
+def test_normalizes_direct_full_time_score_variant() -> None:
+    payload = json.loads(_dataset())
+    payload["matches"][0]["score"] = [1, 0]
+
+    rows = normalize_openfootball_results(
+        json.dumps(payload).encode(),
+        dataset_path="2024-25/en.1.json",
+        competition="Premier League",
+        country="England",
+        season="2024/25",
+        timezone="Europe/London",
+        source_commit=COMMIT,
+        source_updated_at=PUBLISHED_AT,
+    )
+
+    assert rows[0].home_goals == 1
+    assert rows[0].away_goals == 0
+
+
+@pytest.mark.parametrize("score", [[1], [1, -1], [1, 0.5], "1-0"])
+def test_rejects_invalid_direct_full_time_score_variant(score: object) -> None:
+    payload = json.loads(_dataset())
+    payload["matches"][0]["score"] = score
+
+    with pytest.raises(OpenFootballImportError, match="score.ft"):
+        normalize_openfootball_results(
+            json.dumps(payload).encode(),
+            dataset_path="2024-25/en.1.json",
+            competition="Premier League",
+            country="England",
+            season="2024/25",
+            timezone="Europe/London",
+            source_commit=COMMIT,
+            source_updated_at=PUBLISHED_AT,
+        )
+
+
 def test_import_persists_open_data_provenance(session: Session) -> None:
     rows = normalize_openfootball_results(
         _dataset(),
