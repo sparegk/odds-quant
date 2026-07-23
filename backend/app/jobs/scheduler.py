@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Callable, Iterable
 from datetime import UTC, datetime
 from typing import cast
@@ -22,6 +23,36 @@ from app.services.odds_import import import_odds_csv, serialize_odds_rows_csv
 
 logger = logging.getLogger("oddsquant.worker")
 SessionFactory = Callable[[], Session]
+_SENSITIVE_QUERY_PATTERN = re.compile(r"(?i)([?&](?:api[_-]?key|access[_-]?token|token)=)[^&\s]+")
+
+
+class SensitiveQueryFilter(logging.Filter):
+    """Redact credentials embedded in third-party request log arguments."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.msg, str):
+            record.msg = _redact_sensitive_query(record.msg)
+        if isinstance(record.args, tuple):
+            record.args = tuple(_redact_log_argument(value) for value in record.args)
+        elif isinstance(record.args, dict):
+            record.args = {key: _redact_log_argument(value) for key, value in record.args.items()}
+        return True
+
+
+def configure_safe_http_logging() -> None:
+    http_logger = logging.getLogger("httpx")
+    if not any(isinstance(item, SensitiveQueryFilter) for item in http_logger.filters):
+        http_logger.addFilter(SensitiveQueryFilter())
+
+
+def _redact_log_argument(value: object) -> object:
+    if isinstance(value, str) or value.__class__.__name__ == "URL":
+        return _redact_sensitive_query(str(value))
+    return value
+
+
+def _redact_sensitive_query(value: str) -> str:
+    return _SENSITIVE_QUERY_PATTERN.sub(r"\1[REDACTED]", value)
 
 
 def run_provider_collection(
@@ -219,6 +250,7 @@ def build_scheduler(settings: Settings | None = None) -> BlockingScheduler:
 
 def main() -> None:
     settings = get_settings()
+    configure_safe_http_logging()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     register_configured_providers(settings)
     seed_development_demo(settings=settings)

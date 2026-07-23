@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterable, Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -17,6 +18,7 @@ from app.core.config import Settings
 from app.db.models import Event, FixtureObservation, OddsSnapshot, ProviderJob
 from app.db.session import Base
 from app.jobs.scheduler import (
+    SensitiveQueryFilter,
     register_configured_providers,
     run_provider_collection,
     seed_development_demo,
@@ -27,6 +29,7 @@ from app.services.demo_seed import build_demo_odds_csv
 from app.services.odds_import import parse_odds_csv
 
 AS_OF = datetime(2026, 7, 19, 10, 0, tzinfo=UTC)
+LOG_SECRET = "credential-that-must-never-be-logged"
 
 
 class FakeLicensedProvider:
@@ -198,3 +201,22 @@ def test_configured_odds_api_provider_is_registered() -> None:
     assert providers[0].slug == "odds-api-io"
     assert providers[0].kind == "licensed_api"
     assert providers[0].is_demo is False
+
+
+@pytest.mark.parametrize("parameter", ["apiKey", "api_key", "token", "access_token"])
+def test_sensitive_query_filter_redacts_http_credentials(parameter: str) -> None:
+    record = logging.LogRecord(
+        "httpx",
+        logging.INFO,
+        __file__,
+        1,
+        'HTTP Request: GET %s "HTTP/1.1 200 OK"',
+        (f"https://provider.example/events?league=epl&{parameter}={LOG_SECRET}&limit=5",),
+        None,
+    )
+
+    assert SensitiveQueryFilter().filter(record) is True
+
+    rendered = record.getMessage()
+    assert LOG_SECRET not in rendered
+    assert f"{parameter}=[REDACTED]" in rendered
