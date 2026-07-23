@@ -187,6 +187,10 @@ def test_render_postgres_url_selects_installed_psycopg_driver() -> None:
     assert settings.database_url == "postgresql+psycopg://user:password@db:5432/oddsquant"
 
 
+def test_provider_polling_defaults_to_fifteen_minutes() -> None:
+    assert Settings().provider_poll_seconds == 900
+
+
 def test_configured_odds_api_provider_is_registered() -> None:
     register_configured_providers(
         Settings(

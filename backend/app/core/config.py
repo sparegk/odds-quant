@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     admin_api_key: str | None = None
     seed_demo: bool = True
     odds_stale_after_seconds: int = Field(default=300, ge=1)
-    provider_poll_seconds: int = Field(default=300, ge=30)
+    provider_poll_seconds: int = Field(default=900, ge=30)
     odds_api_io_key: str | None = None
     odds_api_io_base_url: str = "https://api.odds-api.io/v3"
     matchday_timezone: str = "Europe/Athens"
