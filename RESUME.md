@@ -2,8 +2,12 @@
 
 ## Current checkpoint
 
-- Branch: `main`. Implementation checkpoints `4426763` and `22ca928` are pushed.
-- The replacement Odds-API.io key remains only in the ignored root `.env`.
+- Branch: `main`. Security, polling, cross-season modeling, and canonical competition
+  checkpoints through `cb736b5` are pushed and passing CI.
+- The prior Odds-API.io key was exposed through local `httpx` URL logging. The ignored logs
+  were removed, credential query logging is now redacted, and the scheduler is stopped.
+  Regenerate the key after the provider cooldown, replace it only in the ignored root `.env`,
+  and do not paste it into chat or tracked files.
 - Required bookmakers are Allwyn/Pamestoixima and Novibet; the authenticated provider
   selection contains both.
 - The collector covers the Premier League plus UEFA Champions League and Conference League
@@ -24,14 +28,26 @@
   settlement tests are independently validated.
 - No closing status is inferred. Coverage remains unsuitable for evaluation where final
   result depth, both-bookmaker coverage, or explicit pre-kickoff closing evidence is absent.
+- Pinned CC0 Premier League results now cover 2022/23 through 2025/26 with 1,520 permitted
+  finals. Current-season Poisson training can use cutoff-valid prior seasons from the exact
+  same sport/name/country competition family and stores every contributing competition ID.
+- Live provider competition labels are canonicalized by supported league slug. Migration
+  `a13c7e9b4d20` reconciles the exact known 2026/27 aliases without fuzzy matching.
+- A local 1,520-match Premier League model and pre-kickoff prediction verified the pipeline.
+  The model remains `unvalidated`; it is not performance or profitability evidence.
 
 ## Next action
 
-Keep scheduled polling active for UEFA main-stage fixtures and newly appearing shot/player
-market metadata. Do not ingest player props when they first appear. First obtain and record
-stable provider player IDs, a licensed timestamped player result source, and explicit
-bookmaker settlement rules; then add deterministic settlement and chronological evaluation
-tests in a separate checkpoint.
+After the provider cooldown, regenerate the Odds-API.io key, replace it in the ignored root
+`.env`, run the sanitized target-bookmaker probe, and restart the scheduler at the configured
+15-minute interval. Require multiple consecutive completed provider jobs before treating the
+worker as restored. The client now reuses one event catalog per cycle and applies bounded
+exponential backoff with jitter to HTTP 429 responses.
+
+After polling is restored, keep collecting UEFA fixtures and supported team markets. Do not
+ingest player props when they first appear. First obtain stable provider player IDs, a licensed
+timestamped player result source, and explicit bookmaker settlement rules; then add
+deterministic settlement and chronological evaluation tests in a separate checkpoint.
 
 Continue to add closing snapshots only when the provider supplies explicit source-timestamped
 closing evidence strictly before kickoff.
