@@ -133,3 +133,43 @@ def test_duplicate_result_provider_does_not_double_count_matches(session: Sessio
     model = train_poisson_model(session, _training_request(session), now=AS_OF)
 
     assert model.sample_size == 32
+
+
+def test_current_season_model_uses_only_same_canonical_competition_history(
+    session: Session,
+) -> None:
+    prior_season = session.scalar(select(Competition))
+    assert prior_season is not None
+    current_season = Competition(
+        sport_id=prior_season.sport_id,
+        name=prior_season.name,
+        country=prior_season.country,
+        season="2027/2028",
+    )
+    session.add(current_season)
+    session.flush()
+    target = session.scalar(
+        select(Event).where(Event.status == "scheduled").order_by(Event.kickoff_at)
+    )
+    assert target is not None
+    target.competition_id = current_season.id
+    session.commit()
+
+    request = _training_request(session).model_copy(update={"competition_id": current_season.id})
+    model = train_poisson_model(session, request, now=AS_OF)
+    output = predict_event(
+        session,
+        model.id,
+        PredictEventRequest(event_id=target.id, predicted_at=AS_OF, inputs_as_of=AS_OF),
+        now=AS_OF,
+    )
+
+    assert model.sample_size == 32
+    assert model.feature_version == "final-score-home-away-v2-cross-season"
+    assert model.config["competition_id"] == current_season.id
+    assert model.config["training_competition_ids"] == [
+        prior_season.id,
+        current_season.id,
+    ]
+    assert model.config["training_competition_scope"] == ("same_sport_name_country_all_seasons")
+    assert output.event_id == target.id

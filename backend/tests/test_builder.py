@@ -91,7 +91,7 @@ def test_builder_uses_scorelines_and_persists_exact_provenance(session: Session)
     assert quote.lower_expected_value is not None
     assert len(quote.fingerprint) == 64
     assert len(quote.input_fingerprint) == 64
-    assert quote.feature_version == "final-score-home-away-v1"
+    assert quote.feature_version == "final-score-home-away-v2-cross-season"
     assert quote.predicted_at <= quote.inputs_as_of <= quote.quoted_at
     assert quote.offered_odds_source == "User-entered research price"
     assert quote.is_demo is True

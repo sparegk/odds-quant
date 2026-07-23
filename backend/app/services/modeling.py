@@ -36,7 +36,7 @@ from app.schemas.models import (
 )
 
 MODEL_KIND = "poisson_team_strength"
-FEATURE_VERSION = "final-score-home-away-v1"
+FEATURE_VERSION = "final-score-home-away-v2-cross-season"
 
 
 class ModelingError(ValueError):
@@ -54,8 +54,10 @@ def train_poisson_model(
     training_end = _utc(request.training_end)
     if training_end > reference:
         raise ModelingError("training_end cannot be in the future")
-    if session.get(Competition, request.competition_id) is None:
+    competition = session.get(Competition, request.competition_id)
+    if competition is None:
         raise ModelingError("competition not found")
+    training_competition_ids = _competition_family_ids(session, competition)
 
     observations = _training_observations(
         session,
@@ -86,6 +88,7 @@ def train_poisson_model(
             "minimum_team_matches": request.minimum_team_matches,
             "shrinkage_matches": request.shrinkage_matches,
             "training_start": training_start.isoformat(),
+            "training_competition_ids": training_competition_ids,
         },
         sort_keys=True,
         separators=(",", ":"),
@@ -100,6 +103,8 @@ def train_poisson_model(
     config.update(
         {
             "competition_id": request.competition_id,
+            "training_competition_ids": training_competition_ids,
+            "training_competition_scope": "same_sport_name_country_all_seasons",
             "minimum_team_matches": request.minimum_team_matches,
             "lambda_bounds": [0.05, 4.0],
             "score_matrix_max_goals": 20,
@@ -242,11 +247,15 @@ def _training_observations(
     training_start: datetime,
     training_end: datetime,
 ) -> list[tuple[MatchResult, Event]]:
+    competition = session.get(Competition, competition_id)
+    if competition is None:
+        raise ModelingError("competition not found")
+    competition_ids = _competition_family_ids(session, competition)
     rows = session.execute(
         select(MatchResult, Event)
         .join(Event, Event.id == MatchResult.event_id)
         .where(
-            Event.competition_id == competition_id,
+            Event.competition_id.in_(competition_ids),
             Event.kickoff_at >= training_start,
             Event.kickoff_at < training_end,
             MatchResult.is_final.is_(True),
@@ -274,6 +283,20 @@ def _training_observations(
         if existing is None or _utc(result.observed_at) > _utc(existing[0].observed_at):
             canonical[key] = (result, event)
     return sorted(canonical.values(), key=lambda row: (_utc(row[1].kickoff_at), row[1].id))
+
+
+def _competition_family_ids(session: Session, competition: Competition) -> list[int]:
+    return list(
+        session.scalars(
+            select(Competition.id)
+            .where(
+                Competition.sport_id == competition.sport_id,
+                Competition.name == competition.name,
+                Competition.country == competition.country,
+            )
+            .order_by(Competition.season, Competition.id)
+        )
+    )
 
 
 def _persist_selection_predictions(
