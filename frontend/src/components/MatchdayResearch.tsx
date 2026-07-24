@@ -423,6 +423,7 @@ function MatchDetail({ detail }: { detail: MatchdayEventDetail }) {
 
       <div className="space-y-7 p-5">
         <BookmakerAvailability detail={detail} />
+        <AvailabilityExplorer detail={detail} />
         <section>
           <DetailHeading eyebrow="Probability versus exact price" title="Ranked match suggestions" />
           {detail.suggestions.length ? (
@@ -486,6 +487,114 @@ function MatchDetail({ detail }: { detail: MatchdayEventDetail }) {
         </section>
       </div>
     </article>
+  )
+}
+
+function AvailabilityExplorer({ detail }: { detail: MatchdayEventDetail }) {
+  const counts = detail.availability_audit.reduce(
+    (result, item) => ({ ...result, [item.status]: result[item.status] + 1 }),
+    { available: 0, partial: 0, blocked: 0 },
+  )
+
+  return (
+    <section aria-label="Availability evidence explorer">
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+        <DetailHeading eyebrow="Nothing hidden" title="Availability evidence explorer" />
+        <div className="mb-3 flex flex-wrap gap-2 text-[11px] font-bold uppercase">
+          <span className="border border-emerald-200 bg-emerald-50 px-2 py-1 text-emerald-800">
+            {counts.available} available
+          </span>
+          <span className="border border-sky-200 bg-sky-50 px-2 py-1 text-sky-800">
+            {counts.partial} partial
+          </span>
+          <span className="border border-amber-200 bg-amber-50 px-2 py-1 text-amber-800">
+            {counts.blocked} blocked
+          </span>
+        </div>
+      </div>
+      <p className="mb-3 text-xs leading-5 text-zinc-600">
+        Unavailable does not mean invisible. Open evidence is retained below with the exact
+        blocker and what must be added before it can qualify.
+      </p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {detail.availability_audit.map((item) => {
+          const available = item.status === 'available'
+          const partial = item.status === 'partial'
+          return (
+            <details
+              className={
+                available
+                  ? 'border border-emerald-200 bg-emerald-50'
+                  : partial
+                    ? 'border border-sky-200 bg-sky-50'
+                    : 'border border-amber-200 bg-amber-50'
+              }
+              data-testid="availability-audit-item"
+              key={item.code}
+              open={!available}
+            >
+              <summary className="cursor-pointer list-none p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold">{item.label}</p>
+                    <p className="mt-1 text-xs text-zinc-600">
+                      {item.present_records} stored record{item.present_records === 1 ? '' : 's'}
+                      {item.research_only ? ' / research-only' : ''}
+                    </p>
+                  </div>
+                  <span
+                    className={
+                      available
+                        ? 'text-[10px] font-bold uppercase text-emerald-700'
+                        : partial
+                          ? 'text-[10px] font-bold uppercase text-sky-700'
+                          : 'text-[10px] font-bold uppercase text-amber-700'
+                    }
+                  >
+                    {item.status}
+                  </span>
+                </div>
+              </summary>
+              <div className="space-y-3 border-t border-black/10 px-3 py-3 text-xs leading-5">
+                <AuditList label="Evidence retained" items={item.evidence} tone="neutral" />
+                <AuditList label="Why it is blocked" items={item.blockers} tone="warning" />
+                <AuditList label="What unlocks it" items={item.unlock_requirements} tone="action" />
+              </div>
+            </details>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+function AuditList({
+  label,
+  items,
+  tone,
+}: {
+  label: string
+  items: string[]
+  tone: 'neutral' | 'warning' | 'action'
+}) {
+  if (!items.length) return null
+  return (
+    <div>
+      <p
+        className={
+          tone === 'warning'
+            ? 'font-bold text-amber-900'
+            : tone === 'action'
+              ? 'font-bold text-sky-900'
+              : 'font-bold text-zinc-700'
+        }
+      >
+        {label}
+      </p>
+      <ul className="mt-1 list-disc space-y-1 pl-4 text-zinc-700">
+        {items.map((item) => <li key={item}>{item}</li>)}
+      </ul>
+    </div>
   )
 }
 

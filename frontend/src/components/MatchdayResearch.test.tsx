@@ -246,6 +246,48 @@ const detail: MatchdayEventDetail = {
     { code: 'shots_on_target', label: 'Shots on target', status: 'blocked', reason: 'Target unvalidated.' },
     { code: 'player_props', label: 'Player props', status: 'blocked', reason: 'Target unvalidated.' },
   ],
+  availability_audit: [
+    {
+      code: 'match_result',
+      label: '1X2',
+      status: 'available',
+      present_records: 1,
+      research_only: false,
+      evidence: ['1 compatible market stored.', '1 fresh bookmaker snapshot retained.'],
+      blockers: [],
+      unlock_requirements: ['Keep the exact price fresh.'],
+    },
+    {
+      code: 'goals',
+      label: 'Goals, BTTS & team totals',
+      status: 'blocked',
+      present_records: 0,
+      research_only: true,
+      evidence: ['0 compatible markets stored.'],
+      blockers: ['No fresh goals price is stored.'],
+      unlock_requirements: ['Import timestamped totals, BTTS, or team-total prices.'],
+    },
+    {
+      code: 'lineups',
+      label: 'Expected & confirmed lineups',
+      status: 'partial',
+      present_records: 1,
+      research_only: true,
+      evidence: ['1 point-in-time fallback starter retained.'],
+      blockers: ['One team still lacks a complete position-valid XI.'],
+      unlock_requirements: ['Provide 11 position-valid starters for both teams.'],
+    },
+    {
+      code: 'player_props',
+      label: 'Player props',
+      status: 'blocked',
+      present_records: 0,
+      research_only: true,
+      evidence: ['0 timestamp-valid player targets stored.'],
+      blockers: ['Player targets and settlement are not independently validated.'],
+      unlock_requirements: ['Pass independent target and settlement validation.'],
+    },
+  ],
   stored_lineups: [],
   lineup_projections: [
     {
@@ -341,6 +383,12 @@ describe('MatchdayResearch', () => {
     expect(screen.getByText('32.0% uncertainty')).toBeInTheDocument()
     expect(screen.getByText('Player markets remain research-only')).toBeInTheDocument()
     expect(screen.getByText('No verified builder value')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Availability evidence explorer' })).toBeInTheDocument()
+    expect(screen.getAllByTestId('availability-audit-item')).toHaveLength(4)
+    expect(screen.getByText('Unavailable does not mean invisible.', { exact: false })).toBeInTheDocument()
+    expect(screen.getByText('No fresh goals price is stored.')).toBeVisible()
+    expect(screen.getByText('Import timestamped totals, BTTS, or team-total prices.')).toBeVisible()
+    expect(screen.getByText('1 point-in-time fallback starter retained.')).toBeVisible()
     expect(selectEvent).toHaveBeenCalledWith(42)
     await waitFor(() => {
       expect(apiMocks.loadMatchdayEvent).toHaveBeenCalledWith(42, ['allwyn', 'novibet'])

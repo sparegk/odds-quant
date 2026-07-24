@@ -645,6 +645,17 @@ export interface SuggestionMarketStatus {
   reason: string
 }
 
+export interface AvailabilityAuditItem {
+  code: string
+  label: string
+  status: 'available' | 'partial' | 'blocked'
+  present_records: number
+  research_only: boolean
+  evidence: string[]
+  blockers: string[]
+  unlock_requirements: string[]
+}
+
 export interface StoredLineupMember {
   player_id: number
   player: string
@@ -712,6 +723,7 @@ export interface MatchdayEventDetail {
   selected_bookmakers: MatchdayBookmakerCode[]
   bookmaker_options: MatchdayBookmakerOption[]
   suggestion_market_statuses: SuggestionMarketStatus[]
+  availability_audit: AvailabilityAuditItem[]
   stored_lineups: StoredLineup[]
   lineup_projections: ExpectedLineupScenario[]
   lineup_research: ResearchGate
