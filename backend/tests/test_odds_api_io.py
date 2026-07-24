@@ -217,6 +217,37 @@ def test_collects_complete_timestamped_prematch_match_result_rows() -> None:
     assert requested_leagues == list(LEAGUE_COUNTRIES)
 
 
+def test_player_markets_remain_discovery_only_and_never_imply_closing() -> None:
+    near_kickoff = datetime(2026, 7, 25, 14, 59, 30, tzinfo=UTC)
+    match_result = {
+        "name": "ML",
+        "updatedAt": "2026-07-25T14:59:00Z",
+        "odds": [{"home": "2.10", "draw": "3.40", "away": "3.20"}],
+    }
+    player_shots = {
+        "name": "Player Shots",
+        "updatedAt": "2026-07-25T14:59:00Z",
+        "odds": [{"label": "Player A", "hdp": "1.5", "over": "1.90", "under": "1.90"}],
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/bookmakers/selected"):
+            return httpx.Response(200, json={"bookmakers": ["Pamestoixima", "Novibet"], "count": 2})
+        if request.url.path.endswith("/events"):
+            events = [_event()] if request.url.params["league"] == "england-premier-league" else []
+            return httpx.Response(200, json=events)
+        payload = {**_event(), "bookmakers": {"Novibet": [match_result, player_shots]}}
+        return httpx.Response(200, json=[payload])
+
+    with OddsApiIoClient(SECRET, transport=httpx.MockTransport(handler)) as client:
+        rows = client.collect_prematch_odds(observed_at=near_kickoff)
+
+    assert len(rows) == 3
+    assert {row.market_type for row in rows} == {MarketType.MATCH_RESULT}
+    assert all(row.is_closing is False for row in rows)
+    assert "Player A" not in {row.selection_name for row in rows}
+
+
 def test_provider_reuses_one_event_catalog_for_fixture_and_odds_collection() -> None:
     requested_paths: list[str] = []
 

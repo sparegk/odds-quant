@@ -56,6 +56,10 @@
   and rejects incomplete or ambiguous outcomes deterministically. A new sanitized 70-event
   probe advertised no additional target markets, so no alias expansion or validation weakening
   is justified. Continue polling and treat these as provider-side availability gaps.
+- A deterministic near-kickoff provider regression now supplies complete Novibet 1X2 beside a
+  labeled player-shots market. Collection emits only the three 1X2 outcomes, excludes the
+  player label, and keeps every row `is_closing=false`. Closing-line tests still require an
+  explicitly stored pre-kickoff closing snapshot and exclude post-kickoff candidates.
 
 ## Next action
 
