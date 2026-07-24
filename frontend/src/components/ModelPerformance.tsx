@@ -31,20 +31,43 @@ export function ModelPerformance({ dashboard, onChanged }: { dashboard: Dashboar
 
 function EvaluationSummary({ run }: { run: EvaluationRun | undefined }) {
   if (!run) return <ModelEmpty title="Performance is not established" detail="This trained version has no chronological held-out evaluation. It cannot unlock calibrated value signals." />
-  return <section><Heading eyebrow="Latest chronological replay" title="Proper-score performance" /><div className="grid grid-cols-2 border border-zinc-200 bg-white md:grid-cols-4"><Metric label="1X2 Brier" value={format(value(run, 'brier_score'))} /><Metric label="Log loss" value={score(run, 'log_loss')} /><Metric label="Calibration error" value={percent(value(run, 'expected_calibration_error'))} /><Metric label="Coverage" value={`${numberMetric(run, 'evaluated_events', 0)} / ${numberMetric(run, 'candidate_events', 0)}`} /></div><BenchmarkComparison run={run} /></section>
+  return <section><Heading eyebrow="Latest chronological replay" title="Proper-score performance" /><div className="grid grid-cols-2 border border-zinc-200 bg-white md:grid-cols-4"><Metric label="1X2 Brier" value={formatScoreInterval(run.metrics, 'brier_score')} /><Metric label="Log loss" value={formatScoreInterval(run.metrics, 'log_loss')} /><Metric label="Calibration error" value={percent(value(run, 'expected_calibration_error'))} /><Metric label="Coverage" value={`${numberMetric(run, 'evaluated_events', 0)} / ${numberMetric(run, 'candidate_events', 0)}`} /></div><BenchmarkComparison run={run} /></section>
 }
 
 function BenchmarkComparison({ run }: { run: EvaluationRun }) {
   const rows: Array<[string, Record<string, unknown> | undefined]> = [
     ['Poisson', run.metrics],
-    ['Dixon–Coles', run.benchmarks.dixon_coles],
+    ['Dixon-Coles', run.benchmarks.dixon_coles],
     ['Chronological Elo', run.benchmarks.elo],
     ['Uniform', run.benchmarks.uniform],
     ['Market consensus', run.benchmarks.market_consensus],
   ]
-  const poissonBrier = value(run, 'brier_score')
-  const poissonLogLoss = value(run, 'log_loss')
-  return <div className="mt-4 overflow-x-auto border border-zinc-200 bg-white"><table className="w-full min-w-[680px] text-left text-sm"><thead className="bg-zinc-50 text-xs uppercase text-zinc-500"><tr><th className="px-4 py-3">Benchmark</th><th className="px-4 py-3 text-right">Brier</th><th className="px-4 py-3 text-right">Log loss</th><th className="px-4 py-3 text-right">Calibration error</th><th className="px-4 py-3 text-right">Observations</th><th className="px-4 py-3">Poisson comparison</th></tr></thead><tbody>{rows.map(([label, metrics]) => { const brier = recordValue(metrics, 'brier_score'); const logLoss = recordValue(metrics, 'log_loss'); const beaten = label !== 'Poisson' && poissonBrier !== null && poissonLogLoss !== null && brier !== null && logLoss !== null && poissonBrier < brier && poissonLogLoss < logLoss; return <tr key={label} className="border-t border-zinc-100"><td className="px-4 py-3 font-semibold">{label}</td><td className="px-4 py-3 text-right font-mono">{format(brier)}</td><td className="px-4 py-3 text-right font-mono">{format(logLoss)}</td><td className="px-4 py-3 text-right font-mono">{percent(recordValue(metrics, 'expected_calibration_error'))}</td><td className="px-4 py-3 text-right font-mono">{formatCount(recordValue(metrics, 'observations'))}</td><td className="px-4 py-3"><span className={`rounded-[4px] border px-2 py-1 text-xs font-bold ${label === 'Poisson' ? 'border-sky-200 bg-sky-50 text-sky-800' : beaten ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>{label === 'Poisson' ? 'REFERENCE' : brier === null || logLoss === null ? 'MISSING' : beaten ? 'BEAT' : 'NOT BEATEN'}</span></td></tr> })}</tbody></table><p className="border-t border-zinc-100 px-4 py-3 text-xs text-zinc-500">Lower Brier score and log loss are better. Dixon–Coles and Elo are replayed only from results known before each forecast cutoff; market coverage may be partial.</p></div>
+  return <div className="mt-4 overflow-x-auto border border-zinc-200 bg-white">
+    <table className="w-full min-w-[1040px] text-left text-sm">
+      <thead className="bg-zinc-50 text-xs uppercase text-zinc-500"><tr>
+        <th className="px-4 py-3">Benchmark</th>
+        <th className="px-4 py-3 text-right">Brier (95% CI)</th>
+        <th className="px-4 py-3 text-right">Log loss (95% CI)</th>
+        <th className="px-4 py-3 text-right">Paired Brier difference</th>
+        <th className="px-4 py-3 text-right">Paired log-loss difference</th>
+        <th className="px-4 py-3 text-right">Observations</th>
+        <th className="px-4 py-3">Poisson evidence</th>
+      </tr></thead>
+      <tbody>{rows.map(([label, metrics]) => {
+        const evidence = comparisonEvidence(label, metrics)
+        return <tr key={label} className="border-t border-zinc-100">
+          <td className="px-4 py-3 font-semibold">{label}</td>
+          <td className="px-4 py-3 text-right font-mono text-xs">{formatScoreInterval(metrics, 'brier_score')}</td>
+          <td className="px-4 py-3 text-right font-mono text-xs">{formatScoreInterval(metrics, 'log_loss')}</td>
+          <td className="px-4 py-3 text-right font-mono text-xs">{formatPairedInterval(metrics, 'brier_score')}</td>
+          <td className="px-4 py-3 text-right font-mono text-xs">{formatPairedInterval(metrics, 'log_loss')}</td>
+          <td className="px-4 py-3 text-right font-mono">{formatCount(recordValue(metrics, 'observations'))}</td>
+          <td className="px-4 py-3"><span className={`rounded-[4px] border px-2 py-1 text-xs font-bold ${comparisonClass(evidence)}`}>{evidence}</span></td>
+        </tr>
+      })}</tbody>
+    </table>
+    <p className="border-t border-zinc-100 px-4 py-3 text-xs leading-5 text-zinc-500">Intervals use the stored chronological moving-block bootstrap. Paired differences are Poisson loss minus benchmark loss on identical events: a wholly negative 95% interval favors Poisson, a wholly positive interval favors the benchmark, and an interval crossing zero is inconclusive. Market coverage may be partial.</p>
+  </div>
 }
 
 function Calibration({ run }: { run: EvaluationRun | undefined }) {
@@ -57,6 +80,77 @@ function Status({ status }: { status: string }) { const ready = status === 'cali
 function Heading({ eyebrow, title }: { eyebrow: string; title: string }) { return <div className="mb-3"><p className="text-xs font-bold uppercase text-emerald-700">{eyebrow}</p><h3 className="mt-1 text-lg font-bold">{title}</h3></div> }
 function Metric({ label, value: text }: { label: string; value: string }) { return <div className="min-w-0 border-r border-b border-zinc-200 p-4"><p className="text-xs font-semibold uppercase text-zinc-500">{label}</p><p className="mt-2 truncate font-mono text-lg font-bold" title={text}>{text}</p></div> }
 function ModelEmpty({ title, detail }: { title: string; detail: string }) { return <div className="border-y border-zinc-200 bg-white px-6 py-10 text-center"><LineChart aria-hidden="true" className="mx-auto text-zinc-400" size={26} /><h3 className="mt-3 font-bold">{title}</h3><p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-zinc-500">{detail}</p></div> }
+type ComparisonEvidence = 'REFERENCE' | 'POISSON BETTER' | 'BENCHMARK BETTER' | 'INCONCLUSIVE' | 'NO INTERVAL'
+
+type NumericInterval = {
+  estimate: number
+  lower: number
+  upper: number
+  confidence_level: number
+  observations: number
+}
+
+function comparisonEvidence(label: string, metrics: Record<string, unknown> | undefined): ComparisonEvidence {
+  if (label === 'Poisson') return 'REFERENCE'
+  const brier = pairedInterval(metrics, 'brier_score')
+  const logLoss = pairedInterval(metrics, 'log_loss')
+  if (!brier || !logLoss) return 'NO INTERVAL'
+  if (brier.upper < 0 && logLoss.upper < 0) return 'POISSON BETTER'
+  if (brier.lower > 0 && logLoss.lower > 0) return 'BENCHMARK BETTER'
+  return 'INCONCLUSIVE'
+}
+
+function comparisonClass(evidence: ComparisonEvidence): string {
+  if (evidence === 'POISSON BETTER') return 'border-emerald-200 bg-emerald-50 text-emerald-800'
+  if (evidence === 'BENCHMARK BETTER') return 'border-rose-200 bg-rose-50 text-rose-800'
+  if (evidence === 'REFERENCE') return 'border-sky-200 bg-sky-50 text-sky-800'
+  return 'border-amber-200 bg-amber-50 text-amber-800'
+}
+
+function formatScoreInterval(metrics: Record<string, unknown> | undefined, key: string): string {
+  const interval = scoreInterval(metrics, key)
+  if (!interval) return format(recordValue(metrics, key))
+  return `${format(interval.estimate)} [${format(interval.lower)}, ${format(interval.upper)}]`
+}
+
+function formatPairedInterval(metrics: Record<string, unknown> | undefined, key: string): string {
+  const interval = pairedInterval(metrics, key)
+  if (!interval) return '—'
+  return `${formatSigned(interval.estimate)} [${formatSigned(interval.lower)}, ${formatSigned(interval.upper)}]`
+}
+
+function scoreInterval(metrics: Record<string, unknown> | undefined, key: string): NumericInterval | null {
+  return numericInterval(recordObject(metrics, 'score_intervals'), key)
+}
+
+function pairedInterval(metrics: Record<string, unknown> | undefined, key: string): NumericInterval | null {
+  return numericInterval(recordObject(metrics, 'paired_loss_difference'), key)
+}
+
+function numericInterval(container: Record<string, unknown> | null, key: string): NumericInterval | null {
+  const candidate = recordObject(container ?? undefined, key)
+  if (!candidate) return null
+  const estimate = finiteNumber(candidate.estimate)
+  const lower = finiteNumber(candidate.lower)
+  const upper = finiteNumber(candidate.upper)
+  const confidenceLevel = finiteNumber(candidate.confidence_level)
+  const observations = finiteNumber(candidate.observations)
+  if (estimate === null || lower === null || upper === null || confidenceLevel === null || observations === null) return null
+  return { estimate, lower, upper, confidence_level: confidenceLevel, observations }
+}
+
+function recordObject(values: Record<string, unknown> | undefined, key: string): Record<string, unknown> | null {
+  const item = values?.[key]
+  return typeof item === 'object' && item !== null && !Array.isArray(item) ? item as Record<string, unknown> : null
+}
+
+function finiteNumber(item: unknown): number | null {
+  return typeof item === 'number' && Number.isFinite(item) ? item : null
+}
+
+function formatSigned(item: number): string {
+  return `${item > 0 ? '+' : ''}${item.toFixed(4)}`
+}
 function value(run: EvaluationRun, key: string): number | null { const item = run.metrics[key]; return typeof item === 'number' && Number.isFinite(item) ? item : null }
 function numberMetric(run: EvaluationRun, key: string, fallback: number): number { return value(run, key) ?? fallback }
 function recordValue(values: Record<string, unknown> | undefined, key: string): number | null { const item = values?.[key]; return typeof item === 'number' && Number.isFinite(item) ? item : null }

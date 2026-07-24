@@ -122,6 +122,7 @@ Planned metrics include:
 - Bet count, hit rate, ROI, yield, and profit in units.
 - Average expected value and closing-line value.
 - Brier score, log loss, calibration error, and probability buckets.
+- Deterministic moving-block bootstrap intervals and paired proper-score differences on aligned chronological events.
 - Maximum drawdown and profit factor.
 - Results by league, bookmaker, market, odds range, and favorite/underdog.
 - Comparisons with market probability, favorite, Elo, and basic Poisson benchmarks.
@@ -220,7 +221,7 @@ The repository is in the **Phase 1 research-workflow milestone**. It includes:
 - Per-tab workflow-readiness gates, automatic dashboard synchronization after writes, preserved event context, and dismissible success notifications.
 - Chromium end-to-end tests covering odds import through signal generation, arbitrage evidence through calculation, and signal backtest through bankroll simulation.
 
-The backend now supports expanding-window chronological evaluation with immutable per-match training fingerprints, 1X2 Brier score, log loss, one-vs-rest calibration buckets, coverage accounting, chronological Elo and Dixon–Coles comparisons, uniform and optional market benchmarks, and an explicit promotion policy.
+The backend now supports expanding-window chronological evaluation with immutable per-match training fingerprints, 1X2 Brier score, log loss, one-vs-rest calibration buckets, coverage accounting, chronological Elo and Dixon–Coles comparisons, uniform and optional market benchmarks, and deterministic 95% moving-block bootstrap intervals. Benchmark comparisons use paired Poisson-minus-benchmark losses on identical events; model promotion requires the upper Brier and log-loss differences against uniform to remain below zero.
 
 Models remain `unvalidated` until a non-demo evaluation passes the fixed evidence policy. The included synthetic history can exercise evaluation code but cannot validate a model. The value-signal service fails closed unless a qualifying calibration run predates the prediction cutoff. The arbitrage service independently fails closed unless prices, tax rules, and stake constraints are current and non-demo, every market outcome is present, and rounded worst-case net profit is positive.
 
