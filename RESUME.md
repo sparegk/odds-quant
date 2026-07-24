@@ -67,6 +67,11 @@
   window, and 693 permitted snapshots. Champions League qualification now covers both required
   bookmakers; Premier League still lacks Novibet, and every competition still lacks explicit
   closing snapshots.
+- An official provider-documentation audit found that the historical-odds endpoint labels its
+  finished-event response as closing but documents no per-price source timestamp. The movements
+  endpoint supplies timestamps without an explicit closing designation. Joining them would
+  infer closing status, so closing ingestion remains blocked pending one response containing
+  both the designation and an original timestamp strictly before kickoff.
 
 ## Next action
 

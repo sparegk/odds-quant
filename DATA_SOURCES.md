@@ -57,6 +57,24 @@ all of the following are independently validated:
 Do not infer player identity from display names, treat a bookmaker label as a validated
 target, or reuse team-market settlement for a player prop.
 
+## Closing Evidence Audit
+
+### Odds-API.io documentation review: 2026-07-24
+
+The provider's official
+[`/historical/odds`](https://docs.odds-api.io/api-reference/historical/get-historical-odds)
+documentation describes its finished-event response as closing odds, but the documented
+response schema does not attach a source timestamp to each returned bookmaker price. The
+official [`/odds/movements`](https://docs.odds-api.io/api-reference/odds/get-odds-movements)
+response includes timestamps for opening, latest, and movement records, but it does not
+explicitly identify any timestamped movement as the closing record.
+
+OddsQuant must not join a finished-event price to a movement by value or select the final
+pre-kickoff movement and infer that it is the provider's closing price. The current adapter
+therefore keeps these records non-closing. Onboarding provider closing evidence remains
+blocked until one response supplies both an explicit closing designation and its original
+source timestamp strictly before kickoff.
+
 ### Live discovery receipt: 2026-07-23
 
 The authenticated football league catalog exposed these UEFA competition slugs:
