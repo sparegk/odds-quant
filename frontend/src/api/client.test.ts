@@ -106,7 +106,9 @@ describe('API client', () => {
     )
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      expect.stringContaining('/api/v1/matchdays/events/42'),
+      expect.stringContaining(
+        '/api/v1/matchdays/events/42?bookmakers=allwyn&bookmakers=novibet',
+      ),
       expect.any(Object),
     )
   })

@@ -603,6 +603,48 @@ export interface ResearchGate {
   reasons: string[]
 }
 
+export type MatchdayBookmakerCode = 'allwyn' | 'novibet'
+
+export interface MatchSuggestion {
+  rank: number
+  source_kind: 'single' | 'builder'
+  source_id: number
+  bookmaker_code: MatchdayBookmakerCode
+  bookmaker: string
+  market_type: string
+  selection_code: string
+  selection_name: string
+  line: number | null
+  legs: BetBuilderLeg[]
+  offered_odds: number
+  model_probability: number
+  lower_probability: number
+  market_fair_probability: number | null
+  expected_value: number
+  lower_expected_value: number
+  confidence: number | null
+  conservative_score: number
+  price_observed_at: string
+  generated_at: string
+  reasons: string[]
+  risks: string[]
+}
+
+export interface MatchdayBookmakerOption {
+  code: MatchdayBookmakerCode
+  name: string
+  selected: boolean
+  has_current_prices: boolean
+  offered_market_types: string[]
+}
+
+export interface SuggestionMarketStatus {
+  code: string
+  label: string
+  status: 'available' | 'price_only' | 'blocked'
+  reason: string
+}
+
 export interface MatchdayEventDetail {
   event: EventSummary
   competition_group: string
@@ -613,6 +655,10 @@ export interface MatchdayEventDetail {
   latest_prediction: ModelOutput | null
   signals: ValueSignal[]
   builder_quotes: BetBuilderQuote[]
+  suggestions: MatchSuggestion[]
+  selected_bookmakers: MatchdayBookmakerCode[]
+  bookmaker_options: MatchdayBookmakerOption[]
+  suggestion_market_statuses: SuggestionMarketStatus[]
   player_research: ResearchGate
   builder_value: ResearchGate
   bookmaker_guidance: string

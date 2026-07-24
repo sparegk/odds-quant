@@ -17,14 +17,18 @@ import { formatDateTime, humanizeCode } from '../lib/format'
 import type {
   BetBuilderQuote,
   Matchday,
+  MatchdayBookmakerCode,
   MatchdayCompetition,
   MatchdayEvent,
   MatchdayEventDetail,
+  MatchSuggestion,
   MarketComparison,
   ResearchGate,
   SnapshotComparison,
   TeamForm,
 } from '../types'
+
+type BookmakerMode = 'both' | MatchdayBookmakerCode
 
 const competitionFilters = [
   { key: 'all', label: 'All tracked' },
@@ -81,6 +85,11 @@ export function MatchdayResearch({ onSelectEvent }: { onSelectEvent: (eventId: n
   const [detailLoading, setDetailLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [detailError, setDetailError] = useState<string | null>(null)
+  const [bookmakerMode, setBookmakerMode] = useState<BookmakerMode>('both')
+  const selectedBookmakers = useMemo<MatchdayBookmakerCode[]>(
+    () => (bookmakerMode === 'both' ? ['allwyn', 'novibet'] : [bookmakerMode]),
+    [bookmakerMode],
+  )
 
   useEffect(() => {
     let active = true
@@ -113,7 +122,7 @@ export function MatchdayResearch({ onSelectEvent }: { onSelectEvent: (eventId: n
       return
     }
     let active = true
-    void loadMatchdayEvent(selectedEventId)
+    void loadMatchdayEvent(selectedEventId, selectedBookmakers)
       .then((loaded) => {
         if (active) setDetail(loaded)
       })
@@ -128,7 +137,7 @@ export function MatchdayResearch({ onSelectEvent }: { onSelectEvent: (eventId: n
     return () => {
       active = false
     }
-  }, [selectedEventId])
+  }, [selectedBookmakers, selectedEventId])
 
   const filteredCompetitions = useMemo(
     () => schedule?.competitions.filter((competition) => filter === 'all' || competition.group_key === filter) ?? [],
@@ -153,6 +162,16 @@ export function MatchdayResearch({ onSelectEvent }: { onSelectEvent: (eventId: n
     setDetail(null)
     setSelectedEventId(eventId)
     onSelectEvent(eventId)
+  }
+
+  const chooseBookmakerMode = (mode: BookmakerMode) => {
+    if (mode === bookmakerMode) return
+    setBookmakerMode(mode)
+    if (selectedEventId !== null) {
+      setDetailLoading(true)
+      setDetailError(null)
+      setDetail(null)
+    }
   }
 
   return (
@@ -195,6 +214,7 @@ export function MatchdayResearch({ onSelectEvent }: { onSelectEvent: (eventId: n
             </button>
           </div>
         </div>
+        <BookmakerSettings mode={bookmakerMode} onChange={chooseBookmakerMode} />
         <div className="flex gap-2 overflow-x-auto p-3" aria-label="Competition filters">
           {competitionFilters.map((item) => (
             <button
@@ -247,6 +267,45 @@ export function MatchdayResearch({ onSelectEvent }: { onSelectEvent: (eventId: n
           </p>
         </>
       ) : null}
+    </div>
+  )
+}
+
+function BookmakerSettings({
+  mode,
+  onChange,
+}: {
+  mode: BookmakerMode
+  onChange: (mode: BookmakerMode) => void
+}) {
+  const choices: { value: BookmakerMode; label: string }[] = [
+    { value: 'both', label: 'Both apps' },
+    { value: 'allwyn', label: 'Allwyn' },
+    { value: 'novibet', label: 'Novibet' },
+  ]
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 bg-zinc-50 px-5 py-3">
+      <div>
+        <p className="text-xs font-bold uppercase text-zinc-700">Suggestion platforms</p>
+        <p className="mt-0.5 text-xs text-zinc-500">Only exact stored prices from selected apps can qualify.</p>
+      </div>
+      <div aria-label="Suggestion platforms" className="flex" role="group">
+        {choices.map((choice) => (
+          <button
+            aria-pressed={mode === choice.value}
+            className={`border px-3 py-2 text-xs font-bold first:rounded-l last:rounded-r ${
+              mode === choice.value
+                ? 'border-emerald-700 bg-emerald-700 text-white'
+                : 'border-zinc-300 bg-white text-zinc-600 hover:bg-zinc-100'
+            }`}
+            key={choice.value}
+            onClick={() => onChange(choice.value)}
+            type="button"
+          >
+            {choice.label}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
@@ -326,23 +385,13 @@ function MatchDetail({ detail }: { detail: MatchdayEventDetail }) {
       </header>
 
       <div className="space-y-7 p-5">
+        <BookmakerAvailability detail={detail} />
         <section>
-          <DetailHeading eyebrow="Probability versus price" title="Research candidates" />
-          {detail.signals.length ? (
+          <DetailHeading eyebrow="Probability versus exact price" title="Ranked match suggestions" />
+          {detail.suggestions.length ? (
             <div className="space-y-3">
-              {detail.signals.map((signal) => (
-                <div className="border border-emerald-200 bg-emerald-50 p-4" key={signal.id}>
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div><p className="text-xs font-bold uppercase text-emerald-700">Evidence-backed {humanizeCode(signal.signal_type)}</p><p className="mt-1 font-bold">{signal.selection_name}</p></div>
-                    <p className="font-mono font-bold">{signal.bookmaker} @ {signal.offered_odds.toFixed(2)}</p>
-                  </div>
-                  <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-                    <EvidenceMetric label="Model" value={percentage(signal.model_probability)} />
-                    <EvidenceMetric label="Market" value={percentage(signal.market_fair_probability)} />
-                    <EvidenceMetric label="Lower EV" value={signedPercentage(signal.lower_expected_value)} />
-                  </div>
-                  <p className="mt-3 text-xs leading-5 text-emerald-950">{signal.reasons[0]}</p>
-                </div>
+              {detail.suggestions.map((suggestion) => (
+                <SuggestionCard key={`${suggestion.source_kind}-${suggestion.source_id}`} suggestion={suggestion} />
               ))}
             </div>
           ) : likely.length ? (
@@ -365,6 +414,8 @@ function MatchDetail({ detail }: { detail: MatchdayEventDetail }) {
           )}
           <p className="mt-3 text-xs leading-5 text-zinc-500">{detail.evidence_note}</p>
         </section>
+
+        <MarketCoverage detail={detail} />
 
         <section>
           <DetailHeading eyebrow="Line shopping" title="Best bookmaker by selection" />
@@ -396,6 +447,102 @@ function MatchDetail({ detail }: { detail: MatchdayEventDetail }) {
         </section>
       </div>
     </article>
+  )
+}
+
+function BookmakerAvailability({ detail }: { detail: MatchdayEventDetail }) {
+  return (
+    <section aria-label="Selected bookmaker coverage" className="border border-zinc-200 bg-zinc-50 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold uppercase text-zinc-600">Active suggestion filter</p>
+          <p className="mt-1 text-sm font-semibold">
+            {detail.selected_bookmakers.map((code) => code === 'allwyn' ? 'Allwyn' : 'Novibet').join(' + ')}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {detail.bookmaker_options.map((option) => (
+            <span
+              className={`border px-2 py-1 text-xs font-semibold ${
+                option.selected && option.has_current_prices
+                  ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                  : option.selected
+                    ? 'border-amber-300 bg-amber-50 text-amber-800'
+                    : 'border-zinc-200 bg-white text-zinc-400'
+              }`}
+              key={option.code}
+            >
+              {option.name}: {option.has_current_prices ? `${option.offered_market_types.length} priced markets` : 'no fresh prices'}
+            </span>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function SuggestionCard({ suggestion }: { suggestion: MatchSuggestion }) {
+  return (
+    <div className="border border-emerald-200 bg-emerald-50 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold uppercase text-emerald-700">
+            #{suggestion.rank} {suggestion.source_kind === 'builder' ? 'Bet builder' : humanizeCode(suggestion.market_type)}
+          </p>
+          <p className="mt-1 font-bold">
+            {suggestion.selection_name}
+            {suggestion.line === null ? '' : ` ${suggestion.line}`}
+          </p>
+        </div>
+        <p className="font-mono font-bold">{suggestion.bookmaker} @ {suggestion.offered_odds.toFixed(2)}</p>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+        <EvidenceMetric label="Model chance" value={percentage(suggestion.model_probability)} />
+        <EvidenceMetric label="Conservative chance" value={percentage(suggestion.lower_probability)} />
+        <EvidenceMetric label="Lower EV" value={signedPercentage(suggestion.lower_expected_value)} />
+        <EvidenceMetric
+          label="Confidence"
+          value={suggestion.confidence === null ? 'Builder interval' : percentage(suggestion.confidence)}
+        />
+      </div>
+      {suggestion.reasons[0] ? <p className="mt-3 text-xs leading-5 text-emerald-950">{suggestion.reasons[0]}</p> : null}
+      {suggestion.risks[0] ? <p className="mt-2 flex gap-2 text-xs leading-5 text-amber-900"><ShieldAlert aria-hidden="true" className="mt-0.5 shrink-0" size={14} />{suggestion.risks[0]}</p> : null}
+      <p className="mt-2 text-[11px] text-zinc-500">Exact price observed {formatDateTime(suggestion.price_observed_at)}. Recheck it in the app before placement; no bet is guaranteed.</p>
+    </div>
+  )
+}
+
+function MarketCoverage({ detail }: { detail: MatchdayEventDetail }) {
+  return (
+    <section>
+      <DetailHeading eyebrow="App availability and validation" title="Markets you asked for" />
+      <div className="grid gap-2 sm:grid-cols-2">
+        {detail.suggestion_market_statuses.map((market) => {
+          const available = market.status === 'available'
+          const priceOnly = market.status === 'price_only'
+          return (
+            <div
+              className={`border p-3 ${
+                available
+                  ? 'border-emerald-200 bg-emerald-50'
+                  : priceOnly
+                    ? 'border-sky-200 bg-sky-50'
+                    : 'border-zinc-200 bg-zinc-50'
+              }`}
+              key={market.code}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-bold">{market.label}</p>
+                <span className={`text-[10px] font-bold uppercase ${available ? 'text-emerald-700' : priceOnly ? 'text-sky-700' : 'text-zinc-500'}`}>
+                  {available ? 'Suggestion' : priceOnly ? 'Price only' : 'Unavailable'}
+                </span>
+              </div>
+              <p className="mt-1 text-xs leading-5 text-zinc-600">{market.reason}</p>
+            </div>
+          )
+        })}
+      </div>
+    </section>
   )
 }
 

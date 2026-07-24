@@ -17,6 +17,7 @@ import type {
   ImportUploadResult,
   MarketComparison,
   Matchday,
+  MatchdayBookmakerCode,
   MatchdayEventDetail,
   ModelVersion,
   ModelOutput,
@@ -242,8 +243,15 @@ export function loadMatchday(date: string, timezone: string): Promise<Matchday> 
   return request<Matchday>(`/api/v1/matchdays?${query.toString()}`)
 }
 
-export function loadMatchdayEvent(eventId: number): Promise<MatchdayEventDetail> {
-  return request<MatchdayEventDetail>(`/api/v1/matchdays/events/${eventId}`)
+export function loadMatchdayEvent(
+  eventId: number,
+  bookmakers: MatchdayBookmakerCode[] = ['allwyn', 'novibet'],
+): Promise<MatchdayEventDetail> {
+  const query = new URLSearchParams()
+  bookmakers.forEach((bookmaker) => query.append('bookmakers', bookmaker))
+  return request<MatchdayEventDetail>(
+    `/api/v1/matchdays/events/${eventId}?${query.toString()}`,
+  )
 }
 
 export function createBuilderQuote(payload: CreateBetBuilderQuote): Promise<BetBuilderQuote> {
