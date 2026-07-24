@@ -61,11 +61,12 @@
   player label, and keeps every row `is_closing=false`. Closing-line tests still require an
   explicitly stored pre-kickoff closing snapshot and exclude post-kickoff candidates.
 - On 2026-07-24, both target bookmakers remained configured and a fresh sanitized 70-event
-  probe advertised no player or additional team markets. Scheduler job `24` observed 70
-  fixtures and atomically imported 105 prices across 35 snapshots. Monitoring then reported
-  10 consecutive completed jobs, no failures in the recent window, and 623 permitted
-  snapshots. Champions League qualification now covers both required bookmakers; Premier
-  League still lacks Novibet, and every competition still lacks explicit closing snapshots.
+  probe advertised no player or additional team markets. Normal scheduler jobs `24` through
+  `26` each observed 70 fixtures and atomically imported 105 prices across 35 snapshots.
+  Monitoring after job `26` reported 10 consecutive completed jobs, no failures in the recent
+  window, and 693 permitted snapshots. Champions League qualification now covers both required
+  bookmakers; Premier League still lacks Novibet, and every competition still lacks explicit
+  closing snapshots.
 
 ## Next action
 
