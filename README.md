@@ -334,6 +334,12 @@ For machine-actionable provider health, run `python -m app.cli monitor-collectio
 bookmaker disappearing between consecutive completed batches of the same active competition.
 The JSON contains sanitized counts and alert codes only.
 
+Operational validation on 2026-07-24 observed scheduled metric-bearing jobs `30` and `31`
+complete without collection alerts or recent failures. Permitted snapshot coverage increased
+from 833 to 868 across the two observations. This validates the consecutive-batch monitoring
+path only; Premier League coverage was still missing Novibet, no permitted closing snapshots
+were present, and no competition was evaluation-ready.
+
 The bookmaker target set is Allwyn's ΠΑΜΕ ΣΤΟΙΧΗΜΑ/Pamestoixima channel and Novibet. Configure a locally accepted Odds-API.io subscription with `ODDSQUANT_ODDS_API_IO_KEY`, then verify that the account exposes both without printing the key:
 
 ```bash
