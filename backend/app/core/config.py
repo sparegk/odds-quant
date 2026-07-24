@@ -24,10 +24,13 @@ class Settings(BaseSettings):
     provider_near_kickoff_window_seconds: int = Field(default=21600, ge=60)
     odds_api_io_key: str | None = None
     odds_api_io_base_url: str = "https://api.odds-api.io/v3"
+    api_football_key: str | None = None
+    api_football_base_url: str = "https://v3.football.api-sports.io"
+    api_football_daily_request_reserve: int = Field(default=10, ge=1, le=99)
     matchday_timezone: str = "Europe/Athens"
     matchday_form_matches: int = Field(default=5, ge=1, le=20)
 
-    @field_validator("admin_api_key", "odds_api_io_key", mode="before")
+    @field_validator("admin_api_key", "odds_api_io_key", "api_football_key", mode="before")
     @classmethod
     def empty_admin_key_is_unset(cls, value: object) -> object:
         return None if value == "" else value
