@@ -143,7 +143,7 @@ const detail: MatchdayEventDetail = {
           is_demo: false,
           source_label: 'LICENSED API',
           freshness_seconds: 300,
-          is_stale: false,
+          is_stale: true,
           overround: 1.05,
           bookmaker_margin: 0.05,
           prices: [
@@ -287,6 +287,16 @@ const detail: MatchdayEventDetail = {
       blockers: ['Player targets and settlement are not independently validated.'],
       unlock_requirements: ['Pass independent target and settlement validation.'],
     },
+    {
+      code: 'player_evidence',
+      label: 'Player performance evidence',
+      status: 'blocked',
+      present_records: 0,
+      research_only: true,
+      evidence: ['0 timestamp-valid player performance records stored.'],
+      blockers: ['Position-adjusted player history is unavailable.'],
+      unlock_requirements: ['Import timestamp-valid, position-appropriate player history.'],
+    },
   ],
   stored_lineups: [],
   lineup_projections: [
@@ -384,11 +394,14 @@ describe('MatchdayResearch', () => {
     expect(screen.getByText('Player markets remain research-only')).toBeInTheDocument()
     expect(screen.getByText('No verified builder value')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Availability evidence explorer' })).toBeInTheDocument()
-    expect(screen.getAllByTestId('availability-audit-item')).toHaveLength(4)
+    expect(screen.getAllByTestId('availability-audit-item')).toHaveLength(5)
     expect(screen.getByText('Unavailable does not mean invisible.', { exact: false })).toBeInTheDocument()
     expect(screen.getByText('No fresh goals price is stored.')).toBeVisible()
-    expect(screen.getByText('Import timestamped totals, BTTS, or team-total prices.')).toBeVisible()
+    expect(screen.getAllByText('Import timestamped totals, BTTS, or team-total prices.')).toHaveLength(2)
     expect(screen.getByText('1 point-in-time fallback starter retained.')).toBeVisible()
+    expect(screen.getByText('Research-only prices:')).toBeVisible()
+    expect(screen.getAllByText('Evidence kept:', { exact: false }).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Evidence still visible:', { exact: false }).length).toBeGreaterThan(0)
     expect(selectEvent).toHaveBeenCalledWith(42)
     await waitFor(() => {
       expect(apiMocks.loadMatchdayEvent).toHaveBeenCalledWith(42, ['allwyn', 'novibet'])

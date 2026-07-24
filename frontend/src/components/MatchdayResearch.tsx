@@ -16,6 +16,7 @@ import { loadMatchday, loadMatchdayEvent } from '../api/client'
 import { formatDateTime, humanizeCode } from '../lib/format'
 import { nextGoodMatchdayDate } from '../lib/matchdays'
 import type {
+  AvailabilityAuditItem,
   BetBuilderQuote,
   ExpectedLineupScenario,
   EventSummary,
@@ -409,6 +410,8 @@ function MatchDetail({ detail }: { detail: MatchdayEventDetail }) {
   const likely = [...(detail.latest_prediction?.predictions ?? [])].sort((left, right) => right.probability - left.probability)
   const bestPrices = detail.markets.flatMap((market) => market.best_prices.map((price) => ({ market, price })))
   const builderQuotes = [...detail.builder_quotes].sort((left, right) => (right.lower_expected_value ?? -1) - (left.lower_expected_value ?? -1))
+  const storedSnapshots = detail.markets.flatMap((market) => market.snapshots)
+  const onlyStalePrices = storedSnapshots.length > 0 && storedSnapshots.every((snapshot) => snapshot.is_stale)
 
   return (
     <article className="border border-zinc-200 bg-white">
@@ -457,6 +460,11 @@ function MatchDetail({ detail }: { detail: MatchdayEventDetail }) {
 
         <section>
           <DetailHeading eyebrow="Line shopping" title="Best bookmaker by selection" />
+          {onlyStalePrices ? (
+            <div className="mb-3 border-l-4 border-amber-400 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950" role="status">
+              <strong>Research-only prices:</strong> every stored snapshot is stale. The odds remain visible so you can inspect the prior market, but they cannot qualify as a current suggestion.
+            </div>
+          ) : null}
           {bestPrices.length ? (
             <div className="overflow-x-auto border-y border-zinc-200">
               <table className="w-full min-w-[580px] text-left text-sm">
@@ -479,9 +487,17 @@ function MatchDetail({ detail }: { detail: MatchdayEventDetail }) {
         <LineupResearch detail={detail} />
 
         <section className="grid gap-4 lg:grid-cols-2">
-          <ResearchGateCard gate={detail.player_research} icon="players" />
+          <ResearchGateCard
+            audit={detail.availability_audit.find((item) => item.code === 'player_evidence')}
+            gate={detail.player_research}
+            icon="players"
+          />
           <div>
-            <ResearchGateCard gate={detail.builder_value} icon="builder" />
+            <ResearchGateCard
+              audit={detail.availability_audit.find((item) => item.code === 'builder')}
+              gate={detail.builder_value}
+              icon="builder"
+            />
             {builderQuotes.length ? <BuilderQuotes quotes={builderQuotes} /> : null}
           </div>
         </section>
@@ -668,6 +684,7 @@ function MarketCoverage({ detail }: { detail: MatchdayEventDetail }) {
         {detail.suggestion_market_statuses.map((market) => {
           const available = market.status === 'available'
           const priceOnly = market.status === 'price_only'
+          const audit = detail.availability_audit.find((item) => item.code === market.code)
           return (
             <div
               className={`border p-3 ${
@@ -686,6 +703,12 @@ function MarketCoverage({ detail }: { detail: MatchdayEventDetail }) {
                 </span>
               </div>
               <p className="mt-1 text-xs leading-5 text-zinc-600">{market.reason}</p>
+              {!available && audit ? (
+                <div className="mt-2 border-t border-black/10 pt-2 text-xs leading-5 text-zinc-700">
+                  <p><strong>Evidence kept:</strong> {audit.evidence[0] ?? 'No stored evidence.'}</p>
+                  <p className="mt-1"><strong>Unlock:</strong> {audit.unlock_requirements[0] ?? 'Additional validated evidence is required.'}</p>
+                </div>
+              ) : null}
             </div>
           )
         })}
@@ -766,7 +789,11 @@ function LineupResearch({ detail }: { detail: MatchdayEventDetail }) {
   return (
     <section>
       <DetailHeading eyebrow="Availability-aware scenarios" title="Expected versus confirmed lineups" />
-      <ResearchGateCard gate={detail.lineup_research} icon="players" />
+      <ResearchGateCard
+        audit={detail.availability_audit.find((item) => item.code === 'lineups')}
+        gate={detail.lineup_research}
+        icon="players"
+      />
       {detail.stored_lineups.length ? (
         <div className="mt-3 grid gap-3 lg:grid-cols-2">
           {detail.stored_lineups.map((lineup) => <StoredLineupCard key={lineup.id} lineup={lineup} />)}
@@ -848,13 +875,27 @@ function ProjectedLineupCard({ scenario }: { scenario: ExpectedLineupScenario })
   )
 }
 
-function ResearchGateCard({ gate, icon }: { gate: ResearchGate; icon: 'players' | 'builder' }) {
+function ResearchGateCard({
+  gate,
+  icon,
+  audit,
+}: {
+  gate: ResearchGate
+  icon: 'players' | 'builder'
+  audit?: AvailabilityAuditItem
+}) {
   const Icon = icon === 'players' ? Users : Sparkles
   const ready = gate.status === 'available'
   return (
     <div className={`h-full border p-4 ${ready ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
       <div className="flex items-start gap-3"><Icon aria-hidden="true" className={ready ? 'text-emerald-700' : 'text-amber-700'} size={20} /><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-bold">{gate.title}</h3><span className={`border px-1.5 py-0.5 text-[10px] font-bold uppercase ${ready ? 'border-emerald-300 text-emerald-800' : 'border-amber-300 text-amber-800'}`}>{gate.status}</span></div><p className="mt-1 text-xs text-zinc-600">{gate.available_records} relevant stored records</p></div></div>
       <ul className="mt-3 space-y-2 text-xs leading-5 text-zinc-700">{gate.reasons.map((reason) => <li className="flex gap-2" key={reason}>{ready ? <CircleCheck aria-hidden="true" className="mt-0.5 shrink-0 text-emerald-700" size={14} /> : <ShieldAlert aria-hidden="true" className="mt-0.5 shrink-0 text-amber-700" size={14} />}{reason}</li>)}</ul>
+      {!ready && audit ? (
+        <div className="mt-3 border-t border-amber-200 pt-3 text-xs leading-5 text-zinc-700">
+          <p><strong>Evidence still visible:</strong> {audit.evidence.join(' ')}</p>
+          <p className="mt-1"><strong>Unlock:</strong> {audit.unlock_requirements.join(' ')}</p>
+        </div>
+      ) : null}
     </div>
   )
 }
