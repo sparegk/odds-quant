@@ -8,11 +8,29 @@ import pytest
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Event, PlayerAppearance, PlayerStatistic, RawIngestion
+from app.db.models import (
+    AvailabilityReport,
+    Event,
+    LineupMember,
+    LineupSnapshot,
+    PlayerAppearance,
+    PlayerStatistic,
+    RawIngestion,
+)
 from app.db.session import Base
-from app.providers.api_football import ApiFootballPlayerPerformance, ApiFootballPlayerSnapshot
+from app.providers.api_football import (
+    ApiFootballInjury,
+    ApiFootballInjurySnapshot,
+    ApiFootballLineupMember,
+    ApiFootballLineupSnapshot,
+    ApiFootballPlayerPerformance,
+    ApiFootballPlayerSnapshot,
+    ApiFootballTeamLineup,
+)
 from app.services.api_football_intelligence import (
     ApiFootballIntelligenceError,
+    build_injury_intelligence_request,
+    build_lineup_intelligence_request,
     build_player_intelligence_request,
 )
 from app.services.demo_seed import seed_demo_data
@@ -85,5 +103,88 @@ def test_player_snapshot_requires_explicit_team_identity_mapping(session: Sessio
         build_player_intelligence_request(
             _snapshot(51),
             event_id=event.id,
+            local_team_ids={},
+        )
+
+
+def _lineup_snapshot() -> ApiFootballLineupSnapshot:
+    return ApiFootballLineupSnapshot(
+        fixture_id=9001,
+        published_at=NOW - timedelta(seconds=5),
+        observed_at=NOW,
+        teams=[
+            ApiFootballTeamLineup(
+                team_id=51,
+                team_name="Northbridge",
+                formation="4-3-3",
+                coach_id=81,
+                coach_name="Research Coach",
+                members=[
+                    ApiFootballLineupMember(
+                        player_id=700 + number,
+                        player_name=f"Player {number}",
+                        position="GK" if number == 1 else "DF",
+                        starter=True,
+                    )
+                    for number in range(1, 12)
+                ],
+            )
+        ],
+    )
+
+
+def test_confirmed_lineup_and_injury_are_persisted_as_distinct_evidence(
+    session: Session,
+) -> None:
+    event = session.scalar(select(Event).order_by(Event.id))
+    assert event is not None
+    team_ids = {51: event.home_team_id}
+    lineup_request = build_lineup_intelligence_request(
+        _lineup_snapshot(), event_id=event.id, local_team_ids=team_ids
+    )
+    import_intelligence_bundle(session, lineup_request, now=NOW)
+    injury_request = build_injury_intelligence_request(
+        ApiFootballInjurySnapshot(
+            fixture_id=9001,
+            published_at=NOW - timedelta(seconds=4),
+            observed_at=NOW,
+            injuries=[
+                ApiFootballInjury(
+                    player_id=701,
+                    player_name="Player 1",
+                    team_id=51,
+                    team_name="Northbridge",
+                    provider_status="Questionable",
+                    reason="Knock",
+                )
+            ],
+        ),
+        event_id=event.id,
+        local_team_ids=team_ids,
+    )
+    import_intelligence_bundle(session, injury_request, now=NOW)
+
+    lineup = session.scalar(select(LineupSnapshot))
+    availability = session.scalar(select(AvailabilityReport))
+    assert lineup is not None
+    assert availability is not None
+    assert lineup.lineup_type == "confirmed"
+    assert lineup.confidence == 1
+    assert session.scalar(select(func.count()).select_from(LineupMember)) == 11
+    assert availability.status == "doubtful"
+    assert availability.confidence == 0.65
+    assert availability.reason == "Questionable: Knock"
+
+
+def test_empty_lineup_is_not_mislabeled_as_confirmed() -> None:
+    with pytest.raises(ApiFootballIntelligenceError, match="not published"):
+        build_lineup_intelligence_request(
+            ApiFootballLineupSnapshot(
+                fixture_id=9001,
+                published_at=NOW,
+                observed_at=NOW,
+                teams=[],
+            ),
+            event_id=1,
             local_team_ids={},
         )

@@ -231,3 +231,104 @@ def test_fixture_player_snapshot_rejects_missing_publication_timestamp() -> None
     with ApiFootballClient(SECRET, transport=httpx.MockTransport(handler)) as client:
         with pytest.raises(ApiFootballError, match="omitted the publication timestamp"):
             client.fixture_player_snapshot(9001)
+
+
+def test_fixture_lineup_snapshot_accepts_only_complete_confirmed_lineups() -> None:
+    observed_at = datetime(2026, 7, 25, 10, 0, 5, tzinfo=UTC)
+    starters = [
+        {
+            "player": {
+                "id": 700 + number,
+                "name": f"Player {number}",
+                "pos": "G" if number == 1 else "D",
+            }
+        }
+        for number in range(1, 12)
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path.endswith("/fixtures/lineups")
+        return httpx.Response(
+            200,
+            headers={"date": "Sat, 25 Jul 2026 10:00:00 GMT"},
+            json=_envelope(
+                [
+                    {
+                        "team": {"id": 51, "name": "Northbridge"},
+                        "formation": "4-3-3",
+                        "coach": {"id": 81, "name": "Research Coach"},
+                        "startXI": starters,
+                        "substitutes": [{"player": {"id": 799, "name": "Reserve", "pos": "M"}}],
+                    }
+                ]
+            ),
+        )
+
+    with ApiFootballClient(
+        SECRET,
+        transport=httpx.MockTransport(handler),
+        clock=lambda: observed_at,
+    ) as client:
+        snapshot = client.fixture_lineup_snapshot(9001)
+
+    assert snapshot.published_at == datetime(2026, 7, 25, 10, 0, tzinfo=UTC)
+    assert snapshot.teams[0].coach_id == 81
+    assert sum(member.starter for member in snapshot.teams[0].members) == 11
+    assert snapshot.teams[0].members[-1].position == "MF"
+
+
+def test_fixture_lineup_snapshot_rejects_incomplete_confirmation() -> None:
+    def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"date": "Sat, 25 Jul 2026 10:00:00 GMT"},
+            json=_envelope(
+                [
+                    {
+                        "team": {"id": 51, "name": "Northbridge"},
+                        "startXI": [],
+                    }
+                ]
+            ),
+        )
+
+    with ApiFootballClient(
+        SECRET,
+        transport=httpx.MockTransport(handler),
+        clock=lambda: datetime(2026, 7, 25, 10, 0, 5, tzinfo=UTC),
+    ) as client:
+        with pytest.raises(ApiFootballError, match="must contain 11 starters"):
+            client.fixture_lineup_snapshot(9001)
+
+
+def test_fixture_injury_snapshot_retains_provider_status_and_reason() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path.endswith("/injuries")
+        return httpx.Response(
+            200,
+            headers={"date": "Sat, 25 Jul 2026 10:00:00 GMT"},
+            json=_envelope(
+                [
+                    {
+                        "player": {
+                            "id": 701,
+                            "name": "Research Keeper",
+                            "type": "Questionable",
+                            "reason": "Knock",
+                        },
+                        "team": {"id": 51, "name": "Northbridge"},
+                        "fixture": {"id": 9001},
+                    }
+                ]
+            ),
+        )
+
+    with ApiFootballClient(
+        SECRET,
+        transport=httpx.MockTransport(handler),
+        clock=lambda: datetime(2026, 7, 25, 10, 0, 5, tzinfo=UTC),
+    ) as client:
+        snapshot = client.fixture_injury_snapshot(9001)
+
+    assert snapshot.injuries[0].provider_status == "Questionable"
+    assert snapshot.injuries[0].reason == "Knock"

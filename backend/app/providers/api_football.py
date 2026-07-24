@@ -71,6 +71,45 @@ class ApiFootballPlayerSnapshot(BaseModel):
     performances: list[ApiFootballPlayerPerformance]
 
 
+class ApiFootballLineupMember(BaseModel):
+    player_id: int
+    player_name: str
+    position: Literal["GK", "DF", "MF", "FW"]
+    starter: bool
+
+
+class ApiFootballTeamLineup(BaseModel):
+    team_id: int
+    team_name: str
+    formation: str | None
+    coach_id: int | None
+    coach_name: str | None
+    members: list[ApiFootballLineupMember]
+
+
+class ApiFootballLineupSnapshot(BaseModel):
+    fixture_id: int
+    published_at: datetime
+    observed_at: datetime
+    teams: list[ApiFootballTeamLineup]
+
+
+class ApiFootballInjury(BaseModel):
+    player_id: int
+    player_name: str
+    team_id: int
+    team_name: str
+    provider_status: str
+    reason: str | None
+
+
+class ApiFootballInjurySnapshot(BaseModel):
+    fixture_id: int
+    published_at: datetime
+    observed_at: datetime
+    injuries: list[ApiFootballInjury]
+
+
 class _Subscription(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -188,6 +227,60 @@ class _TeamPlayers(BaseModel):
 
     team: _TeamRef
     players: list[_PlayerPerformance]
+
+
+class _LineupPlayer(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: int
+    name: str = Field(min_length=1)
+    pos: str
+
+
+class _LineupMember(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    player: _LineupPlayer
+
+
+class _CoachRef(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: int | None = None
+    name: str | None = None
+
+
+class _TeamLineup(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    team: _TeamRef
+    formation: str | None = None
+    coach: _CoachRef | None = None
+    startXI: list[_LineupMember]
+    substitutes: list[_LineupMember] = Field(default_factory=list)
+
+
+class _InjuryPlayer(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: int
+    name: str = Field(min_length=1)
+    type: str = Field(min_length=1)
+    reason: str | None = None
+
+
+class _InjuryFixture(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: int
+
+
+class _InjuryResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    player: _InjuryPlayer
+    team: _TeamRef
+    fixture: _InjuryFixture
 
 
 class ApiFootballClient:
@@ -333,6 +426,107 @@ class ApiFootballClient:
             observed_at=observed_at,
             performances=performances,
         )
+
+    def fixture_lineup_snapshot(self, fixture_id: int) -> ApiFootballLineupSnapshot:
+        payload, published_at, observed_at = self._fixture_snapshot(
+            fixture_id, "/fixtures/lineups", "lineups"
+        )
+        try:
+            rows = [_TeamLineup.model_validate(item) for item in _response_list(payload)]
+        except ValidationError as exc:
+            raise ApiFootballError("API-Football returned invalid fixture lineups") from exc
+        teams: list[ApiFootballTeamLineup] = []
+        seen_players: set[int] = set()
+        seen_teams: set[int] = set()
+        for row in rows:
+            if row.team.id in seen_teams:
+                raise ApiFootballError("API-Football returned a duplicate lineup team")
+            if len(row.startXI) != 11:
+                raise ApiFootballError("API-Football confirmed lineup must contain 11 starters")
+            seen_teams.add(row.team.id)
+            members: list[ApiFootballLineupMember] = []
+            for value, starter in (
+                *((member, True) for member in row.startXI),
+                *((member, False) for member in row.substitutes),
+            ):
+                if value.player.id in seen_players:
+                    raise ApiFootballError("API-Football returned a duplicate lineup player")
+                seen_players.add(value.player.id)
+                members.append(
+                    ApiFootballLineupMember(
+                        player_id=value.player.id,
+                        player_name=value.player.name,
+                        position=_position(value.player.pos),
+                        starter=starter,
+                    )
+                )
+            coach_id = row.coach.id if row.coach is not None else None
+            coach_name = row.coach.name if row.coach is not None else None
+            if (coach_id is None) != (coach_name is None):
+                raise ApiFootballError("API-Football returned an incomplete coach identity")
+            teams.append(
+                ApiFootballTeamLineup(
+                    team_id=row.team.id,
+                    team_name=row.team.name,
+                    formation=row.formation,
+                    coach_id=coach_id,
+                    coach_name=coach_name,
+                    members=members,
+                )
+            )
+        return ApiFootballLineupSnapshot(
+            fixture_id=fixture_id,
+            published_at=published_at,
+            observed_at=observed_at,
+            teams=teams,
+        )
+
+    def fixture_injury_snapshot(self, fixture_id: int) -> ApiFootballInjurySnapshot:
+        payload, published_at, observed_at = self._fixture_snapshot(
+            fixture_id, "/injuries", "injuries"
+        )
+        try:
+            rows = [_InjuryResponse.model_validate(item) for item in _response_list(payload)]
+        except ValidationError as exc:
+            raise ApiFootballError("API-Football returned invalid fixture injuries") from exc
+        injuries: list[ApiFootballInjury] = []
+        seen: set[tuple[int, int]] = set()
+        for row in rows:
+            if row.fixture.id != fixture_id:
+                raise ApiFootballError("API-Football returned injuries for a different fixture")
+            identity = (row.player.id, row.team.id)
+            if identity in seen:
+                raise ApiFootballError("API-Football returned a duplicate fixture injury")
+            seen.add(identity)
+            injuries.append(
+                ApiFootballInjury(
+                    player_id=row.player.id,
+                    player_name=row.player.name,
+                    team_id=row.team.id,
+                    team_name=row.team.name,
+                    provider_status=row.player.type,
+                    reason=row.player.reason,
+                )
+            )
+        return ApiFootballInjurySnapshot(
+            fixture_id=fixture_id,
+            published_at=published_at,
+            observed_at=observed_at,
+            injuries=injuries,
+        )
+
+    def _fixture_snapshot(
+        self, fixture_id: int, path: str, label: str
+    ) -> tuple[_Envelope, datetime, datetime]:
+        if fixture_id <= 0:
+            raise ValueError("fixture id must be positive")
+        payload, published_at = self._get_snapshot(path, fixture=str(fixture_id))
+        if published_at is None:
+            raise ApiFootballError(f"API-Football omitted the publication timestamp for {label}")
+        observed_at = _aware_utc(self._clock(), "observation timestamp")
+        if published_at > observed_at:
+            raise ApiFootballError("API-Football publication timestamp is after observation")
+        return payload, published_at, observed_at
 
     def _get_envelope(self, path: str, **params: str) -> _Envelope:
         return self._get_snapshot(path, **params)[0]
