@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -11,6 +11,7 @@ from app.db.models import (
     BacktestResult,
     BacktestRun,
     Bookmaker,
+    Competition,
     Event,
     Market,
     ModelEventOutput,
@@ -20,10 +21,16 @@ from app.db.models import (
     OddsSnapshot,
     Provider,
     Selection,
+    Team,
     ValueSignal,
 )
 from app.quant.odds import devig_proportional, implied_probability
-from app.schemas.signals import GenerateSignalsRequest, SignalBatchView, ValueSignalView
+from app.schemas.signals import (
+    GenerateSignalsRequest,
+    ResearchValueCandidateView,
+    SignalBatchView,
+    ValueSignalView,
+)
 from app.signals.policy import SignalInput, classify_signal
 
 
@@ -37,6 +44,176 @@ class _SnapshotPrices:
     bookmaker: Bookmaker
     prices: dict[int, float]
     fair_probabilities: dict[int, float]
+
+
+def list_research_value_candidates(
+    session: Session,
+    *,
+    as_of: datetime | None = None,
+    horizon_hours: int = 168,
+    limit: int = 200,
+) -> list[ResearchValueCandidateView]:
+    """Compare upcoming predictions with lawful prices without qualifying recommendations."""
+    reference = _utc(as_of or datetime.now(UTC))
+    horizon = reference + timedelta(hours=horizon_hours)
+    output_rows = session.execute(
+        select(ModelEventOutput, ModelVersion, Event)
+        .join(ModelVersion, ModelVersion.id == ModelEventOutput.model_version_id)
+        .join(Event, Event.id == ModelEventOutput.event_id)
+        .where(
+            Event.kickoff_at > reference,
+            Event.kickoff_at <= horizon,
+            Event.is_demo.is_(False),
+            ModelVersion.is_demo.is_(False),
+            ModelEventOutput.predicted_at <= reference,
+            ModelEventOutput.inputs_as_of <= reference,
+            ModelEventOutput.predicted_at < Event.kickoff_at,
+        )
+        .order_by(
+            Event.kickoff_at,
+            ModelEventOutput.event_id,
+            ModelEventOutput.predicted_at.desc(),
+            ModelEventOutput.id.desc(),
+        )
+    ).all()
+    latest_outputs: list[tuple[ModelEventOutput, ModelVersion, Event]] = []
+    seen_events: set[int] = set()
+    for output, model, event in output_rows:
+        if event.id in seen_events:
+            continue
+        seen_events.add(event.id)
+        latest_outputs.append((output, model, event))
+
+    candidates: list[ResearchValueCandidateView] = []
+    for output, model, event in latest_outputs:
+        home = session.get(Team, event.home_team_id)
+        away = session.get(Team, event.away_team_id)
+        competition = session.get(Competition, event.competition_id)
+        if home is None or away is None or competition is None:
+            continue
+        prediction_rows = session.execute(
+            select(ModelPrediction, Selection, Market)
+            .join(Selection, Selection.id == ModelPrediction.selection_id)
+            .join(Market, Market.id == Selection.market_id)
+            .where(ModelPrediction.output_id == output.id)
+            .order_by(Market.id, Selection.id)
+        ).all()
+        by_market: dict[int, list[tuple[ModelPrediction, Selection, Market]]] = defaultdict(list)
+        for prediction, selection, market in prediction_rows:
+            by_market[market.id].append((prediction, selection, market))
+        try:
+            sample_size_per_team = _venue_sample_size(model.config, event)
+        except SignalGenerationError:
+            sample_size_per_team = 0
+
+        for rows in by_market.values():
+            market = rows[0][2]
+            snapshots = _latest_compatible_snapshots(session, market, generated_at=reference)
+            if not snapshots:
+                continue
+            consensus = {
+                selection_id: sum(
+                    snapshot.fair_probabilities[selection_id] for snapshot in snapshots
+                )
+                / len(snapshots)
+                for selection_id in snapshots[0].fair_probabilities
+            }
+            for prediction, selection, _ in rows:
+                if selection.id not in consensus:
+                    continue
+                best = max(
+                    snapshots,
+                    key=lambda snapshot: (
+                        snapshot.prices[selection.id],
+                        _utc(snapshot.snapshot.observed_at),
+                        snapshot.snapshot.id,
+                    ),
+                )
+                offered_odds = best.prices[selection.id]
+                market_probability = consensus[selection.id]
+                expected_value = prediction.probability * offered_odds - 1.0
+                lower_expected_value = prediction.lower_probability * offered_odds - 1.0
+                probability_edge = prediction.probability - market_probability
+                if expected_value <= 0 and probability_edge <= 0:
+                    continue
+                age_minutes = max(
+                    0.0,
+                    (reference - _utc(best.snapshot.observed_at)).total_seconds() / 60,
+                )
+                blockers: list[str] = []
+                if model.evaluation_status != "calibrated":
+                    blockers.append("Model has no qualifying chronological calibration.")
+                if sample_size_per_team < 8:
+                    blockers.append(
+                        "Fewer than 8 venue-specific matches per team support this comparison."
+                    )
+                if lower_expected_value <= 0:
+                    blockers.append(
+                        "The model's lower probability bound does not retain positive EV."
+                    )
+                if expected_value < 0.05:
+                    blockers.append("Raw expected value is below the 5% VALUE threshold.")
+                if probability_edge < 0.03:
+                    blockers.append("Model edge is below the 3 percentage-point VALUE threshold.")
+                if age_minutes > 60:
+                    blockers.append("The best compatible price is older than 60 minutes.")
+                risks = [
+                    "This is an exploratory model/price disagreement, not a betting recommendation."
+                ]
+                if len(snapshots) == 1:
+                    risks.append("Market consensus currently comes from one bookmaker.")
+                if output.evidence_class == "team_baseline":
+                    risks.append("The prediction has no confirmed-lineup adjustment.")
+                candidates.append(
+                    ResearchValueCandidateView(
+                        event_id=event.id,
+                        home_team=home.name,
+                        away_team=away.name,
+                        competition=competition.name,
+                        kickoff_at=_utc(event.kickoff_at),
+                        output_id=output.id,
+                        model_version_id=model.id,
+                        model_version=model.version,
+                        model_evaluation_status=model.evaluation_status,
+                        evidence_class=output.evidence_class,
+                        prediction_id=prediction.id,
+                        market_id=market.id,
+                        market_type=market.market_type,
+                        line=float(market.line) if market.line is not None else None,
+                        selection_id=selection.id,
+                        selection_code=selection.code,
+                        selection_name=selection.name,
+                        bookmaker_id=best.bookmaker.id,
+                        bookmaker=best.bookmaker.name,
+                        odds_snapshot_id=best.snapshot.id,
+                        offered_odds=offered_odds,
+                        raw_implied_probability=implied_probability(offered_odds),
+                        market_fair_probability=market_probability,
+                        model_probability=prediction.probability,
+                        lower_probability=prediction.lower_probability,
+                        upper_probability=prediction.upper_probability,
+                        expected_value=expected_value,
+                        lower_expected_value=lower_expected_value,
+                        probability_edge=probability_edge,
+                        odds_observed_at=_utc(best.snapshot.observed_at),
+                        odds_age_minutes=age_minutes,
+                        bookmaker_count=len(snapshots),
+                        is_stale=age_minutes > 60,
+                        status="research_only",
+                        qualification_blockers=blockers,
+                        risks=risks,
+                    )
+                )
+    return sorted(
+        candidates,
+        key=lambda item: (
+            -item.expected_value,
+            -item.probability_edge,
+            item.kickoff_at,
+            item.event_id,
+            item.selection_id,
+        ),
+    )[:limit]
 
 
 def generate_value_signals(

@@ -33,6 +33,7 @@ from app.services.modeling import predict_event, train_poisson_model
 from app.services.signals import (
     SignalGenerationError,
     generate_value_signals,
+    list_research_value_candidates,
     list_underdog_signals,
     list_value_signals,
 )
@@ -150,6 +151,61 @@ def test_uncalibrated_or_demo_prediction_is_blocked(session: Session) -> None:
             session,
             GenerateSignalsRequest(output_id=output.id, generated_at=AS_OF + timedelta(minutes=5)),
         )
+
+
+def test_upcoming_uncalibrated_model_price_gaps_remain_research_only(
+    session: Session,
+) -> None:
+    model, output, event = _prepared_output(session)
+    for provider in session.scalars(select(Provider)).all():
+        provider.is_demo = False
+    for bookmaker in session.scalars(select(Bookmaker)).all():
+        bookmaker.is_demo = False
+    event.is_demo = False
+    model.is_demo = False
+    away_prediction = session.scalar(
+        select(ModelPrediction)
+        .join(Selection, Selection.id == ModelPrediction.selection_id)
+        .where(ModelPrediction.output_id == output.id, Selection.code == "AWAY")
+    )
+    assert away_prediction is not None
+    away_prediction.probability = 0.45
+    away_prediction.lower_probability = 0.30
+    away_prediction.upper_probability = 0.55
+    away_prediction.fair_odds = 1 / 0.45
+    session.commit()
+
+    candidates = list_research_value_candidates(
+        session, as_of=AS_OF + timedelta(minutes=5), horizon_hours=48
+    )
+
+    away = next(item for item in candidates if item.selection_code == "AWAY")
+    assert away.status == "research_only"
+    assert away.expected_value > 0
+    assert away.probability_edge > 0
+    assert away.odds_observed_at <= AS_OF + timedelta(minutes=5)
+    assert "chronological calibration" in away.qualification_blockers[0]
+    assert away.risks[0].endswith("not a betting recommendation.")
+
+
+def test_research_candidates_reject_predictions_after_the_requested_cutoff(
+    session: Session,
+) -> None:
+    model, _, event = _prepared_output(session)
+    for provider in session.scalars(select(Provider)).all():
+        provider.is_demo = False
+    for bookmaker in session.scalars(select(Bookmaker)).all():
+        bookmaker.is_demo = False
+    event.is_demo = False
+    model.is_demo = False
+    session.commit()
+
+    assert (
+        list_research_value_candidates(
+            session, as_of=AS_OF - timedelta(seconds=1), horizon_hours=48
+        )
+        == []
+    )
 
 
 def test_calibrated_signal_generation_is_persisted_and_idempotent(

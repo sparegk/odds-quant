@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -7,16 +8,41 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_admin_key
 from app.db.session import get_db
-from app.schemas.signals import GenerateSignalsRequest, SignalBatchView, ValueSignalView
+from app.schemas.signals import (
+    GenerateSignalsRequest,
+    ResearchValueCandidateView,
+    SignalBatchView,
+    ValueSignalView,
+)
 from app.services.signals import (
     SignalGenerationError,
     generate_value_signals,
+    list_research_value_candidates,
     list_underdog_signals,
     list_value_signals,
 )
 
 router = APIRouter()
 Database = Annotated[Session, Depends(get_db)]
+
+
+@router.get(
+    "/signals/research-candidates",
+    response_model=list[ResearchValueCandidateView],
+    tags=["signals"],
+)
+def research_candidates(
+    database: Database,
+    as_of: datetime | None = None,
+    horizon_hours: Annotated[int, Query(ge=1, le=720)] = 168,
+    limit: Annotated[int, Query(ge=1, le=1000)] = 200,
+) -> list[ResearchValueCandidateView]:
+    return list_research_value_candidates(
+        database,
+        as_of=as_of,
+        horizon_hours=horizon_hours,
+        limit=limit,
+    )
 
 
 @router.post(

@@ -56,6 +56,45 @@ class ValueSignalView(BaseModel):
     risks: list[str]
 
 
+class ResearchValueCandidateView(BaseModel):
+    event_id: int
+    home_team: str
+    away_team: str
+    competition: str
+    kickoff_at: datetime
+    output_id: int
+    model_version_id: int
+    model_version: str
+    model_evaluation_status: str
+    evidence_class: str
+    prediction_id: int
+    market_id: int
+    market_type: str
+    line: float | None
+    selection_id: int
+    selection_code: str
+    selection_name: str
+    bookmaker_id: int
+    bookmaker: str
+    odds_snapshot_id: int
+    offered_odds: float
+    raw_implied_probability: float
+    market_fair_probability: float
+    model_probability: float
+    lower_probability: float
+    upper_probability: float
+    expected_value: float
+    lower_expected_value: float
+    probability_edge: float
+    odds_observed_at: datetime
+    odds_age_minutes: float
+    bookmaker_count: int
+    is_stale: bool
+    status: str
+    qualification_blockers: list[str]
+    risks: list[str]
+
+
 class SignalBatchView(BaseModel):
     event_id: int
     output_id: int
