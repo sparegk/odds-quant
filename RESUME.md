@@ -86,6 +86,10 @@
   It remains unapproved because access is paid, no token is configured, and current provider
   documentation conflicts on whether `last_processed_at` remains in fixture responses. A
   credentialed field-only probe is required before implementation or registration.
+- Adaptive provider scheduling now uses the normal 15-minute interval while fixtures are
+  distant and a five-minute interval inside the final six hours before kickoff. Exact window
+  and kickoff boundaries are deterministic, restarts skip premature duplicate requests, and
+  every accepted price remains non-closing without explicit provider evidence.
 
 ## Next action
 

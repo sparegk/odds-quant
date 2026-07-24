@@ -19,6 +19,9 @@ from app.db.models import Event, FixtureObservation, OddsSnapshot, ProviderJob
 from app.db.session import Base
 from app.jobs.scheduler import (
     SensitiveQueryFilter,
+    adaptive_poll_seconds,
+    build_scheduler,
+    poll_registered_providers_adaptively,
     register_configured_providers,
     run_provider_collection,
     seed_development_demo,
@@ -189,6 +192,128 @@ def test_render_postgres_url_selects_installed_psycopg_driver() -> None:
 
 def test_provider_polling_defaults_to_fifteen_minutes() -> None:
     assert Settings().provider_poll_seconds == 900
+    assert Settings().provider_near_kickoff_poll_seconds == 300
+    assert Settings().provider_near_kickoff_window_seconds == 21600
+
+
+def test_near_kickoff_polling_cannot_be_slower_than_base_polling() -> None:
+    with pytest.raises(ValueError, match="cannot be slower"):
+        Settings(provider_poll_seconds=300, provider_near_kickoff_poll_seconds=301)
+
+
+def test_adaptive_polling_uses_exact_pre_kickoff_window_boundaries(
+    sessions: sessionmaker[Session],
+) -> None:
+    provider = FixtureOnlyProvider(
+        [
+            FixtureImportRow(
+                provider_event_key="boundary-fixture",
+                competition="UEFA Champions League Qualification",
+                country="International",
+                season="2026/27",
+                kickoff_at=AS_OF + timedelta(hours=6),
+                home_team="Boundary Home",
+                away_team="Boundary Away",
+                observed_at=AS_OF - timedelta(minutes=1),
+            )
+        ]
+    )
+    run_provider_collection(
+        provider,
+        session_factory=sessions,
+        now=AS_OF - timedelta(minutes=1),
+    )
+
+    with sessions() as session:
+        assert (
+            adaptive_poll_seconds(
+                session,
+                now=AS_OF - timedelta(seconds=1),
+                base_seconds=900,
+                near_kickoff_seconds=300,
+                near_kickoff_window_seconds=21600,
+            )
+            == 900
+        )
+        assert (
+            adaptive_poll_seconds(
+                session,
+                now=AS_OF,
+                base_seconds=900,
+                near_kickoff_seconds=300,
+                near_kickoff_window_seconds=21600,
+            )
+            == 300
+        )
+        assert (
+            adaptive_poll_seconds(
+                session,
+                now=AS_OF + timedelta(hours=6),
+                base_seconds=900,
+                near_kickoff_seconds=300,
+                near_kickoff_window_seconds=21600,
+            )
+            == 900
+        )
+
+
+def test_adaptive_polling_skips_restart_duplicate_until_interval_is_due(
+    sessions: sessionmaker[Session],
+) -> None:
+    provider = FixtureOnlyProvider(
+        [
+            FixtureImportRow(
+                provider_event_key="restart-fixture",
+                competition="UEFA Conference League Qualification",
+                country="International",
+                season="2026/27",
+                kickoff_at=AS_OF + timedelta(hours=2),
+                home_team="Restart Home",
+                away_team="Restart Away",
+                observed_at=AS_OF - timedelta(minutes=1),
+            )
+        ]
+    )
+    register_odds_provider(provider)
+    settings = Settings(
+        seed_demo=False,
+        provider_poll_seconds=900,
+        provider_near_kickoff_poll_seconds=300,
+        provider_near_kickoff_window_seconds=21600,
+    )
+
+    assert (
+        poll_registered_providers_adaptively(settings=settings, session_factory=sessions, now=AS_OF)
+        == 1
+    )
+    assert (
+        poll_registered_providers_adaptively(
+            settings=settings,
+            session_factory=sessions,
+            now=AS_OF + timedelta(seconds=299),
+        )
+        == 0
+    )
+    assert (
+        poll_registered_providers_adaptively(
+            settings=settings,
+            session_factory=sessions,
+            now=AS_OF + timedelta(seconds=300),
+        )
+        == 1
+    )
+
+    with sessions() as session:
+        assert session.scalar(select(func.count()).select_from(ProviderJob)) == 2
+        assert session.scalar(select(func.count()).select_from(FixtureObservation)) == 1
+
+
+def test_scheduler_wakes_at_near_kickoff_cadence() -> None:
+    scheduler = build_scheduler(Settings(seed_demo=False, provider_near_kickoff_poll_seconds=180))
+    jobs = scheduler.get_jobs()
+
+    assert len(jobs) == 1
+    assert jobs[0].trigger.interval.total_seconds() == 180
 
 
 def test_configured_odds_api_provider_is_registered() -> None:

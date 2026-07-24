@@ -242,6 +242,19 @@ Freshness thresholds are configurable per provider and competition because updat
 
 Collectors should poll more often as kickoff approaches while staying within provider terms and documented rate limits. They use conditional requests where supported, exponential backoff, jitter, retry budgets, and job-level observability. Repeated payload hashes, out-of-order timestamps, clock skew, partial markets, and implausible jumps are flagged.
 
+The registered odds worker wakes every five minutes. It polls at the normal 15-minute interval
+while no stored non-demo scheduled fixture is within six hours of kickoff, then switches to a
+five-minute interval through the final pre-kickoff window. The exact six-hour boundary uses the
+faster interval; events at or after kickoff are excluded. A worker restart consults the latest
+persisted provider-job start and skips a duplicate request until the applicable interval is due.
+These intervals are configurable, but the near-kickoff interval cannot be slower than the base
+interval.
+
+Adaptive collection does not designate a closing line. Every accepted provider row remains
+`is_closing=false` unless a separately validated response explicitly supplies closing status
+and its original pre-kickoff source timestamp. Existing atomic completeness, identity,
+timestamp, rate-limit backoff, and post-kickoff rejection rules remain in force.
+
 No collector should optimize frequency at the expense of legality or validity. If the licensed source cannot provide sufficiently fresh data for a use case, the UI reports that limitation and disables strong signals or arbitrage ranking.
 
 ## Storage And Retention

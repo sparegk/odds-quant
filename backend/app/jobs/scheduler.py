@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.collectors.registry import register_odds_provider, registered_odds_providers
 from app.core.config import Settings, get_settings
-from app.db.models import Provider, ProviderJob
+from app.db.models import Event, Provider, ProviderJob
 from app.db.session import SessionLocal
 from app.providers.base import OddsProvider
 from app.providers.odds_api_io import OddsApiIoProvider
@@ -24,6 +24,12 @@ from app.services.odds_import import import_odds_csv, serialize_odds_rows_csv
 logger = logging.getLogger("oddsquant.worker")
 SessionFactory = Callable[[], Session]
 _SENSITIVE_QUERY_PATTERN = re.compile(r"(?i)([?&](?:api[_-]?key|access[_-]?token|token)=)[^&\s]+")
+
+
+def _utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 class SensitiveQueryFilter(logging.Filter):
@@ -93,6 +99,7 @@ def run_provider_collection(
             status="running",
             finished_at=None,
             message="",
+            created_at=started_at,
         )
         session.add(job)
         session.commit()
@@ -197,6 +204,72 @@ def poll_registered_providers() -> None:
         run_provider_collection(provider)
 
 
+def adaptive_poll_seconds(
+    session: Session,
+    *,
+    now: datetime,
+    base_seconds: int,
+    near_kickoff_seconds: int,
+    near_kickoff_window_seconds: int,
+) -> int:
+    current = _utc(now)
+    nearest = session.scalar(
+        select(Event.kickoff_at)
+        .where(
+            Event.is_demo.is_(False),
+            Event.status == "scheduled",
+            Event.kickoff_at > current,
+        )
+        .order_by(Event.kickoff_at, Event.id)
+        .limit(1)
+    )
+    if nearest is None:
+        return base_seconds
+    until_kickoff = (_utc(nearest) - current).total_seconds()
+    if until_kickoff <= near_kickoff_window_seconds:
+        return near_kickoff_seconds
+    return base_seconds
+
+
+def poll_registered_providers_adaptively(
+    *,
+    settings: Settings | None = None,
+    session_factory: SessionFactory = SessionLocal,
+    now: datetime | None = None,
+) -> int:
+    runtime_settings = settings or get_settings()
+    current = _utc(now or datetime.now(UTC))
+    with session_factory() as session:
+        interval = adaptive_poll_seconds(
+            session,
+            now=current,
+            base_seconds=runtime_settings.provider_poll_seconds,
+            near_kickoff_seconds=runtime_settings.provider_near_kickoff_poll_seconds,
+            near_kickoff_window_seconds=runtime_settings.provider_near_kickoff_window_seconds,
+        )
+    jobs_started = 0
+    for provider_adapter in registered_odds_providers():
+        with session_factory() as session:
+            provider = session.scalar(
+                select(Provider).where(Provider.slug == provider_adapter.slug)
+            )
+            latest_started = None
+            if provider is not None:
+                latest_started = session.scalar(
+                    select(ProviderJob.created_at)
+                    .where(ProviderJob.provider_id == provider.id)
+                    .order_by(ProviderJob.created_at.desc(), ProviderJob.id.desc())
+                    .limit(1)
+                )
+        if latest_started is not None:
+            elapsed = (current - _utc(latest_started)).total_seconds()
+            if elapsed < interval:
+                continue
+        run_provider_collection(provider_adapter, session_factory=session_factory, now=current)
+        jobs_started += 1
+    return jobs_started
+
+
 def register_configured_providers(settings: Settings) -> None:
     if settings.odds_api_io_key:
         register_odds_provider(
@@ -227,13 +300,14 @@ def build_scheduler(settings: Settings | None = None) -> BlockingScheduler:
     runtime_settings = settings or get_settings()
     scheduler = BlockingScheduler(timezone="UTC")
     scheduler.add_job(
-        poll_registered_providers,
+        poll_registered_providers_adaptively,
         "interval",
-        seconds=runtime_settings.provider_poll_seconds,
+        seconds=runtime_settings.provider_near_kickoff_poll_seconds,
         id="poll-registered-odds-providers",
         coalesce=True,
         max_instances=1,
         next_run_time=datetime.now(UTC),
+        kwargs={"settings": runtime_settings},
     )
     if runtime_settings.seed_demo and runtime_settings.environment.casefold() != "production":
         scheduler.add_job(

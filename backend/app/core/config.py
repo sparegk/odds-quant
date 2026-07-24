@@ -1,6 +1,7 @@
 from functools import lru_cache
+from typing import Self
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,6 +20,8 @@ class Settings(BaseSettings):
     seed_demo: bool = True
     odds_stale_after_seconds: int = Field(default=300, ge=1)
     provider_poll_seconds: int = Field(default=900, ge=30)
+    provider_near_kickoff_poll_seconds: int = Field(default=300, ge=30)
+    provider_near_kickoff_window_seconds: int = Field(default=21600, ge=60)
     odds_api_io_key: str | None = None
     odds_api_io_base_url: str = "https://api.odds-api.io/v3"
     matchday_timezone: str = "Europe/Athens"
@@ -39,6 +42,12 @@ class Settings(BaseSettings):
         if value.startswith("postgresql://"):
             return value.replace("postgresql://", "postgresql+psycopg://", 1)
         return value
+
+    @model_validator(mode="after")
+    def validate_provider_poll_intervals(self) -> Self:
+        if self.provider_near_kickoff_poll_seconds > self.provider_poll_seconds:
+            raise ValueError("near-kickoff provider polling cannot be slower than base polling")
+        return self
 
 
 @lru_cache
