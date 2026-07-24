@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from app.schemas.api import EventSummary, MarketComparison
 from app.schemas.builder import BetBuilderLegView, BetBuilderQuoteView
+from app.schemas.lineups import ExpectedLineupScenarioView, StoredLineupView
 from app.schemas.models import ModelOutputView
 from app.schemas.signals import ValueSignalView
 
@@ -129,6 +130,9 @@ class MatchdayEventDetailView(BaseModel):
     selected_bookmakers: list[Literal["allwyn", "novibet"]]
     bookmaker_options: list[MatchdayBookmakerOptionView]
     suggestion_market_statuses: list[SuggestionMarketStatusView]
+    stored_lineups: list[StoredLineupView]
+    lineup_projections: list[ExpectedLineupScenarioView]
+    lineup_research: ResearchGateView
     player_research: ResearchGateView
     builder_value: ResearchGateView
     bookmaker_guidance: str

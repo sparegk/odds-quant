@@ -12,7 +12,6 @@ from app.db.models import (
     Bookmaker,
     Competition,
     Event,
-    LineupSnapshot,
     Market,
     MatchResult,
     ModelEventOutput,
@@ -34,6 +33,7 @@ from app.schemas.matchday import (
 )
 from app.services.builder import list_bet_builder_quotes
 from app.services.catalog import get_event, odds_comparison
+from app.services.lineup_projection import latest_stored_lineups, project_expected_lineups
 from app.services.match_suggestions import (
     bookmaker_options,
     build_match_suggestions,
@@ -314,14 +314,29 @@ def get_matchday_event_detail(
         )
         or 0
     )
-    lineup_count = (
-        session.scalar(
-            select(func.count())
-            .select_from(LineupSnapshot)
-            .where(LineupSnapshot.event_id == event.id, LineupSnapshot.observed_at <= cutoff)
+    stored_lineups = latest_stored_lineups(session, event_id=event.id, as_of=cutoff)
+    complete_stored_teams = {
+        lineup.team_id
+        for lineup in stored_lineups
+        if sum(member.starter for member in lineup.members) == 11
+    }
+    lineup_projections = [
+        scenario
+        for scenario in project_expected_lineups(
+            session,
+            event_id=event.id,
+            as_of=cutoff,
+            history_matches=form_matches,
         )
-        or 0
-    )
+        if scenario.team_id not in complete_stored_teams
+    ]
+    complete_projected_teams = {
+        scenario.team_id
+        for scenario in lineup_projections
+        if scenario.scenario_kind == "availability_weighted" and scenario.status == "projected"
+    }
+    lineup_covered_teams = complete_stored_teams | complete_projected_teams
+    lineup_count = len(stored_lineups)
     player_reasons = [
         "Player-level targets and settlement rules have not been independently validated.",
         "Position-adjusted minimum minutes, shrinkage, and chronological ablations are required "
@@ -333,8 +348,44 @@ def get_matchday_event_detail(
         )
     if lineup_count == 0:
         player_reasons.append(
-            "No timestamp-valid expected or confirmed lineup is stored for this match."
+            "No timestamp-valid third-party expected or confirmed lineup is stored for this match."
         )
+
+    lineup_reasons = [
+        "Confirmed, third-party expected, and OddsQuant fallback lineups remain separate "
+        "evidence classes.",
+        "Fallback projections use only timestamp-valid prior appearances and availability "
+        "known at the cutoff.",
+        "Lineup projections widen decision uncertainty; they do not create model edge until "
+        "chronological ablation validates an adjustment.",
+    ]
+    if lineup_projections:
+        lineup_reasons.append(
+            "Fallback scenarios are shown because a complete stored lineup was unavailable "
+            "for at least one team."
+        )
+    if len(lineup_covered_teams) < 2:
+        lineup_reasons.append(
+            "At least one team lacks enough position-valid evidence for a complete XI."
+        )
+    baseline_projections = [
+        scenario
+        for scenario in lineup_projections
+        if scenario.scenario_kind == "availability_weighted"
+    ]
+    lineup_gate = ResearchGateView(
+        status="available" if len(lineup_covered_teams) == 2 else "blocked",
+        title=(
+            "Lineup scenarios available"
+            if len(lineup_covered_teams) == 2
+            else "Lineup uncertainty remains high"
+        ),
+        available_records=(
+            sum(len(lineup.members) for lineup in stored_lineups)
+            + sum(len(scenario.starters) for scenario in baseline_projections)
+        ),
+        reasons=lineup_reasons,
+    )
 
     qualified_builder_quotes = [
         quote
@@ -398,6 +449,9 @@ def get_matchday_event_detail(
         selected_bookmakers=sorted(selected),
         bookmaker_options=bookmaker_options(markets, selected),
         suggestion_market_statuses=market_statuses(markets, selected, ranked_suggestions),
+        stored_lineups=stored_lineups,
+        lineup_projections=lineup_projections,
+        lineup_research=lineup_gate,
         player_research=ResearchGateView(
             status="blocked",
             title="Player markets remain research-only",

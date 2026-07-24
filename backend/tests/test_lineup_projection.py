@@ -12,6 +12,8 @@ from app.db.models import (
     AvailabilityReport,
     Competition,
     Event,
+    LineupMember,
+    LineupSnapshot,
     Player,
     PlayerAppearance,
     Provider,
@@ -19,7 +21,7 @@ from app.db.models import (
     Team,
 )
 from app.db.session import Base
-from app.services.lineup_projection import project_expected_lineups
+from app.services.lineup_projection import latest_stored_lineups, project_expected_lineups
 
 NOW = datetime(2026, 7, 24, 12, 0, tzinfo=UTC)
 
@@ -243,3 +245,49 @@ def test_projection_excludes_availability_published_after_cutoff(session: Sessio
 
     assert stored.availability_status == "unknown"
     assert stored.start_probability > 0
+
+
+def test_stored_lineups_exclude_confirmed_evidence_published_after_cutoff(
+    session: Session,
+) -> None:
+    target, players, provider = _seed_projection_history(session)
+    expected = LineupSnapshot(
+        event_id=target.id,
+        team_id=target.home_team_id,
+        coach_id=None,
+        provider_id=provider.id,
+        lineup_type="expected",
+        formation="4-3-3",
+        source_updated_at=NOW - timedelta(minutes=10),
+        observed_at=NOW - timedelta(minutes=9),
+        confidence=0.7,
+    )
+    leaked_confirmed = LineupSnapshot(
+        event_id=target.id,
+        team_id=target.home_team_id,
+        coach_id=None,
+        provider_id=provider.id,
+        lineup_type="confirmed",
+        formation="4-3-3",
+        source_updated_at=NOW + timedelta(hours=1),
+        observed_at=NOW - timedelta(minutes=1),
+        confidence=1,
+    )
+    session.add_all([expected, leaked_confirmed])
+    session.flush()
+    session.add(
+        LineupMember(
+            lineup_snapshot_id=expected.id,
+            player_id=players[0].id,
+            starter=True,
+            position="GK",
+            role=None,
+            expected_probability=0.8,
+        )
+    )
+    session.commit()
+
+    stored = latest_stored_lineups(session, event_id=target.id, as_of=NOW)
+
+    assert [lineup.lineup_type for lineup in stored] == ["expected"]
+    assert stored[0].members[0].player == "Player 0"

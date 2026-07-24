@@ -246,6 +246,44 @@ const detail: MatchdayEventDetail = {
     { code: 'shots_on_target', label: 'Shots on target', status: 'blocked', reason: 'Target unvalidated.' },
     { code: 'player_props', label: 'Player props', status: 'blocked', reason: 'Target unvalidated.' },
   ],
+  stored_lineups: [],
+  lineup_projections: [
+    {
+      event_id: 42,
+      team_id: 1,
+      team: 'Northbridge FC',
+      status: 'projected',
+      scenario_kind: 'availability_weighted',
+      formation: '4-3-3',
+      as_of: '2026-07-21T12:05:00Z',
+      feature_version: 'expected-lineup-v1',
+      input_fingerprint: '1234567890abcdef',
+      historical_matches: 5,
+      confidence: 0.68,
+      uncertainty: 0.32,
+      starters: [
+        {
+          player_id: 101,
+          player: 'Projected Keeper',
+          position: 'GK',
+          role: null,
+          start_probability: 0.86,
+          recent_appearances: 5,
+          recent_starts: 5,
+          recent_minutes: 450,
+          availability_status: 'available',
+        },
+      ],
+      alternates: [],
+      warnings: ['Projection remains provisional until the official lineup is published.'],
+    },
+  ],
+  lineup_research: {
+    status: 'available',
+    title: 'Lineup scenarios available',
+    available_records: 11,
+    reasons: ['Fallback projections remain separate from confirmed lineups.'],
+  },
   player_research: {
     status: 'blocked',
     title: 'Player markets remain research-only',
@@ -297,6 +335,10 @@ describe('MatchdayResearch', () => {
     expect(screen.getByText('Fair probability')).toBeInTheDocument()
     expect(screen.getByText('39.7%')).toBeInTheDocument()
     expect(screen.getByText(/Team form unavailable/)).toBeInTheDocument()
+    expect(screen.getByText('Expected versus confirmed lineups')).toBeInTheDocument()
+    expect(screen.getByText('Projected Keeper')).toBeInTheDocument()
+    expect(screen.getByText('68.0% confidence')).toBeInTheDocument()
+    expect(screen.getByText('32.0% uncertainty')).toBeInTheDocument()
     expect(screen.getByText('Player markets remain research-only')).toBeInTheDocument()
     expect(screen.getByText('No verified builder value')).toBeInTheDocument()
     expect(selectEvent).toHaveBeenCalledWith(42)

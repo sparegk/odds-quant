@@ -464,6 +464,12 @@ def test_matchday_detail_uses_only_pre_cutoff_form_and_fails_closed_for_player_b
     assert payload["markets"][0]["best_prices"]
     assert payload["player_research"]["status"] == "blocked"
     assert "settlement rules" in payload["player_research"]["reasons"][0]
+    assert payload["stored_lineups"] == []
+    assert len(payload["lineup_projections"]) == 2
+    assert payload["lineup_research"]["status"] == "blocked"
+    assert all(
+        scenario["status"] == "insufficient_data" for scenario in payload["lineup_projections"]
+    )
     assert payload["builder_value"]["status"] == "blocked"
     assert payload["selected_bookmakers"] == ["allwyn", "novibet"]
     assert payload["suggestions"] == []

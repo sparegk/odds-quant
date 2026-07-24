@@ -17,6 +17,7 @@ import { formatDateTime, humanizeCode } from '../lib/format'
 import { nextGoodMatchdayDate } from '../lib/matchdays'
 import type {
   BetBuilderQuote,
+  ExpectedLineupScenario,
   EventSummary,
   Matchday,
   MatchdayBookmakerCode,
@@ -27,6 +28,7 @@ import type {
   MarketComparison,
   ResearchGate,
   SnapshotComparison,
+  StoredLineup,
   TeamForm,
 } from '../types'
 
@@ -473,6 +475,8 @@ function MatchDetail({ detail }: { detail: MatchdayEventDetail }) {
           <div className="grid gap-3 sm:grid-cols-2">{detail.team_form.map((form) => <TeamFormCard form={form} key={form.team_id} />)}</div>
         </section>
 
+        <LineupResearch detail={detail} />
+
         <section className="grid gap-4 lg:grid-cols-2">
           <ResearchGateCard gate={detail.player_research} icon="players" />
           <div>
@@ -645,6 +649,92 @@ function TeamFormCard({ form }: { form: TeamForm }) {
       <div className="mt-3 flex flex-wrap gap-1.5">{form.results.map((result) => <span className={`grid h-7 w-7 place-items-center rounded-full text-xs font-bold ${result.outcome === 'W' ? 'bg-emerald-100 text-emerald-800' : result.outcome === 'D' ? 'bg-zinc-200 text-zinc-700' : 'bg-rose-100 text-rose-800'}`} key={result.event_id} title={`${result.venue} vs ${result.opponent}, ${result.goals_for}-${result.goals_against}`}>{result.outcome}</span>)}</div>
       </>}
       {form.warnings.map((warning) => <p className="mt-2 text-xs text-amber-700" key={warning}>{warning}</p>)}
+    </div>
+  )
+}
+
+function LineupResearch({ detail }: { detail: MatchdayEventDetail }) {
+  return (
+    <section>
+      <DetailHeading eyebrow="Availability-aware scenarios" title="Expected versus confirmed lineups" />
+      <ResearchGateCard gate={detail.lineup_research} icon="players" />
+      {detail.stored_lineups.length ? (
+        <div className="mt-3 grid gap-3 lg:grid-cols-2">
+          {detail.stored_lineups.map((lineup) => <StoredLineupCard key={lineup.id} lineup={lineup} />)}
+        </div>
+      ) : null}
+      {detail.lineup_projections.length ? (
+        <div className="mt-3 grid gap-3 lg:grid-cols-2">
+          {detail.lineup_projections.map((scenario) => (
+            <ProjectedLineupCard
+              key={`${scenario.team_id}-${scenario.scenario_kind}`}
+              scenario={scenario}
+            />
+          ))}
+        </div>
+      ) : null}
+    </section>
+  )
+}
+
+function StoredLineupCard({ lineup }: { lineup: StoredLineup }) {
+  return (
+    <div className="border border-emerald-200 bg-emerald-50 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <p className="text-[10px] font-bold uppercase text-emerald-700">{lineup.lineup_type} evidence</p>
+          <h4 className="mt-1 font-bold">{lineup.team}</h4>
+          <p className="mt-1 text-xs text-zinc-600">{lineup.formation ?? 'Formation unavailable'} / {lineup.provider}</p>
+        </div>
+        <span className="border border-emerald-300 bg-white px-2 py-1 text-xs font-bold text-emerald-800">
+          {percentage(lineup.confidence)} confidence
+        </span>
+      </div>
+      <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
+        {lineup.members.filter((member) => member.starter).map((member) => (
+          <div className="flex items-center justify-between border border-emerald-100 bg-white px-2 py-1.5 text-xs" key={member.player_id}>
+            <span><strong>{member.position}</strong> {member.player}</span>
+            {member.expected_probability === null ? null : <span className="font-mono">{percentage(member.expected_probability)}</span>}
+          </div>
+        ))}
+      </div>
+      <p className="mt-3 text-[11px] text-zinc-500">Published {formatDateTime(lineup.published_at)}</p>
+    </div>
+  )
+}
+
+function ProjectedLineupCard({ scenario }: { scenario: ExpectedLineupScenario }) {
+  const projected = scenario.status === 'projected'
+  return (
+    <div className={`border p-4 ${projected ? 'border-sky-200 bg-sky-50' : 'border-amber-200 bg-amber-50'}`}>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <p className="text-[10px] font-bold uppercase text-sky-700">
+            OddsQuant fallback / {scenario.scenario_kind === 'doubtful_available' ? 'doubtful available' : 'availability weighted'}
+          </p>
+          <h4 className="mt-1 font-bold">{scenario.team}</h4>
+          <p className="mt-1 text-xs text-zinc-600">{scenario.formation} / {scenario.historical_matches} prior matches</p>
+        </div>
+        <div className="text-right text-xs">
+          <p className="font-bold">{percentage(scenario.confidence)} confidence</p>
+          <p className="mt-1 text-zinc-500">{percentage(scenario.uncertainty)} uncertainty</p>
+        </div>
+      </div>
+      {scenario.starters.length ? (
+        <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
+          {scenario.starters.map((member) => (
+            <div className="flex items-center justify-between border border-sky-100 bg-white px-2 py-1.5 text-xs" key={member.player_id}>
+              <span className="truncate"><strong>{member.position}</strong> {member.player}</span>
+              <span className="ml-2 font-mono">{percentage(member.start_probability)}</span>
+            </div>
+          ))}
+        </div>
+      ) : <ResearchEmpty text="Not enough timestamp-valid position evidence to project this XI." />}
+      {scenario.alternates.length ? <p className="mt-3 text-xs text-zinc-600"><strong>Alternates:</strong> {scenario.alternates.map((member) => `${member.player} ${percentage(member.start_probability)}`).join(', ')}</p> : null}
+      {scenario.warnings.map((warning) => <p className="mt-2 text-xs text-amber-800" key={warning}>{warning}</p>)}
+      <p className="mt-3 font-mono text-[10px] text-zinc-400" title={scenario.input_fingerprint}>
+        {scenario.feature_version} / {scenario.input_fingerprint.slice(0, 12)}
+      </p>
     </div>
   )
 }

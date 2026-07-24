@@ -10,8 +10,22 @@ from typing import cast
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.db.models import AvailabilityReport, Event, Player, PlayerAppearance, Team
-from app.schemas.lineups import ExpectedLineupScenarioView, ProjectedLineupMemberView
+from app.db.models import (
+    AvailabilityReport,
+    Event,
+    LineupMember,
+    LineupSnapshot,
+    Player,
+    PlayerAppearance,
+    Provider,
+    Team,
+)
+from app.schemas.lineups import (
+    ExpectedLineupScenarioView,
+    ProjectedLineupMemberView,
+    StoredLineupMemberView,
+    StoredLineupView,
+)
 
 FEATURE_VERSION = "expected-lineup-v1"
 FORMATION = "4-3-3"
@@ -58,6 +72,75 @@ def project_expected_lineups(
             history_matches=history_matches,
         )
     ]
+
+
+def latest_stored_lineups(
+    session: Session,
+    *,
+    event_id: int,
+    as_of: datetime,
+) -> list[StoredLineupView]:
+    target = session.get(Event, event_id)
+    if target is None:
+        raise ValueError("event not found")
+    cutoff = min(_utc(as_of), _utc(target.kickoff_at))
+    rows = session.execute(
+        select(LineupSnapshot, Team.name, Provider.name)
+        .join(Team, Team.id == LineupSnapshot.team_id)
+        .join(Provider, Provider.id == LineupSnapshot.provider_id)
+        .where(
+            LineupSnapshot.event_id == event_id,
+            LineupSnapshot.observed_at <= cutoff,
+            LineupSnapshot.source_updated_at.is_not(None),
+            LineupSnapshot.source_updated_at <= cutoff,
+        )
+        .order_by(
+            LineupSnapshot.team_id,
+            LineupSnapshot.lineup_type,
+            LineupSnapshot.observed_at.desc(),
+            LineupSnapshot.id.desc(),
+        )
+    ).all()
+    latest: dict[tuple[int, str], tuple[LineupSnapshot, str, str]] = {}
+    for lineup, team_name, provider_name in rows:
+        latest.setdefault((lineup.team_id, lineup.lineup_type), (lineup, team_name, provider_name))
+    views: list[StoredLineupView] = []
+    for lineup, team_name, provider_name in latest.values():
+        members = session.execute(
+            select(LineupMember, Player)
+            .join(Player, Player.id == LineupMember.player_id)
+            .where(LineupMember.lineup_snapshot_id == lineup.id)
+            .order_by(LineupMember.starter.desc(), LineupMember.position, Player.name)
+        ).all()
+        views.append(
+            StoredLineupView(
+                id=lineup.id,
+                event_id=lineup.event_id,
+                team_id=lineup.team_id,
+                team=team_name,
+                lineup_type=lineup.lineup_type,
+                formation=lineup.formation,
+                provider=provider_name,
+                published_at=_utc(cast(datetime, lineup.source_updated_at)),
+                observed_at=_utc(lineup.observed_at),
+                confidence=lineup.confidence,
+                members=[
+                    StoredLineupMemberView(
+                        player_id=player.id,
+                        player=player.name,
+                        starter=member.starter,
+                        position=player.position,
+                        role=member.role,
+                        expected_probability=member.expected_probability,
+                    )
+                    for member, player in members
+                ],
+            )
+        )
+    return sorted(
+        views,
+        key=lambda view: (view.team_id, 0 if view.lineup_type == "confirmed" else 1),
+    )
 
 
 def _team_scenarios(

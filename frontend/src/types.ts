@@ -645,6 +645,59 @@ export interface SuggestionMarketStatus {
   reason: string
 }
 
+export interface StoredLineupMember {
+  player_id: number
+  player: string
+  starter: boolean
+  position: 'GK' | 'DF' | 'MF' | 'FW'
+  role: string | null
+  expected_probability: number | null
+}
+
+export interface StoredLineup {
+  id: number
+  event_id: number
+  team_id: number
+  team: string
+  lineup_type: 'expected' | 'confirmed'
+  formation: string | null
+  provider: string
+  published_at: string
+  observed_at: string
+  confidence: number
+  members: StoredLineupMember[]
+}
+
+export interface ProjectedLineupMember {
+  player_id: number
+  player: string
+  position: 'GK' | 'DF' | 'MF' | 'FW'
+  role: string | null
+  start_probability: number
+  recent_appearances: number
+  recent_starts: number
+  recent_minutes: number
+  availability_status: string
+}
+
+export interface ExpectedLineupScenario {
+  event_id: number
+  team_id: number
+  team: string
+  status: 'projected' | 'insufficient_data'
+  scenario_kind: 'availability_weighted' | 'doubtful_available'
+  formation: string
+  as_of: string
+  feature_version: string
+  input_fingerprint: string
+  historical_matches: number
+  confidence: number
+  uncertainty: number
+  starters: ProjectedLineupMember[]
+  alternates: ProjectedLineupMember[]
+  warnings: string[]
+}
+
 export interface MatchdayEventDetail {
   event: EventSummary
   competition_group: string
@@ -659,6 +712,9 @@ export interface MatchdayEventDetail {
   selected_bookmakers: MatchdayBookmakerCode[]
   bookmaker_options: MatchdayBookmakerOption[]
   suggestion_market_statuses: SuggestionMarketStatus[]
+  stored_lineups: StoredLineup[]
+  lineup_projections: ExpectedLineupScenario[]
+  lineup_research: ResearchGate
   player_research: ResearchGate
   builder_value: ResearchGate
   bookmaker_guidance: string
