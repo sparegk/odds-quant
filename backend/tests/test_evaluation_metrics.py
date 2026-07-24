@@ -6,6 +6,7 @@ import pytest
 
 from app.quant.evaluation import (
     calibration_buckets,
+    moving_block_mean_interval,
     multiclass_brier,
     multiclass_log_loss,
     summarize_probabilities,
@@ -52,3 +53,43 @@ def test_invalid_probability_vectors_are_rejected(
 ) -> None:
     with pytest.raises(ValueError):
         multiclass_brier(probabilities, "HOME")
+
+
+def test_moving_block_bootstrap_is_deterministic_and_chronology_aware() -> None:
+    values = [0.10, 0.12, 0.14, 0.35, 0.37, 0.39, 0.20, 0.22]
+
+    first = moving_block_mean_interval(values, resamples=500, block_length=2, seed=17)
+    second = moving_block_mean_interval(values, resamples=500, block_length=2, seed=17)
+
+    assert first == second
+    assert first.estimate == pytest.approx(sum(values) / len(values))
+    assert first.lower < first.estimate < first.upper
+    assert first.block_length == 2
+    assert first.observations == len(values)
+    assert first.as_dict()["method"] == "moving_block_bootstrap"
+
+
+def test_moving_block_bootstrap_is_degenerate_for_constant_losses() -> None:
+    interval = moving_block_mean_interval([0.25] * 12, resamples=200, seed=9)
+
+    assert interval.estimate == pytest.approx(0.25)
+    assert interval.lower == pytest.approx(0.25)
+    assert interval.upper == pytest.approx(0.25)
+    assert interval.block_length == 2
+
+
+def test_moving_block_bootstrap_rejects_invalid_inputs() -> None:
+    with pytest.raises(ValueError, match="at least one observation"):
+        moving_block_mean_interval([])
+    with pytest.raises(ValueError, match="finite"):
+        moving_block_mean_interval([math.nan])
+    with pytest.raises(ValueError, match="confidence_level"):
+        moving_block_mean_interval([0.1], confidence_level=1)
+    with pytest.raises(ValueError, match="at least 100"):
+        moving_block_mean_interval([0.1], resamples=99)
+    with pytest.raises(ValueError, match="between 1"):
+        moving_block_mean_interval([0.1, 0.2], block_length=0)
+    with pytest.raises(ValueError, match="must be an integer"):
+        moving_block_mean_interval([0.1, 0.2], block_length=1.5)  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="seed must be an integer"):
+        moving_block_mean_interval([0.1], seed=True)

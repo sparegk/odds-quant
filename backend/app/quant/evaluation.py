@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import random
 from dataclasses import asdict, dataclass
 
 OUTCOMES = ("HOME", "DRAW", "AWAY")
@@ -19,6 +20,82 @@ class CalibrationBucket:
 
     def as_dict(self) -> dict[str, object]:
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class BootstrapMeanInterval:
+    estimate: float
+    lower: float
+    upper: float
+    confidence_level: float
+    resamples: int
+    block_length: int
+    observations: int
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "method": "moving_block_bootstrap",
+            **asdict(self),
+        }
+
+
+def moving_block_mean_interval(
+    values: list[float],
+    *,
+    confidence_level: float = 0.95,
+    resamples: int = 2000,
+    block_length: int | None = None,
+    seed: int = 0,
+) -> BootstrapMeanInterval:
+    observations = [float(value) for value in values]
+    if not observations:
+        raise ValueError("bootstrap requires at least one observation")
+    if any(not math.isfinite(value) for value in observations):
+        raise ValueError("bootstrap observations must be finite")
+    if (
+        isinstance(confidence_level, bool)
+        or not isinstance(confidence_level, (int, float))
+        or not math.isfinite(confidence_level)
+        or not 0 < confidence_level < 1
+    ):
+        raise ValueError("bootstrap confidence_level must be in (0, 1)")
+    if isinstance(resamples, bool) or not isinstance(resamples, int) or resamples < 100:
+        raise ValueError("bootstrap requires at least 100 resamples")
+    if isinstance(seed, bool) or not isinstance(seed, int):
+        raise ValueError("bootstrap seed must be an integer")
+
+    count = len(observations)
+    if block_length is None:
+        selected_block_length = min(count, max(1, round(count ** (1 / 3))))
+    else:
+        if isinstance(block_length, bool) or not isinstance(block_length, int):
+            raise ValueError("bootstrap block_length must be an integer")
+        selected_block_length = block_length
+    if not 1 <= selected_block_length <= count:
+        raise ValueError("bootstrap block_length must be between 1 and the sample size")
+
+    generator = random.Random(seed)
+    bootstrap_means: list[float] = []
+    latest_start = count - selected_block_length
+    for _ in range(resamples):
+        sample: list[float] = []
+        while len(sample) < count:
+            start = generator.randint(0, latest_start)
+            remaining = count - len(sample)
+            sample.extend(observations[start : start + min(selected_block_length, remaining)])
+        bootstrap_means.append(sum(sample) / count)
+    bootstrap_means.sort()
+
+    tail_probability = (1 - confidence_level) / 2
+    return BootstrapMeanInterval(
+        estimate=sum(observations) / count,
+        lower=_percentile(bootstrap_means, tail_probability),
+        upper=_percentile(bootstrap_means, 1 - tail_probability),
+        confidence_level=confidence_level,
+        resamples=resamples,
+        block_length=selected_block_length,
+        observations=count,
+    )
 
 
 def multiclass_brier(probabilities: dict[str, float], actual_outcome: str) -> float:
@@ -108,6 +185,14 @@ def calibration_buckets(
             )
         )
     return buckets
+
+
+def _percentile(sorted_values: list[float], probability: float) -> float:
+    position = (len(sorted_values) - 1) * probability
+    lower_index = math.floor(position)
+    upper_index = math.ceil(position)
+    weight = position - lower_index
+    return sorted_values[lower_index] * (1 - weight) + sorted_values[upper_index] * weight
 
 
 def _validated(
