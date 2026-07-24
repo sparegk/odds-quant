@@ -38,7 +38,11 @@ describe('API client', () => {
 
     expect(data.status.automated_betting).toBe(false)
     expect(data.resource_errors).toEqual({})
-    expect(fetchMock).toHaveBeenCalledTimes(12)
+    expect(fetchMock).toHaveBeenCalledTimes(13)
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/api/v1/data/monitoring'),
+      expect.any(Object),
+    )
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/api/v1/arbitrage/opportunities'),
       expect.any(Object),
@@ -56,7 +60,7 @@ describe('API client', () => {
           automated_betting: false,
         }), { status: 200 }))
       }
-      if (url.endsWith('/api/v1/recommendations')) {
+      if (url.endsWith('/api/v1/data/monitoring')) {
         return Promise.resolve(new Response('{}', { status: 503 }))
       }
       return Promise.resolve(new Response('[]', { status: 200 }))
@@ -66,8 +70,9 @@ describe('API client', () => {
     const data = await loadDashboard()
 
     expect(data.status.phase).toBe('model_baseline')
+    expect(data.monitoring).toBeNull()
     expect(data.signals).toEqual([])
-    expect(data.resource_errors).toEqual({ signals: 'API request failed: 503' })
+    expect(data.resource_errors).toEqual({ monitoring: 'API request failed: 503' })
   })
 
   it('requests comparison data for the selected event', async () => {

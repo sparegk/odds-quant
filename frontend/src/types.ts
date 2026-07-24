@@ -53,6 +53,42 @@ export interface ProviderJob {
   finished_at: string | null
 }
 
+export interface ProviderCollectionHealth {
+  provider_id: number
+  provider: string
+  provider_slug: string
+  latest_job_id: number | null
+  latest_job_status: string | null
+  latest_job_created_at: string | null
+  latest_job_finished_at: string | null
+  latest_success_at: string | null
+  consecutive_completed_jobs: number
+  failures_in_recent_window: number
+  running_job_age_seconds: number | null
+  latest_success_age_seconds: number | null
+  healthy: boolean
+  blockers: string[]
+}
+
+export interface CollectionAlert {
+  code: string
+  severity: string
+  provider_slug: string
+  competition: string | null
+  bookmaker: string | null
+  detail: string
+}
+
+export interface CollectionMonitoring {
+  observed_at: string
+  expected_poll_seconds: number
+  recent_job_limit: number
+  healthy: boolean
+  providers: ProviderCollectionHealth[]
+  alerts: CollectionAlert[]
+  coverage: DataCoverage
+}
+
 export interface ModelVersion {
   id: number
   name: string
@@ -231,6 +267,7 @@ export type DashboardResource =
   | 'providers'
   | 'imports'
   | 'jobs'
+  | 'monitoring'
   | 'models'
   | 'evaluations'
   | 'signals'
@@ -588,6 +625,7 @@ export interface DashboardData {
   providers: ProviderSummary[]
   imports: ImportJob[]
   jobs: ProviderJob[]
+  monitoring?: CollectionMonitoring | null
   models: ModelVersion[]
   evaluations: EvaluationRun[]
   signals: ValueSignal[]

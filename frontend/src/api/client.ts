@@ -7,6 +7,7 @@ import type {
   BankrollSimulation,
   BetBuilderQuote,
   CreateBetBuilderQuote,
+  CollectionMonitoring,
   DataCoverage,
   DashboardData,
   DashboardResource,
@@ -90,7 +91,7 @@ async function loadResource<T>(resource: DashboardResource, path: string, fallba
 }
 
 export async function loadDashboard(): Promise<DashboardData> {
-  const [status, events, providers, imports, jobs, models, evaluations, signals, underdogs, arbitrage, backtests, readiness] = await Promise.all([
+  const [status, events, providers, imports, jobs, monitoring, models, evaluations, signals, underdogs, arbitrage, backtests, readiness] = await Promise.all([
     loadResource<ProjectStatus>('status', '/api/v1/status', {
       phase: 'unavailable',
       sports: [],
@@ -101,6 +102,7 @@ export async function loadDashboard(): Promise<DashboardData> {
     loadResource<ProviderSummary[]>('providers', '/api/v1/providers', []),
     loadResource<ImportJob[]>('imports', '/api/v1/imports', []),
     loadResource<ProviderJob[]>('jobs', '/api/v1/jobs', []),
+    loadResource<CollectionMonitoring | null>('monitoring', '/api/v1/data/monitoring', null),
     loadResource<ModelVersion[]>('models', '/api/v1/models', []),
     loadResource<EvaluationRun[]>('evaluations', '/api/v1/evaluations', []),
     loadResource<ValueSignal[]>('signals', '/api/v1/recommendations', []),
@@ -113,7 +115,7 @@ export async function loadDashboard(): Promise<DashboardData> {
       bookmaker_tax_mappings: 0, bookmaker_constraints: 0, intelligence_records: 0,
     }),
   ])
-  const resources = [status, events, providers, imports, jobs, models, evaluations, signals, underdogs, arbitrage, backtests, readiness]
+  const resources = [status, events, providers, imports, jobs, monitoring, models, evaluations, signals, underdogs, arbitrage, backtests, readiness]
   const resource_errors = Object.fromEntries(
     resources.filter((result) => result.error).map((result) => [result.resource, result.error]),
   ) as DashboardData['resource_errors']
@@ -123,6 +125,7 @@ export async function loadDashboard(): Promise<DashboardData> {
     providers: providers.data,
     imports: imports.data,
     jobs: jobs.data,
+    monitoring: monitoring.data,
     models: models.data,
     evaluations: evaluations.data,
     signals: signals.data,
