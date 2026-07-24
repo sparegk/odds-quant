@@ -90,6 +90,10 @@
   distant and a five-minute interval inside the final six hours before kickoff. Exact window
   and kickoff boundaries are deterministic, restarts skip premature duplicate requests, and
   every accepted price remains non-closing without explicit provider evidence.
+- Provider jobs now retain sanitized per-competition bookmaker counts. Monitoring emits
+  machine-readable alerts for stale success, latest or repeated failures, and bookmaker
+  coverage regression between consecutive active batches. The CLI can fail automation with
+  exit status `3` while returning the complete JSON evidence report.
 
 ## Next action
 
@@ -109,8 +113,9 @@ From `backend`:
 1. Run `python -m app.cli probe-target-bookmakers` and require `complete: true`.
 2. Run `python -m app.cli probe-bet-builder-markets` for sanitized availability metadata.
 3. Poll through the registered scheduler collector for normal atomic imports.
-4. Run `python -m app.cli monitor-collection` (or `GET /api/v1/data/monitoring`) after each
-   accepted batch; require fresh consecutive jobs and review the embedded coverage blockers.
+4. Run `python -m app.cli monitor-collection --fail-on-alerts` (or
+   `GET /api/v1/data/monitoring`) after each accepted batch; require fresh consecutive jobs and
+   review the embedded alerts and coverage blockers.
 5. Keep all secrets, raw licensed responses, and the local database unversioned.
 
 ## Verification and commit discipline

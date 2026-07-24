@@ -156,6 +156,7 @@ def test_collection_monitoring_requires_two_fresh_completed_jobs(
     assert response.status_code == 200
     payload = response.json()
     assert payload["healthy"] is True
+    assert payload["alerts"] == []
     assert payload["expected_poll_seconds"] == 900
     assert payload["coverage"]["permitted_events"] == 0
     health = payload["providers"][0]
@@ -182,6 +183,128 @@ def test_collection_monitoring_requires_two_fresh_completed_jobs(
         "latest_provider_job_not_completed",
         "fewer_than_two_consecutive_completed_jobs",
     ]
+    assert failed["alerts"] == [
+        {
+            "code": "provider_collection_failed",
+            "severity": "critical",
+            "provider_slug": "licensed-monitor",
+            "competition": None,
+            "bookmaker": None,
+            "detail": "Latest provider collection failed.",
+        }
+    ]
+
+
+def test_collection_monitoring_alerts_on_repeated_failures_and_bookmaker_regression(
+    api: tuple[TestClient, Session, datetime],
+) -> None:
+    client, session, as_of = api
+    provider = Provider(
+        slug="licensed-alerts",
+        name="Licensed Alerts",
+        kind="bookmaker_aggregator",
+        is_demo=False,
+        capabilities={"odds": True},
+    )
+    session.add(provider)
+    session.flush()
+    for minutes in (4, 3):
+        finished_at = as_of - timedelta(minutes=minutes)
+        session.add(
+            ProviderJob(
+                provider_id=provider.id,
+                job_type="collect_odds",
+                status="failed",
+                message="Collection failed (ProviderError)",
+                created_at=finished_at - timedelta(seconds=2),
+                finished_at=finished_at,
+            )
+        )
+    session.add_all(
+        [
+            ProviderJob(
+                provider_id=provider.id,
+                job_type="collect_odds",
+                status="completed",
+                message="Imported sanitized prices",
+                created_at=as_of - timedelta(minutes=2),
+                finished_at=as_of - timedelta(minutes=2),
+                metrics={
+                    "competitions": {
+                        "UEFA Champions League Qualification": {
+                            "fixtures": 10,
+                            "bookmakers": {
+                                "Allwyn / Pamestoixima": 30,
+                                "Novibet": 30,
+                            },
+                        }
+                    }
+                },
+            ),
+            ProviderJob(
+                provider_id=provider.id,
+                job_type="collect_odds",
+                status="completed",
+                message="Imported sanitized prices",
+                created_at=as_of - timedelta(minutes=1),
+                finished_at=as_of - timedelta(minutes=1),
+                metrics={
+                    "competitions": {
+                        "UEFA Champions League Qualification": {
+                            "fixtures": 10,
+                            "bookmakers": {"Allwyn / Pamestoixima": 30},
+                        }
+                    }
+                },
+            ),
+        ]
+    )
+    session.commit()
+
+    payload = client.get("/api/v1/data/monitoring").json()
+
+    assert payload["healthy"] is False
+    assert [item["code"] for item in payload["alerts"]] == [
+        "repeated_provider_failures",
+        "bookmaker_coverage_regressed",
+    ]
+    regression = payload["alerts"][1]
+    assert regression["competition"] == "UEFA Champions League Qualification"
+    assert regression["bookmaker"] == "Novibet"
+
+
+def test_collection_monitoring_alerts_when_latest_success_is_stale(
+    api: tuple[TestClient, Session, datetime],
+) -> None:
+    client, session, as_of = api
+    provider = Provider(
+        slug="licensed-stale",
+        name="Licensed Stale",
+        kind="bookmaker_aggregator",
+        is_demo=False,
+        capabilities={"odds": True},
+    )
+    session.add(provider)
+    session.flush()
+    for minutes in (32, 31):
+        finished_at = as_of - timedelta(minutes=minutes)
+        session.add(
+            ProviderJob(
+                provider_id=provider.id,
+                job_type="collect_odds",
+                status="completed",
+                message="Imported sanitized prices",
+                created_at=finished_at - timedelta(seconds=2),
+                finished_at=finished_at,
+            )
+        )
+    session.commit()
+
+    payload = client.get("/api/v1/data/monitoring").json()
+
+    assert payload["healthy"] is False
+    assert payload["alerts"][0]["code"] == "provider_collection_stale"
+    assert payload["alerts"][0]["severity"] == "critical"
 
 
 def test_odds_comparison_calculates_devig_and_best_prices(

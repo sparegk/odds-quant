@@ -767,3 +767,4 @@ class ProviderJob(Base, TimestampMixin):
     status: Mapped[str] = mapped_column(String(30))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     message: Mapped[str] = mapped_column(Text, default="")
+    metrics: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)

@@ -329,6 +329,11 @@ Use the Data Operations coverage audit, or `GET /api/v1/data/coverage`, before t
 
 An upload may still be valid while the competition remains blocked for evaluation. Do not fill gaps with demo records, backfilled timestamps, inferred closing flags, or data acquired outside its licence or source terms.
 
+For machine-actionable provider health, run `python -m app.cli monitor-collection
+--fail-on-alerts`. It exits with status `3` for stale collection, latest/repeated failures, or a
+bookmaker disappearing between consecutive completed batches of the same active competition.
+The JSON contains sanitized counts and alert codes only.
+
 The bookmaker target set is Allwyn's ΠΑΜΕ ΣΤΟΙΧΗΜΑ/Pamestoixima channel and Novibet. Configure a locally accepted Odds-API.io subscription with `ODDSQUANT_ODDS_API_IO_KEY`, then verify that the account exposes both without printing the key:
 
 ```bash
@@ -368,6 +373,7 @@ Current stored-data routes include:
 - `GET /api/v1/matchdays?date={YYYY-MM-DD}&timezone={IANA timezone}`
 - `GET /api/v1/readiness`
 - `GET /api/v1/data/coverage`
+- `GET /api/v1/data/monitoring`
 - `GET /api/v1/matchdays/events/{event_id}`
 - `GET /api/v1/events` and `GET /api/v1/events/{event_id}`
 - `GET /api/v1/providers`

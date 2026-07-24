@@ -255,6 +255,14 @@ Adaptive collection does not designate a closing line. Every accepted provider r
 and its original pre-kickoff source timestamp. Existing atomic completeness, identity,
 timestamp, rate-limit backoff, and post-kickoff rejection rules remain in force.
 
+Each provider job stores sanitized collection metrics: fixture and price counts plus
+per-competition bookmaker row counts. It never stores prices, selections, event identities, or
+raw licensed payloads in job metrics. Monitoring compares the two latest completed metric sets
+only when the competition is present in both. It alerts when a previously present bookmaker
+disappears, when the latest collection fails, when at least two recent jobs failed, or when the
+latest success is stale. `python -m app.cli monitor-collection --fail-on-alerts` prints the same
+JSON report and exits with status `3` when any alert needs automation or operator review.
+
 No collector should optimize frequency at the expense of legality or validity. If the licensed source cannot provide sufficiently fresh data for a use case, the UI reports that limitation and disables strong signals or arbitrage ranking.
 
 ## Storage And Retention

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+from collections import Counter
 from collections.abc import Callable, Iterable
 from datetime import UTC, datetime
 from typing import cast
@@ -17,6 +18,7 @@ from app.db.session import SessionLocal
 from app.providers.base import OddsProvider
 from app.providers.odds_api_io import OddsApiIoProvider
 from app.schemas.fixtures import FixtureImportRow
+from app.schemas.odds import OddsImportRow
 from app.services.demo_seed import seed_demo_data
 from app.services.fixture_import import import_provider_fixtures
 from app.services.odds_import import import_odds_csv, serialize_odds_rows_csv
@@ -100,6 +102,7 @@ def run_provider_collection(
             finished_at=None,
             message="",
             created_at=started_at,
+            metrics={},
         )
         session.add(job)
         session.commit()
@@ -152,7 +155,14 @@ def run_provider_collection(
             message = f"{fixture_message}; provider returned no odds rows"
         else:
             message = "Provider returned no fixture or odds rows"
-        _finish_job(session_factory, job_id, "completed", message, started_at)
+        _finish_job(
+            session_factory,
+            job_id,
+            "completed",
+            message,
+            started_at,
+            metrics=_collection_metrics(fixtures, rows),
+        )
     except Exception as exc:
         error_type = type(exc).__name__
         logger.error(
@@ -178,12 +188,34 @@ def _collect_fixtures(provider: OddsProvider) -> list[FixtureImportRow]:
     return list(typed())
 
 
+def _collection_metrics(
+    fixtures: list[FixtureImportRow], rows: list[OddsImportRow]
+) -> dict[str, object]:
+    fixture_counts = Counter(item.competition for item in fixtures)
+    price_counts: dict[str, Counter[str]] = {}
+    for row in rows:
+        price_counts.setdefault(row.competition, Counter())[row.bookmaker] += 1
+    competitions = {
+        competition: {
+            "fixtures": fixture_counts[competition],
+            "bookmakers": dict(sorted(price_counts.get(competition, Counter()).items())),
+        }
+        for competition in sorted(set(fixture_counts) | set(price_counts))
+    }
+    return {
+        "fixtures_received": len(fixtures),
+        "prices_received": len(rows),
+        "competitions": competitions,
+    }
+
+
 def _finish_job(
     session_factory: SessionFactory,
     job_id: int,
     status: str,
     message: str,
     started_at: datetime,
+    metrics: dict[str, object] | None = None,
 ) -> None:
     with session_factory() as session:
         job = session.get(ProviderJob, job_id)
@@ -192,6 +224,7 @@ def _finish_job(
         job.status = status
         job.finished_at = max(datetime.now(UTC), started_at)
         job.message = message
+        job.metrics = metrics or {}
         session.commit()
 
 

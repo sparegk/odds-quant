@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.models import Provider, ProviderJob
-from app.schemas.api import CollectionMonitoringView, ProviderCollectionHealth
+from app.schemas.api import CollectionAlert, CollectionMonitoringView, ProviderCollectionHealth
 from app.services.data_coverage import data_coverage
 
 
@@ -28,7 +28,8 @@ def _build_monitoring(
 ) -> CollectionMonitoringView:
     providers = _provider_rows(session)
     health = [_provider_health(session, item, poll, now, limit) for item in providers]
-    return _monitoring_view(session, poll, now, limit, health)
+    alerts = _collection_alerts(session, providers, health, limit)
+    return _monitoring_view(session, poll, now, limit, health, alerts)
 
 
 def _provider_rows(session: Session) -> list[Provider]:
@@ -43,16 +44,120 @@ def _provider_rows(session: Session) -> list[Provider]:
 
 
 def _monitoring_view(
-    session: Session, poll: int, now: datetime, limit: int, health: list[ProviderCollectionHealth]
+    session: Session,
+    poll: int,
+    now: datetime,
+    limit: int,
+    health: list[ProviderCollectionHealth],
+    alerts: list[CollectionAlert],
 ) -> CollectionMonitoringView:
     return CollectionMonitoringView(
         observed_at=now,
         expected_poll_seconds=poll,
         recent_job_limit=limit,
-        healthy=bool(health) and all(item.healthy for item in health),
+        healthy=bool(health) and all(item.healthy for item in health) and not alerts,
         providers=health,
+        alerts=alerts,
         coverage=data_coverage(session),
     )
+
+
+def _collection_alerts(
+    session: Session,
+    providers: list[Provider],
+    health: list[ProviderCollectionHealth],
+    limit: int,
+) -> list[CollectionAlert]:
+    health_by_provider = {item.provider_id: item for item in health}
+    alerts: list[CollectionAlert] = []
+    for provider in providers:
+        item = health_by_provider[provider.id]
+        alerts.extend(_health_alerts(item))
+        jobs = _provider_jobs(session, provider.id, limit)
+        alerts.extend(_coverage_regression_alerts(provider, jobs))
+    return alerts
+
+
+def _health_alerts(health: ProviderCollectionHealth) -> list[CollectionAlert]:
+    alerts: list[CollectionAlert] = []
+    if "latest_provider_success_stale" in health.blockers:
+        alerts.append(
+            CollectionAlert(
+                code="provider_collection_stale",
+                severity="critical",
+                provider_slug=health.provider_slug,
+                detail="Latest successful provider collection exceeded two expected intervals.",
+            )
+        )
+    if health.latest_job_status == "failed":
+        alerts.append(
+            CollectionAlert(
+                code="provider_collection_failed",
+                severity="critical",
+                provider_slug=health.provider_slug,
+                detail="Latest provider collection failed.",
+            )
+        )
+    elif health.failures_in_recent_window >= 2:
+        alerts.append(
+            CollectionAlert(
+                code="repeated_provider_failures",
+                severity="warning",
+                provider_slug=health.provider_slug,
+                detail="At least two provider collections failed in the recent job window.",
+            )
+        )
+    return alerts
+
+
+def _coverage_regression_alerts(
+    provider: Provider, jobs: list[ProviderJob]
+) -> list[CollectionAlert]:
+    completed = [job for job in jobs if job.status == "completed" and job.metrics]
+    if len(completed) < 2:
+        return []
+    latest = _job_competition_coverage(completed[0])
+    previous = _job_competition_coverage(completed[1])
+    alerts: list[CollectionAlert] = []
+    for competition in sorted(set(latest) & set(previous)):
+        missing = previous[competition] - latest[competition]
+        for bookmaker in sorted(missing):
+            alerts.append(
+                CollectionAlert(
+                    code="bookmaker_coverage_regressed",
+                    severity="warning",
+                    provider_slug=provider.slug,
+                    competition=competition,
+                    bookmaker=bookmaker,
+                    detail=(
+                        "Bookmaker supplied prices in the previous completed collection but "
+                        "not in the latest completed collection for this active competition."
+                    ),
+                )
+            )
+    return alerts
+
+
+def _job_competition_coverage(job: ProviderJob) -> dict[str, set[str]]:
+    competitions = job.metrics.get("competitions")
+    if not isinstance(competitions, dict):
+        return {}
+    coverage: dict[str, set[str]] = {}
+    for competition, value in competitions.items():
+        if not isinstance(competition, str) or not isinstance(value, dict):
+            continue
+        bookmakers = value.get("bookmakers")
+        if not isinstance(bookmakers, dict):
+            continue
+        coverage[competition] = {
+            bookmaker
+            for bookmaker, count in bookmakers.items()
+            if isinstance(bookmaker, str)
+            and isinstance(count, int)
+            and not isinstance(count, bool)
+            and count > 0
+        }
+    return coverage
 
 
 def _provider_jobs(session: Session, provider_id: int, limit: int) -> list[ProviderJob]:

@@ -15,6 +15,7 @@ from app.providers.openfootball import (
     OpenFootballImportError,
     normalize_openfootball_results,
 )
+from app.schemas.api import CollectionMonitoringView
 from app.schemas.models import EvaluateModelRequest, PredictEventRequest, TrainPoissonRequest
 from app.schemas.signals import GenerateSignalsRequest
 from app.services.collection_monitoring import collection_monitoring
@@ -70,6 +71,11 @@ def _parser() -> argparse.ArgumentParser:
         help="report persisted provider-job health and permitted data coverage",
     )
     monitor.add_argument("--recent-job-limit", type=int, default=10)
+    monitor.add_argument(
+        "--fail-on-alerts",
+        action="store_true",
+        help="exit with status 3 when collection alerts are present",
+    )
     train = commands.add_parser("train-poisson", help="train a versioned Poisson baseline")
     train.add_argument("competition_id", type=int)
     train.add_argument("training_start", type=datetime.fromisoformat)
@@ -219,6 +225,8 @@ def main() -> int:
         print(json.dumps({"status": "rejected", "error": str(exc)}))
         return 2
     print(result.model_dump_json())
+    if isinstance(result, CollectionMonitoringView) and args.fail_on_alerts and result.alerts:
+        return 3
     return 0
 
 

@@ -97,6 +97,17 @@ def test_registered_provider_collection_records_completed_job(
         assert job is not None
         assert job.status == "completed"
         assert job.message == "Imported 24 prices across 8 snapshots"
+        assert job.metrics["prices_received"] == 24
+        assert job.metrics["fixtures_received"] == 0
+        assert job.metrics["competitions"] == {
+            "Synthetic Premier Division": {
+                "fixtures": 0,
+                "bookmakers": {
+                    "Licensed Atlas Sports": 12,
+                    "Licensed Beacon Bet": 12,
+                },
+            }
+        }
         assert session.scalar(select(func.count()).select_from(OddsSnapshot)) == 8
 
 

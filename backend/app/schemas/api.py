@@ -96,12 +96,22 @@ class ProviderCollectionHealth(BaseModel):
     blockers: list[str]
 
 
+class CollectionAlert(BaseModel):
+    code: str
+    severity: str
+    provider_slug: str
+    competition: str | None = None
+    bookmaker: str | None = None
+    detail: str
+
+
 class CollectionMonitoringView(BaseModel):
     observed_at: datetime
     expected_poll_seconds: int
     recent_job_limit: int
     healthy: bool
     providers: list[ProviderCollectionHealth]
+    alerts: list[CollectionAlert]
     coverage: DataCoverageView
 
 
