@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     api_football_key: str | None = None
     api_football_base_url: str = "https://v3.football.api-sports.io"
     api_football_daily_request_reserve: int = Field(default=10, ge=1, le=99)
+    api_football_poll_seconds: int = Field(default=1800, ge=300)
     matchday_timezone: str = "Europe/Athens"
     matchday_form_matches: int = Field(default=5, ge=1, le=20)
 

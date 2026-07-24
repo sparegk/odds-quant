@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 import httpx
 import pytest
@@ -332,3 +332,79 @@ def test_fixture_injury_snapshot_retains_provider_status_and_reason() -> None:
 
     assert snapshot.injuries[0].provider_status == "Questionable"
     assert snapshot.injuries[0].reason == "Knock"
+
+
+def test_fixture_catalog_retains_exact_provider_identities() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.params["date"] == "2026-07-28"
+        assert request.url.params["timezone"] == "UTC"
+        return httpx.Response(
+            200,
+            headers={"date": "Sat, 25 Jul 2026 10:00:00 GMT"},
+            json=_envelope(
+                [
+                    {
+                        "fixture": {
+                            "id": 9001,
+                            "date": "2026-07-28T18:00:00+00:00",
+                            "status": {"short": "NS"},
+                        },
+                        "league": {
+                            "id": 2,
+                            "name": "UEFA Champions League",
+                            "season": 2026,
+                        },
+                        "teams": {
+                            "home": {"id": 51, "name": "Northbridge"},
+                            "away": {"id": 52, "name": "Harbour Athletic"},
+                        },
+                    }
+                ]
+            ),
+        )
+
+    with ApiFootballClient(
+        SECRET,
+        transport=httpx.MockTransport(handler),
+        clock=lambda: datetime(2026, 7, 25, 10, 0, 5, tzinfo=UTC),
+    ) as client:
+        snapshot = client.fixture_catalog(date(2026, 7, 28))
+
+    assert snapshot.fixtures[0].fixture_id == 9001
+    assert snapshot.fixtures[0].home_team_id == 51
+    assert snapshot.fixtures[0].kickoff_at == datetime(2026, 7, 28, 18, 0, tzinfo=UTC)
+
+
+def test_fixture_catalog_conservatively_handles_bounded_server_clock_skew() -> None:
+    def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"date": "Sat, 25 Jul 2026 10:01:30 GMT"},
+            json=_envelope([]),
+        )
+
+    with ApiFootballClient(
+        SECRET,
+        transport=httpx.MockTransport(handler),
+        clock=lambda: datetime(2026, 7, 25, 10, 0, tzinfo=UTC),
+    ) as client:
+        snapshot = client.fixture_catalog(date(2026, 7, 25))
+
+    assert snapshot.observed_at == datetime(2026, 7, 25, 10, 1, 30, tzinfo=UTC)
+
+
+def test_fixture_catalog_rejects_unbounded_server_clock_skew() -> None:
+    def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"date": "Sat, 25 Jul 2026 10:05:01 GMT"},
+            json=_envelope([]),
+        )
+
+    with ApiFootballClient(
+        SECRET,
+        transport=httpx.MockTransport(handler),
+        clock=lambda: datetime(2026, 7, 25, 10, 0, tzinfo=UTC),
+    ) as client:
+        with pytest.raises(ApiFootballError, match="after observation"):
+            client.fixture_catalog(date(2026, 7, 25))

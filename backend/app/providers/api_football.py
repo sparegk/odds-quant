@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from email.utils import parsedate_to_datetime
 from typing import Literal
 
@@ -108,6 +108,26 @@ class ApiFootballInjurySnapshot(BaseModel):
     published_at: datetime
     observed_at: datetime
     injuries: list[ApiFootballInjury]
+
+
+class ApiFootballFixture(BaseModel):
+    fixture_id: int
+    kickoff_at: datetime
+    status: str
+    league_id: int
+    league_name: str
+    season: int
+    home_team_id: int
+    home_team_name: str
+    away_team_id: int
+    away_team_name: str
+
+
+class ApiFootballFixtureSnapshot(BaseModel):
+    on_date: date
+    published_at: datetime
+    observed_at: datetime
+    fixtures: list[ApiFootballFixture]
 
 
 class _Subscription(BaseModel):
@@ -283,6 +303,43 @@ class _InjuryResponse(BaseModel):
     fixture: _InjuryFixture
 
 
+class _FixtureStatus(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    short: str = Field(min_length=1)
+
+
+class _CatalogFixture(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: int
+    date: datetime
+    status: _FixtureStatus
+
+
+class _CatalogLeague(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: int
+    name: str = Field(min_length=1)
+    season: int
+
+
+class _CatalogTeams(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    home: _TeamRef
+    away: _TeamRef
+
+
+class _CatalogResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    fixture: _CatalogFixture
+    league: _CatalogLeague
+    teams: _CatalogTeams
+
+
 class ApiFootballClient:
     """Credentialed client with a hard daily quota reserve and sanitized failures."""
 
@@ -384,9 +441,7 @@ class ApiFootballClient:
             raise ApiFootballError(
                 "API-Football omitted the publication timestamp for player statistics"
             )
-        observed_at = _aware_utc(self._clock(), "observation timestamp")
-        if published_at > observed_at:
-            raise ApiFootballError("API-Football publication timestamp is after observation")
+        observed_at = _observed_at(self._clock(), published_at)
         try:
             teams = [_TeamPlayers.model_validate(item) for item in _response_list(payload)]
         except ValidationError as exc:
@@ -425,6 +480,46 @@ class ApiFootballClient:
             published_at=published_at,
             observed_at=observed_at,
             performances=performances,
+        )
+
+    def fixture_catalog(self, on_date: date) -> ApiFootballFixtureSnapshot:
+        payload, published_at = self._get_snapshot(
+            "/fixtures", date=on_date.isoformat(), timezone="UTC"
+        )
+        if published_at is None:
+            raise ApiFootballError(
+                "API-Football omitted the publication timestamp for fixture catalog"
+            )
+        observed_at = _observed_at(self._clock(), published_at)
+        try:
+            rows = [_CatalogResponse.model_validate(item) for item in _response_list(payload)]
+        except ValidationError as exc:
+            raise ApiFootballError("API-Football returned invalid fixture catalog") from exc
+        fixtures: list[ApiFootballFixture] = []
+        seen: set[int] = set()
+        for row in rows:
+            if row.fixture.id in seen:
+                raise ApiFootballError("API-Football returned a duplicate catalog fixture")
+            seen.add(row.fixture.id)
+            fixtures.append(
+                ApiFootballFixture(
+                    fixture_id=row.fixture.id,
+                    kickoff_at=_aware_utc(row.fixture.date, "fixture kickoff"),
+                    status=row.fixture.status.short,
+                    league_id=row.league.id,
+                    league_name=row.league.name,
+                    season=row.league.season,
+                    home_team_id=row.teams.home.id,
+                    home_team_name=row.teams.home.name,
+                    away_team_id=row.teams.away.id,
+                    away_team_name=row.teams.away.name,
+                )
+            )
+        return ApiFootballFixtureSnapshot(
+            on_date=on_date,
+            published_at=published_at,
+            observed_at=observed_at,
+            fixtures=fixtures,
         )
 
     def fixture_lineup_snapshot(self, fixture_id: int) -> ApiFootballLineupSnapshot:
@@ -523,9 +618,7 @@ class ApiFootballClient:
         payload, published_at = self._get_snapshot(path, fixture=str(fixture_id))
         if published_at is None:
             raise ApiFootballError(f"API-Football omitted the publication timestamp for {label}")
-        observed_at = _aware_utc(self._clock(), "observation timestamp")
-        if published_at > observed_at:
-            raise ApiFootballError("API-Football publication timestamp is after observation")
+        observed_at = _observed_at(self._clock(), published_at)
         return payload, published_at, observed_at
 
     def _get_envelope(self, path: str, **params: str) -> _Envelope:
@@ -583,6 +676,15 @@ def _aware_utc(value: datetime, label: str) -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
         raise ValueError(f"{label} must include a UTC offset")
     return value.astimezone(UTC)
+
+
+def _observed_at(local_time: datetime, published_at: datetime) -> datetime:
+    observed_at = _aware_utc(local_time, "observation timestamp")
+    if published_at <= observed_at:
+        return observed_at
+    if published_at - observed_at <= timedelta(minutes=5):
+        return published_at
+    raise ApiFootballError("API-Football publication timestamp is after observation")
 
 
 def _position(value: str) -> str:

@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 from pydantic import BaseModel
 
 from app.core.config import get_settings
 from app.db.session import SessionLocal
+from app.providers.api_football import ApiFootballClient, ApiFootballError
 from app.providers.odds_api_io import OddsApiIoClient, OddsApiIoError
 from app.providers.openfootball import (
     OPENFOOTBALL_LICENSE_URL,
@@ -18,6 +19,7 @@ from app.providers.openfootball import (
 from app.schemas.api import CollectionMonitoringView
 from app.schemas.models import EvaluateModelRequest, PredictEventRequest, TrainPoissonRequest
 from app.schemas.signals import GenerateSignalsRequest
+from app.services.api_football_collection import collect_api_football_intelligence
 from app.services.collection_monitoring import collection_monitoring
 from app.services.demo_seed import seed_demo_data, seed_demo_results
 from app.services.evaluation import EvaluationError, evaluate_model
@@ -66,6 +68,11 @@ def _parser() -> argparse.ArgumentParser:
         "probe-bet-builder-markets",
         help="report sanitized corner/shot/player market metadata without ingesting props",
     )
+    api_football = commands.add_parser(
+        "collect-api-football-intelligence",
+        help="collect exact-match lineups, injuries, and completed player statistics",
+    )
+    api_football.add_argument("--date", type=date.fromisoformat, default=date.today())
     monitor = commands.add_parser(
         "monitor-collection",
         help="report persisted provider-job health and permitted data coverage",
@@ -163,6 +170,23 @@ def main() -> int:
                     base_url=settings.odds_api_io_base_url,
                 ) as client:
                     result = client.probe_bet_builder_markets(observed_at=datetime.now(UTC))
+            elif args.command == "collect-api-football-intelligence":
+                settings = get_settings()
+                with ApiFootballClient(
+                    settings.api_football_key or "",
+                    base_url=settings.api_football_base_url,
+                    daily_request_reserve=settings.api_football_daily_request_reserve,
+                ) as client:
+                    account = client.account_probe()
+                    if not account.active:
+                        raise ApiFootballError("API-Football account is inactive")
+                    coverage = client.target_coverage().leagues
+                    result = collect_api_football_intelligence(
+                        session,
+                        client=client,
+                        coverage=coverage,
+                        on_date=args.date,
+                    )
             elif args.command == "monitor-collection":
                 settings = get_settings()
                 result = collection_monitoring(
@@ -219,6 +243,9 @@ def main() -> int:
         print(json.dumps({"status": "rejected", "error": str(exc)}))
         return 2
     except OddsApiIoError as exc:
+        print(json.dumps({"status": "rejected", "error": str(exc)}))
+        return 2
+    except ApiFootballError as exc:
         print(json.dumps({"status": "rejected", "error": str(exc)}))
         return 2
     except (ModelingError, EvaluationError, SignalGenerationError) as exc:

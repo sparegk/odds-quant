@@ -4,7 +4,7 @@ import logging
 import re
 from collections import Counter
 from collections.abc import Callable, Iterable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import cast
 
 from apscheduler.schedulers.blocking import BlockingScheduler  # type: ignore[import-untyped]
@@ -15,10 +15,16 @@ from app.collectors.registry import register_odds_provider, registered_odds_prov
 from app.core.config import Settings, get_settings
 from app.db.models import Event, Provider, ProviderJob
 from app.db.session import SessionLocal
+from app.providers.api_football import (
+    API_FOOTBALL_TERMS_URL,
+    ApiFootballClient,
+    ApiFootballLeagueCoverage,
+)
 from app.providers.base import OddsProvider
 from app.providers.odds_api_io import OddsApiIoProvider
 from app.schemas.fixtures import FixtureImportRow
 from app.schemas.odds import OddsImportRow
+from app.services.api_football_collection import collect_api_football_intelligence
 from app.services.demo_seed import seed_demo_data
 from app.services.fixture_import import import_provider_fixtures
 from app.services.odds_import import import_odds_csv, serialize_odds_rows_csv
@@ -26,6 +32,7 @@ from app.services.odds_import import import_odds_csv, serialize_odds_rows_csv
 logger = logging.getLogger("oddsquant.worker")
 SessionFactory = Callable[[], Session]
 _SENSITIVE_QUERY_PATTERN = re.compile(r"(?i)([?&](?:api[_-]?key|access[_-]?token|token)=)[^&\s]+")
+_api_football_coverage_cache: tuple[datetime, list[ApiFootballLeagueCoverage]] | None = None
 
 
 def _utc(value: datetime) -> datetime:
@@ -313,6 +320,96 @@ def register_configured_providers(settings: Settings) -> None:
         )
 
 
+def poll_api_football_intelligence(
+    *,
+    settings: Settings | None = None,
+    session_factory: SessionFactory = SessionLocal,
+    now: datetime | None = None,
+) -> int | None:
+    runtime_settings = settings or get_settings()
+    if not runtime_settings.api_football_key:
+        return None
+    current = _utc(now or datetime.now(UTC))
+    with session_factory() as session:
+        provider = session.scalar(select(Provider).where(Provider.slug == "api-football"))
+        if provider is None:
+            provider = Provider(
+                slug="api-football",
+                name="API-Football",
+                kind="licensed_api",
+                is_demo=False,
+                terms_url=API_FOOTBALL_TERMS_URL,
+                capabilities={
+                    "football_intelligence": True,
+                    "acquisition_method": "licensed_api",
+                    "usage_authorized": True,
+                },
+            )
+            session.add(provider)
+            session.flush()
+        job = ProviderJob(
+            provider_id=provider.id,
+            job_type="collect_football_intelligence",
+            status="running",
+            finished_at=None,
+            message="",
+            created_at=current,
+            metrics={},
+        )
+        session.add(job)
+        session.commit()
+        job_id = job.id
+    try:
+        global _api_football_coverage_cache
+        with ApiFootballClient(
+            runtime_settings.api_football_key,
+            base_url=runtime_settings.api_football_base_url,
+            daily_request_reserve=runtime_settings.api_football_daily_request_reserve,
+        ) as client:
+            cached = _api_football_coverage_cache
+            if cached is None or current - cached[0] >= timedelta(hours=24):
+                account = client.account_probe()
+                if not account.active:
+                    raise RuntimeError("API-Football account is inactive")
+                coverage = client.target_coverage().leagues
+                _api_football_coverage_cache = (current, coverage)
+            else:
+                coverage = cached[1]
+            with session_factory() as session:
+                summary = collect_api_football_intelligence(
+                    session,
+                    client=client,
+                    coverage=coverage,
+                    on_date=current.date(),
+                    now=current,
+                )
+        message = (
+            f"Matched {summary.fixtures_matched}/{summary.fixtures_seen} API-Football fixtures; "
+            f"imported {summary.lineups_imported} lineups, "
+            f"{summary.injuries_imported} availability records, and "
+            f"{summary.player_snapshots_imported} player snapshots"
+        )
+        _finish_job(
+            session_factory,
+            job_id,
+            "completed",
+            message,
+            current,
+            metrics=summary.model_dump(mode="json"),
+        )
+    except Exception as exc:
+        error_type = type(exc).__name__
+        logger.error("API-Football collection failed: error_type=%s", error_type)
+        _finish_job(
+            session_factory,
+            job_id,
+            "failed",
+            f"Collection failed ({error_type})",
+            current,
+        )
+    return job_id
+
+
 def seed_development_demo(
     *,
     settings: Settings | None = None,
@@ -342,6 +439,17 @@ def build_scheduler(settings: Settings | None = None) -> BlockingScheduler:
         next_run_time=datetime.now(UTC),
         kwargs={"settings": runtime_settings},
     )
+    if runtime_settings.api_football_key:
+        scheduler.add_job(
+            poll_api_football_intelligence,
+            "interval",
+            seconds=runtime_settings.api_football_poll_seconds,
+            id="poll-api-football-intelligence",
+            coalesce=True,
+            max_instances=1,
+            next_run_time=datetime.now(UTC),
+            kwargs={"settings": runtime_settings},
+        )
     if runtime_settings.seed_demo and runtime_settings.environment.casefold() != "production":
         scheduler.add_job(
             seed_development_demo,

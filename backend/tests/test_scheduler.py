@@ -205,6 +205,15 @@ def test_provider_polling_defaults_to_fifteen_minutes() -> None:
     assert Settings().provider_poll_seconds == 900
     assert Settings().provider_near_kickoff_poll_seconds == 300
     assert Settings().provider_near_kickoff_window_seconds == 21600
+    assert Settings().api_football_poll_seconds == 1800
+
+
+def test_scheduler_registers_api_football_poll_only_when_configured() -> None:
+    without_key = build_scheduler(Settings(api_football_key=None))
+    with_key = build_scheduler(Settings(api_football_key="configured-secret"))
+
+    assert without_key.get_job("poll-api-football-intelligence") is None
+    assert with_key.get_job("poll-api-football-intelligence") is not None
 
 
 def test_near_kickoff_polling_cannot_be_slower_than_base_polling() -> None:
@@ -320,7 +329,13 @@ def test_adaptive_polling_skips_restart_duplicate_until_interval_is_due(
 
 
 def test_scheduler_wakes_at_near_kickoff_cadence() -> None:
-    scheduler = build_scheduler(Settings(seed_demo=False, provider_near_kickoff_poll_seconds=180))
+    scheduler = build_scheduler(
+        Settings(
+            seed_demo=False,
+            api_football_key="",
+            provider_near_kickoff_poll_seconds=180,
+        )
+    )
     jobs = scheduler.get_jobs()
 
     assert len(jobs) == 1
