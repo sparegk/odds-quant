@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
+from typing import Literal
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -48,6 +51,24 @@ class ApiFootballCoverageProbe(BaseModel):
     provider: str = "API-Football"
     leagues: list[ApiFootballLeagueCoverage]
     missing_league_ids: list[int]
+
+
+class ApiFootballPlayerPerformance(BaseModel):
+    player_id: int
+    player_name: str
+    team_id: int
+    team_name: str
+    position: Literal["GK", "DF", "MF", "FW"]
+    starter: bool
+    minutes: int = Field(ge=0, le=130)
+    metrics: dict[str, float]
+
+
+class ApiFootballPlayerSnapshot(BaseModel):
+    fixture_id: int
+    published_at: datetime
+    observed_at: datetime
+    performances: list[ApiFootballPlayerPerformance]
 
 
 class _Subscription(BaseModel):
@@ -125,6 +146,50 @@ class _Envelope(BaseModel):
     response: object
 
 
+class _PlayerRef(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: int
+    name: str = Field(min_length=1)
+
+
+class _TeamRef(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: int
+    name: str = Field(min_length=1)
+
+
+class _Games(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    minutes: int | None = Field(default=None, ge=0, le=130)
+    position: str | None = None
+    rating: float | None = None
+    captain: bool = False
+    substitute: bool | None = None
+
+
+class _PlayerStatistics(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    games: _Games
+
+
+class _PlayerPerformance(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    player: _PlayerRef
+    statistics: list[_PlayerStatistics]
+
+
+class _TeamPlayers(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    team: _TeamRef
+    players: list[_PlayerPerformance]
+
+
 class ApiFootballClient:
     """Credentialed client with a hard daily quota reserve and sanitized failures."""
 
@@ -135,6 +200,7 @@ class ApiFootballClient:
         base_url: str = "https://v3.football.api-sports.io",
         daily_request_reserve: int = 10,
         transport: httpx.BaseTransport | None = None,
+        clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         if not api_key.strip():
             raise ApiFootballError("ODDSQUANT_API_FOOTBALL_KEY is not configured")
@@ -143,6 +209,7 @@ class ApiFootballClient:
         self._api_key = api_key
         self._daily_request_reserve = daily_request_reserve
         self._remaining: int | None = None
+        self._clock = clock
         self._client = httpx.Client(
             base_url=base_url.rstrip("/"),
             headers={"x-apisports-key": api_key},
@@ -216,7 +283,61 @@ class ApiFootballClient:
             missing_league_ids=missing,
         )
 
+    def fixture_player_snapshot(self, fixture_id: int) -> ApiFootballPlayerSnapshot:
+        if fixture_id <= 0:
+            raise ValueError("fixture id must be positive")
+        payload, published_at = self._get_snapshot("/fixtures/players", fixture=str(fixture_id))
+        if published_at is None:
+            raise ApiFootballError(
+                "API-Football omitted the publication timestamp for player statistics"
+            )
+        observed_at = _aware_utc(self._clock(), "observation timestamp")
+        if published_at > observed_at:
+            raise ApiFootballError("API-Football publication timestamp is after observation")
+        try:
+            teams = [_TeamPlayers.model_validate(item) for item in _response_list(payload)]
+        except ValidationError as exc:
+            raise ApiFootballError(
+                "API-Football returned invalid fixture player statistics"
+            ) from exc
+        performances: list[ApiFootballPlayerPerformance] = []
+        seen: set[int] = set()
+        for team in teams:
+            for player in team.players:
+                if player.player.id in seen:
+                    raise ApiFootballError("API-Football returned a duplicate fixture player")
+                if not player.statistics:
+                    continue
+                statistics = player.statistics[0]
+                games = statistics.games
+                if games.position is None or games.substitute is None:
+                    raise ApiFootballError(
+                        "API-Football omitted player position or starter evidence"
+                    )
+                seen.add(player.player.id)
+                performances.append(
+                    ApiFootballPlayerPerformance(
+                        player_id=player.player.id,
+                        player_name=player.player.name,
+                        team_id=team.team.id,
+                        team_name=team.team.name,
+                        position=_position(games.position),
+                        starter=not games.substitute,
+                        minutes=games.minutes or 0,
+                        metrics=_numeric_metrics(statistics),
+                    )
+                )
+        return ApiFootballPlayerSnapshot(
+            fixture_id=fixture_id,
+            published_at=published_at,
+            observed_at=observed_at,
+            performances=performances,
+        )
+
     def _get_envelope(self, path: str, **params: str) -> _Envelope:
+        return self._get_snapshot(path, **params)[0]
+
+    def _get_snapshot(self, path: str, **params: str) -> tuple[_Envelope, datetime | None]:
         if self._remaining is not None and self._remaining <= self._daily_request_reserve:
             raise ApiFootballError("API-Football daily request reserve reached")
         try:
@@ -232,7 +353,7 @@ class ApiFootballClient:
             raise ApiFootballError("API-Football returned an invalid response envelope") from exc
         if payload.errors:
             raise ApiFootballError("API-Football rejected the request")
-        return payload
+        return payload, _published_at(response)
 
     def _update_remaining(self, response: httpx.Response) -> None:
         raw = response.headers.get("x-ratelimit-requests-remaining")
@@ -251,3 +372,43 @@ def _response_list(payload: _Envelope) -> list[object]:
     if not isinstance(payload.response, list) or payload.results != len(payload.response):
         raise ApiFootballError("API-Football response count does not match its payload")
     return payload.response
+
+
+def _published_at(response: httpx.Response) -> datetime | None:
+    raw = response.headers.get("date")
+    if raw is None:
+        return None
+    try:
+        parsed = parsedate_to_datetime(raw)
+    except (TypeError, ValueError) as exc:
+        raise ApiFootballError("API-Football returned an invalid publication timestamp") from exc
+    return _aware_utc(parsed, "publication timestamp")
+
+
+def _aware_utc(value: datetime, label: str) -> datetime:
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError(f"{label} must include a UTC offset")
+    return value.astimezone(UTC)
+
+
+def _position(value: str) -> str:
+    positions = {"G": "GK", "D": "DF", "M": "MF", "F": "FW"}
+    try:
+        return positions[value.upper()]
+    except KeyError as exc:
+        raise ApiFootballError(f"unsupported API-Football player position: {value}") from exc
+
+
+def _numeric_metrics(statistics: _PlayerStatistics) -> dict[str, float]:
+    payload = statistics.model_dump(exclude_none=True)
+    metrics: dict[str, float] = {}
+    for group, values in payload.items():
+        if group == "games" or not isinstance(values, dict):
+            continue
+        for name, value in values.items():
+            if isinstance(value, bool) or not isinstance(value, int | float):
+                continue
+            metrics[f"{group}.{name}"] = float(value)
+    if statistics.games.rating is not None:
+        metrics["games.rating"] = statistics.games.rating
+    return metrics

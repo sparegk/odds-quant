@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import httpx
 import pytest
 
@@ -159,3 +161,73 @@ def test_provider_errors_are_sanitized() -> None:
             client.account_probe()
 
     assert SECRET not in str(caught.value)
+
+
+def test_fixture_player_snapshot_requires_server_publication_time_and_normalizes() -> None:
+    observed_at = datetime(2026, 7, 25, 10, 0, 5, tzinfo=UTC)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path.endswith("/fixtures/players")
+        assert request.url.params["fixture"] == "9001"
+        return httpx.Response(
+            200,
+            headers={
+                "date": "Sat, 25 Jul 2026 10:00:00 GMT",
+                "x-ratelimit-requests-remaining": "95",
+            },
+            json=_envelope(
+                [
+                    {
+                        "team": {"id": 51, "name": "Northbridge"},
+                        "players": [
+                            {
+                                "player": {"id": 701, "name": "Research Keeper"},
+                                "statistics": [
+                                    {
+                                        "games": {
+                                            "minutes": 90,
+                                            "position": "G",
+                                            "rating": "7.2",
+                                            "captain": False,
+                                            "substitute": False,
+                                        },
+                                        "goals": {"saves": 4},
+                                        "passes": {"total": 32, "key": 1},
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ]
+            ),
+        )
+
+    with ApiFootballClient(
+        SECRET,
+        transport=httpx.MockTransport(handler),
+        clock=lambda: observed_at,
+    ) as client:
+        snapshot = client.fixture_player_snapshot(9001)
+
+    assert snapshot.published_at == datetime(2026, 7, 25, 10, 0, tzinfo=UTC)
+    assert snapshot.observed_at == observed_at
+    assert len(snapshot.performances) == 1
+    performance = snapshot.performances[0]
+    assert performance.position == "GK"
+    assert performance.starter is True
+    assert performance.minutes == 90
+    assert performance.metrics == {
+        "games.rating": 7.2,
+        "goals.saves": 4.0,
+        "passes.key": 1.0,
+        "passes.total": 32.0,
+    }
+
+
+def test_fixture_player_snapshot_rejects_missing_publication_timestamp() -> None:
+    def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=_envelope([]))
+
+    with ApiFootballClient(SECRET, transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(ApiFootballError, match="omitted the publication timestamp"):
+            client.fixture_player_snapshot(9001)
