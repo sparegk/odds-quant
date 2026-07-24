@@ -142,6 +142,40 @@ def test_intelligence_import_rejects_empty_or_unknown_payloads() -> None:
                 "provider_name": "Manual research",
             }
         )
+
+
+def test_flashscore_evidence_requires_manual_or_licensed_authorized_provenance() -> None:
+    request = _base_request()
+    request.update(
+        {
+            "provider_slug": "flashscore-manual",
+            "provider_name": "Flashscore manual research",
+            "source_url": "https://www.flashscore.com/match/example/summary/lineups/",
+        }
+    )
+
+    with pytest.raises(ValidationError, match="explicit permission"):
+        IntelligenceImportRequest.model_validate(request)
+
+    request.update(
+        {
+            "provider_terms_url": "https://www.flashscore.com/terms-of-use/",
+            "acquisition_method": "manual_entry",
+            "usage_authorized": True,
+        }
+    )
+    parsed = IntelligenceImportRequest.model_validate(request)
+
+    assert parsed.acquisition_method == "manual_entry"
+    assert parsed.usage_authorized is True
+
+
+def test_external_feed_requires_terms_and_authorization() -> None:
+    request = _base_request()
+    request["acquisition_method"] = "official_feed"
+
+    with pytest.raises(ValidationError, match="external feeds require"):
+        IntelligenceImportRequest.model_validate(request)
     with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
         IntelligenceImportRequest.model_validate(
             {

@@ -4,6 +4,13 @@
 
 OddsQuant may ingest football data from licensed sports-data APIs, official competition or club sources, user-uploaded CSV files, manual entries, and clearly labelled demo data. It must not scrape protected bookmaker or sports-data services, bypass access controls, or infer that a named bookmaker exposes a public API.
 
+Flashscore lineup pages may be referenced only through an expressly licensed integration or a
+timestamped manual/user-supplied observation whose lawful-use attestation and source URL are
+stored. Flashscore's published terms prohibit automated requests, scraping, aggregation, and
+recreation without express consent, so OddsQuant does not implement a Flashscore scraper or
+private-endpoint adapter. A Flashscore predicted lineup remains third-party expected-lineup
+evidence; it is never relabelled as confirmed and never backfilled into an earlier cutoff.
+
 Every record must identify its provider, source type, source key, source update time, ingestion time, effective period, and whether it is real, manually entered, or generated. Raw permitted responses should be retained immutably with a checksum so normalization can be reproduced.
 
 ## Matchday Provider Split

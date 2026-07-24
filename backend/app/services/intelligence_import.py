@@ -136,6 +136,10 @@ def import_availability_csv(
         source_key=source_key,
         provider_slug=provider_slug,
         provider_name=provider_name,
+        provider_kind=provider.kind,
+        provider_terms_url=provider.terms_url,
+        acquisition_method=str(provider.capabilities.get("acquisition_method", "manual_entry")),
+        usage_authorized=bool(provider.capabilities.get("usage_authorized", False)),
         is_demo=provider.is_demo,
         availability=availability,
     )
@@ -502,14 +506,23 @@ def _provider(session: Session, request: IntelligenceImportRequest) -> Provider:
         provider = Provider(
             slug=request.provider_slug,
             name=request.provider_name,
-            kind="user_intelligence",
+            kind=request.provider_kind,
             is_demo=request.is_demo,
-            terms_url=None,
-            capabilities={"football_intelligence": True},
+            terms_url=request.provider_terms_url,
+            capabilities={
+                "football_intelligence": True,
+                "acquisition_method": request.acquisition_method,
+                "usage_authorized": request.usage_authorized,
+            },
         )
         session.add(provider)
         session.flush()
-    elif provider.name != request.provider_name or provider.is_demo != request.is_demo:
+    elif (
+        provider.name != request.provider_name
+        or provider.is_demo != request.is_demo
+        or provider.kind != request.provider_kind
+        or provider.terms_url != request.provider_terms_url
+    ):
         raise IntelligenceImportError(
             [_error("provider_slug", "provider identity conflicts with stored provider")]
         )

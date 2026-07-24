@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Literal
+from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -9,6 +10,8 @@ Position = Literal["GK", "DF", "MF", "FW"]
 AvailabilityStatus = Literal["available", "doubtful", "out", "injured", "suspended", "unknown"]
 EvidenceClass = Literal["official", "licensed_provider", "manual", "correction"]
 LineupType = Literal["expected", "confirmed"]
+ProviderKind = Literal["user_intelligence", "licensed_api", "official_source", "demo"]
+AcquisitionMethod = Literal["manual_entry", "licensed_api", "official_feed", "demo"]
 
 
 class StrictInput(BaseModel):
@@ -170,6 +173,11 @@ class IntelligenceImportRequest(StrictInput):
     source_key: str = Field(min_length=1, max_length=255)
     provider_slug: str = Field(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$", max_length=60)
     provider_name: str = Field(min_length=1, max_length=120)
+    provider_kind: ProviderKind = "user_intelligence"
+    provider_terms_url: str | None = Field(default=None, max_length=500)
+    source_url: str | None = Field(default=None, max_length=500)
+    acquisition_method: AcquisitionMethod = "manual_entry"
+    usage_authorized: bool = False
     is_demo: bool = False
     players: list[PlayerInput] = Field(default_factory=list, max_length=5000)
     coaches: list[CoachInput] = Field(default_factory=list, max_length=1000)
@@ -196,6 +204,36 @@ class IntelligenceImportRequest(StrictInput):
         )
         if not any(collections):
             raise ValueError("intelligence import must contain at least one record")
+        for field, value in (
+            ("provider_terms_url", self.provider_terms_url),
+            ("source_url", self.source_url),
+        ):
+            if value is not None:
+                parsed = urlparse(value)
+                if parsed.scheme != "https" or not parsed.netloc:
+                    raise ValueError(f"{field} must be an absolute HTTPS URL")
+        source_host = urlparse(self.source_url or "").hostname or ""
+        is_flashscore = "flashscore" in self.provider_slug or source_host.casefold().endswith(
+            ("flashscore.com", "flashscore.mobi")
+        )
+        if is_flashscore:
+            if self.acquisition_method not in {"manual_entry", "licensed_api"}:
+                raise ValueError(
+                    "Flashscore evidence cannot be collected by an automated or unofficial feed"
+                )
+            if not self.usage_authorized:
+                raise ValueError(
+                    "Flashscore evidence requires explicit permission or a user attestation "
+                    "of lawful use"
+                )
+            terms_host = urlparse(self.provider_terms_url or "").hostname or ""
+            if not terms_host.casefold().endswith("flashscore.com"):
+                raise ValueError("Flashscore evidence must retain the provider terms URL")
+        elif self.acquisition_method in {"licensed_api", "official_feed"}:
+            if not self.provider_terms_url or not self.usage_authorized:
+                raise ValueError(
+                    "external feeds require a terms URL and explicit authorization evidence"
+                )
         return self
 
 

@@ -18,6 +18,7 @@ from app.db.models import (
     LineupMember,
     LineupSnapshot,
     Player,
+    Provider,
     RawIngestion,
 )
 from app.db.session import Base, get_db
@@ -124,6 +125,31 @@ def test_bundle_import_is_atomic_timestamped_and_idempotent(session: Session) ->
     assert raw.schema_version == "football-intelligence-bundle-v1"
     assert raw.source_updated_at is not None
     assert raw.source_updated_at.replace(tzinfo=UTC) == NOW - timedelta(minutes=2)
+
+
+def test_bundle_persists_authorized_source_provenance(session: Session) -> None:
+    request = _request(session)
+    request.provider_slug = "flashscore-manual"
+    request.provider_name = "Flashscore manual research"
+    request.provider_terms_url = "https://www.flashscore.com/terms-of-use/"
+    request.source_url = "https://www.flashscore.com/match/example/summary/lineups/"
+    request.acquisition_method = "manual_entry"
+    request.usage_authorized = True
+
+    result = import_intelligence_bundle(session, request, now=NOW)
+
+    provider = session.scalar(select(Provider).where(Provider.slug == "flashscore-manual"))
+    raw = session.scalar(
+        select(RawIngestion).where(RawIngestion.content_sha256 == result.content_sha256)
+    )
+    assert provider is not None and raw is not None
+    assert provider.terms_url == "https://www.flashscore.com/terms-of-use/"
+    assert provider.capabilities["acquisition_method"] == "manual_entry"
+    assert provider.capabilities["usage_authorized"] is True
+    assert isinstance(raw.payload, dict)
+    source_url = raw.payload["source_url"]
+    assert isinstance(source_url, str)
+    assert source_url.startswith("https://www.flashscore.com/")
 
 
 def test_bundle_import_rolls_back_every_domain_row_on_identity_error(session: Session) -> None:
