@@ -72,6 +72,10 @@
   endpoint supplies timestamps without an explicit closing designation. Joining them would
   infer closing status, so closing ingestion remains blocked pending one response containing
   both the designation and an original timestamp strictly before kickoff.
+- A sanitized historical-result audit found 143 settled UEFA qualification events, including
+  two without `ft` and seven with extra-time or after-penalty structures. The provider does not
+  document the football period-key semantics or a result publication/update timestamp. Import
+  remains blocked rather than inferring regulation-time scores or accepting a partial feed.
 
 ## Next action
 

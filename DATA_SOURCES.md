@@ -75,6 +75,27 @@ therefore keeps these records non-closing. Onboarding provider closing evidence 
 blocked until one response supplies both an explicit closing designation and its original
 source timestamp strictly before kickoff.
 
+## Result Evidence Audit
+
+### Odds-API.io historical-event review: 2026-07-24
+
+The provider's official
+[`/historical/events`](https://docs.odds-api.io/api-reference/historical/get-historical-events)
+documentation describes finished events and exposes top-level scores plus a `periods` object,
+but it does not define the football period keys or include a result publication/update
+timestamp.
+
+A sanitized field-only probe covering July 2026 found 42 settled Champions League
+qualification events and 101 settled Conference League qualification events. Of those 143
+events, 141 exposed `ft`; seven also exposed extra-time or after-penalty structures, and two
+did not expose `ft`. No raw identities or score values were retained by the probe.
+
+OddsQuant must not infer regulation-time settlement from undocumented period keys, silently
+drop incomplete events, or claim an original result publication time from the later retrieval
+time. Result ingestion from this endpoint remains blocked until the provider documents the
+period semantics and supplies source timing, or a separately permitted result source passes
+the same identity, completeness, settlement, and chronology gates.
+
 ### Live discovery receipt: 2026-07-23
 
 The authenticated football league catalog exposed these UEFA competition slugs:
