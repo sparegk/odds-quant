@@ -13,6 +13,7 @@ from app.providers.api_football import ApiFootballClient, ApiFootballError
 from app.providers.odds_api_io import OddsApiIoClient, OddsApiIoError
 from app.providers.openfootball import (
     OPENFOOTBALL_CHAMPIONS_LICENSE_URL,
+    OPENFOOTBALL_EUROPE_LICENSE_URL,
     OPENFOOTBALL_LICENSE_URL,
     OpenFootballImportError,
     normalize_openfootball_results,
@@ -77,6 +78,11 @@ def _parser() -> argparse.ArgumentParser:
         "--source-updated-at", required=True, type=datetime.fromisoformat
     )
     openfootball_text.add_argument("--team-aliases", type=Path)
+    openfootball_text.add_argument(
+        "--repository",
+        choices=("champions-league", "europe"),
+        default="champions-league",
+    )
     commands.add_parser(
         "probe-target-bookmakers",
         help="verify configured odds-provider coverage for required bookmakers",
@@ -201,10 +207,22 @@ def main() -> int:
                     session,
                     filename=f"openfootball-champions-{args.season}-{args.source_commit[:12]}.csv",
                     content=serialize_result_rows_csv(rows),
-                    provider_slug="openfootball-champions-cc0",
-                    provider_name="OpenFootball Champions League CC0 results",
+                    provider_slug=(
+                        "openfootball-champions-cc0"
+                        if args.repository == "champions-league"
+                        else "openfootball-europe-cc0"
+                    ),
+                    provider_name=(
+                        "OpenFootball Champions League CC0 results"
+                        if args.repository == "champions-league"
+                        else "OpenFootball Europe CC0 results"
+                    ),
                     provider_kind="open_data",
-                    provider_terms_url=OPENFOOTBALL_CHAMPIONS_LICENSE_URL,
+                    provider_terms_url=(
+                        OPENFOOTBALL_CHAMPIONS_LICENSE_URL
+                        if args.repository == "champions-league"
+                        else OPENFOOTBALL_EUROPE_LICENSE_URL
+                    ),
                 )
             elif args.command == "probe-target-bookmakers":
                 settings = get_settings()

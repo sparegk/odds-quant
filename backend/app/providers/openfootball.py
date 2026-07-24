@@ -15,13 +15,14 @@ OPENFOOTBALL_LICENSE_URL = "https://github.com/openfootball/football.json/blob/m
 OPENFOOTBALL_CHAMPIONS_LICENSE_URL = (
     "https://github.com/openfootball/champions-league/blob/master/LICENSE.md"
 )
+OPENFOOTBALL_EUROPE_LICENSE_URL = "https://github.com/openfootball/europe/blob/master/LICENSE.md"
 _COMMIT_PATTERN = re.compile(r"[0-9a-f]{40}")
 _TEXT_DATE_PATTERN = re.compile(
     r"^\s*(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+([A-Z][a-z]{2})\s+(\d{1,2})(?:\s+(\d{4}))?\s*$"
 )
 _TEXT_MATCH_PATTERN = re.compile(
-    r"^\s*(\d{1,2}:\d{2})\s+(.+?)\s+\([A-Z]{3}\)\s+v\s+"
-    r"(.+?)\s+\([A-Z]{3}\)\s+(\d+)-(\d+)(?:\s+\(\d+-\d+\))?\s*$"
+    r"^\s*(\d{1,2}:\d{2})\s+(.+?)(?:\s+\([A-Z]{3}\))?\s+v\s+"
+    r"(.+?)(?:\s+\([A-Z]{3}\))?\s+(\d+)-(\d+)(?:\s+\(\d+-\d+\))?\s*$"
 )
 
 
@@ -182,7 +183,12 @@ def normalize_openfootball_text_results(
             )
         kickoff_text, source_home, source_away, home_goals, away_goals = match.groups()
         hour, minute = (int(part) for part in kickoff_text.split(":"))
-        kickoff_local = current_date.replace(hour=hour, minute=minute, tzinfo=local_timezone)
+        try:
+            kickoff_local = current_date.replace(hour=hour, minute=minute, tzinfo=local_timezone)
+        except ValueError as exc:
+            raise OpenFootballImportError(
+                f"line {line_number} contains an invalid kickoff time"
+            ) from exc
         kickoff_at = kickoff_local.astimezone(UTC)
         if observed_at < kickoff_at:
             raise OpenFootballImportError(

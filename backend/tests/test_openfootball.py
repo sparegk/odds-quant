@@ -157,9 +157,9 @@ def test_normalizes_unambiguous_football_text_with_explicit_aliases() -> None:
 
 
 def test_football_text_rejects_ambiguous_timed_result() -> None:
-    content = b"  Tue Jul 8 2024\n    16:00 Broken v Row 1-0\n"
+    content = b"  Tue Jul 8 2024\n    25:00 Broken v Row 1-0\n"
 
-    with pytest.raises(OpenFootballImportError, match="not an unambiguous completed match"):
+    with pytest.raises(OpenFootballImportError, match="invalid kickoff time"):
         normalize_openfootball_text_results(
             content,
             dataset_path="2025-26/clq.txt",
@@ -170,6 +170,29 @@ def test_football_text_rejects_ambiguous_timed_result() -> None:
             source_commit=COMMIT,
             source_updated_at=PUBLISHED_AT,
         )
+
+
+def test_normalizes_domestic_football_text_without_country_codes() -> None:
+    rows = normalize_openfootball_text_results(
+        (
+            b"= Challenge League 2024/25\n"
+            b"  Fri Jul 19 2024\n"
+            b"    20:15  FC Aarau v FC Thun Berner Oberland  1-3 (0-2)\n"
+        ),
+        dataset_path="switzerland/2024-25_ch2.txt",
+        competition="Swiss Challenge League",
+        country="Switzerland",
+        season="2024/25",
+        timezone="Europe/Zurich",
+        source_commit=COMMIT,
+        source_updated_at=PUBLISHED_AT,
+        team_aliases={"FC Thun Berner Oberland": "FC Thun"},
+    )
+
+    assert rows[0].home_team == "FC Aarau"
+    assert rows[0].away_team == "FC Thun"
+    assert rows[0].home_goals == 1
+    assert rows[0].away_goals == 3
 
 
 def test_import_persists_champions_repository_provenance(session: Session) -> None:
