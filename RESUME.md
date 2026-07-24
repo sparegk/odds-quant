@@ -76,6 +76,11 @@
   two without `ft` and seven with extra-time or after-penalty structures. The provider does not
   document the football period-key semantics or a result publication/update timestamp. Import
   remains blocked rather than inferring regulation-time scores or accepting a partial feed.
+- A 2026-07-24 football-data.org review found current Champions League qualification only on
+  `TIER_TWO`, while Conference League qualification was `TIER_FOUR` and still cataloged a 2025
+  season. Its score contract is sufficiently explicit, but plan coverage and post-cancellation
+  reference restrictions are not yet compatible with approving it for both live feeds. No
+  subscription or adapter registration was authorized.
 
 ## Next action
 

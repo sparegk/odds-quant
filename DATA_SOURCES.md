@@ -77,6 +77,25 @@ source timestamp strictly before kickoff.
 
 ## Result Evidence Audit
 
+### football-data.org provider review: 2026-07-24
+
+The provider's live unauthenticated v4 competition catalog listed Champions League
+Qualification (`CLQ`, id `2174`) on `TIER_TWO` with a current 2026 season, but Conference
+League Qualification (`COLQ`, id `2185`) on `TIER_FOUR` with its latest catalog season ending
+in August 2025. The public coverage page lists both competitions but does not establish that
+the current Conference League qualification season is available to the intended account.
+
+The v4 match contract is otherwise technically promising: `FINISHED`, `lastUpdated`,
+`score.duration`, `regularTime`, `extraTime`, and `penalties` provide the fields required to
+separate regulation settlement from later phases. The provider's terms require visible
+attribution, bind an API key to one application, and prohibit continuing to reference obtained
+football data after subscription cancellation.
+
+Do not register this adapter until the exact subscribed plan is confirmed to cover both target
+qualification competitions and the provider confirms retention/reference rights compatible
+with reproducible model evidence. No paid subscription or account change is authorized by this
+review.
+
 ### Odds-API.io historical-event review: 2026-07-24
 
 The provider's official
