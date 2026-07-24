@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { DashboardData, ValueSignal } from './types'
+import type { DashboardData, ResearchValueCandidate, ValueSignal } from './types'
 import { ArbitrageResearch, BacktestResearch, InlineError, InlineLoading, ResourceErrors, SignalResearch, SuccessNotice } from './App'
 import { chooseDefaultEventId, preserveSelectedEventId } from './lib/events'
 import { UnderdogScanner } from './components/UnderdogScanner'
@@ -44,6 +44,48 @@ const valueSignal: ValueSignal = {
   generated_at: '2026-07-19T12:00:00Z',
   reasons: ['The calibrated model probability exceeds compatible market consensus.'],
   risks: ['Price acceptance is not guaranteed.'],
+}
+
+const researchCandidate: ResearchValueCandidate = {
+  event_id: 7,
+  home_team: 'Northbridge FC',
+  away_team: 'Harbour Athletic',
+  competition: 'Research League',
+  kickoff_at: '2026-07-20T18:00:00Z',
+  output_id: 11,
+  model_version_id: 3,
+  model_version: 'poisson-research-v1',
+  model_evaluation_status: 'unvalidated',
+  evidence_class: 'team_baseline',
+  prediction_id: 13,
+  market_id: 17,
+  market_type: 'MATCH_RESULT',
+  line: null,
+  selection_id: 19,
+  selection_code: 'AWAY',
+  selection_name: 'Harbour Athletic',
+  bookmaker_id: 23,
+  bookmaker: 'Beacon',
+  odds_snapshot_id: 29,
+  offered_odds: 3.4,
+  raw_implied_probability: 0.2941,
+  market_fair_probability: 0.28,
+  model_probability: 0.35,
+  lower_probability: 0.22,
+  upper_probability: 0.49,
+  expected_value: 0.19,
+  lower_expected_value: -0.252,
+  probability_edge: 0.07,
+  odds_observed_at: '2026-07-19T12:00:00Z',
+  odds_age_minutes: 2,
+  bookmaker_count: 1,
+  is_stale: false,
+  status: 'research_only',
+  qualification_blockers: [
+    'Model has no qualifying chronological calibration.',
+    "The model's lower probability bound does not retain positive EV.",
+  ],
+  risks: ['This is an exploratory model/price disagreement, not a betting recommendation.'],
 }
 
 const dashboard: DashboardData = {
@@ -167,6 +209,15 @@ describe('ValueOpportunities', () => {
     render(<ValueOpportunities dashboard={dashboard} onOpenEvent={() => undefined} />)
     fireEvent.change(screen.getByLabelText('Minimum lower EV (%)'), { target: { value: '10' } })
     expect(screen.getByText('No opportunities match these filters')).toBeInTheDocument()
+  })
+
+  it('keeps upcoming research gaps visible without calling them recommendations', () => {
+    render(<ValueOpportunities dashboard={{ ...dashboard, signals: [], research_candidates: [researchCandidate] }} onOpenEvent={() => undefined} />)
+
+    expect(screen.getByText('Research-only candidates')).toBeInTheDocument()
+    expect(screen.getByText('Research #1 · not qualified')).toBeInTheDocument()
+    expect(screen.getByText('Model has no qualifying chronological calibration.')).toBeInTheDocument()
+    expect(screen.getByText('No qualified VALUE recommendations yet')).toBeInTheDocument()
   })
 })
 

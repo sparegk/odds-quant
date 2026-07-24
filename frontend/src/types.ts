@@ -271,6 +271,7 @@ export type DashboardResource =
   | 'models'
   | 'evaluations'
   | 'signals'
+  | 'research_candidates'
   | 'underdogs'
   | 'arbitrage'
   | 'backtests'
@@ -645,6 +646,45 @@ export interface SuggestionMarketStatus {
   reason: string
 }
 
+export interface ResearchValueCandidate {
+  event_id: number
+  home_team: string
+  away_team: string
+  competition: string
+  kickoff_at: string
+  output_id: number
+  model_version_id: number
+  model_version: string
+  model_evaluation_status: string
+  evidence_class: string
+  prediction_id: number
+  market_id: number
+  market_type: string
+  line: number | null
+  selection_id: number
+  selection_code: string
+  selection_name: string
+  bookmaker_id: number
+  bookmaker: string
+  odds_snapshot_id: number
+  offered_odds: number
+  raw_implied_probability: number
+  market_fair_probability: number
+  model_probability: number
+  lower_probability: number
+  upper_probability: number
+  expected_value: number
+  lower_expected_value: number
+  probability_edge: number
+  odds_observed_at: string
+  odds_age_minutes: number
+  bookmaker_count: number
+  is_stale: boolean
+  status: 'research_only'
+  qualification_blockers: string[]
+  risks: string[]
+}
+
 export interface AvailabilityAuditItem {
   code: string
   label: string
@@ -743,6 +783,7 @@ export interface DashboardData {
   models: ModelVersion[]
   evaluations: EvaluationRun[]
   signals: ValueSignal[]
+  research_candidates?: ResearchValueCandidate[]
   underdogs: ValueSignal[]
   arbitrage: ArbitrageOpportunity[]
   backtests: SignalBacktest[]

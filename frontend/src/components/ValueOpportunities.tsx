@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { AlertTriangle, Filter, TrendingUp } from 'lucide-react'
 
 import { formatDateTime, humanizeCode } from '../lib/format'
-import type { DashboardData, ValueSignal } from '../types'
+import type { DashboardData, ResearchValueCandidate, ValueSignal } from '../types'
 
 type ValueSort = 'LOWER_EV' | 'EDGE' | 'CONFIDENCE' | 'FRESHNESS'
 
@@ -13,6 +13,7 @@ export function ValueOpportunities({ dashboard, onOpenEvent }: { dashboard: Dash
   const [minimumConfidence, setMinimumConfidence] = useState('0')
   const [sort, setSort] = useState<ValueSort>('LOWER_EV')
   const events = useMemo(() => new Map(dashboard.events.map((event) => [event.id, event])), [dashboard.events])
+  const researchCandidates = dashboard.research_candidates ?? []
   const competitions = unique(dashboard.signals.map((signal) => events.get(signal.event_id)?.competition))
   const markets = unique(dashboard.signals.map((signal) => signal.market_type))
   const filtered = useMemo(() => dashboard.signals
@@ -23,26 +24,40 @@ export function ValueOpportunities({ dashboard, onOpenEvent }: { dashboard: Dash
     .sort((left, right) => sortValue(right, sort) - sortValue(left, sort) || right.expected_value - left.expected_value),
   [competition, dashboard.signals, events, market, minimumConfidence, minimumLowerEv, sort])
 
-  if (!dashboard.signals.length) {
-    return <div className="space-y-5"><EmptyValue title="No stored value opportunities" detail="VALUE recommendations appear only after a non-demo model passes chronological calibration and a prediction joins complete compatible pre-kickoff odds." /><div className="border-l-4 border-amber-400 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">Demo evaluations, stale prices, weak calibration, or uncertainty wider than the estimated edge cannot unlock this screen.</div></div>
+  if (!dashboard.signals.length && !researchCandidates.length) {
+    return <div className="space-y-5"><EmptyValue title="No value research for upcoming matches" detail="The screen will populate when an upcoming non-demo prediction joins a complete compatible pre-kickoff price." /><div className="border-l-4 border-amber-400 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">Qualified VALUE recommendations still require chronological calibration, fresh prices, adequate samples, and positive conservative EV.</div></div>
   }
 
   const averageLowerEv = filtered.length ? filtered.reduce((sum, signal) => sum + signal.lower_expected_value, 0) / filtered.length : null
   const freshest = filtered.length ? Math.min(...filtered.map((signal) => signal.odds_age_minutes)) : null
+  const positiveRawEv = researchCandidates.filter((candidate) => candidate.expected_value > 0).length
 
   return <div className="space-y-7">
-    <div><p className="text-xs font-bold uppercase text-emerald-700">Calibrated model versus market</p><h2 className="mt-1 text-lg font-bold">Value opportunity research</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-zinc-500">Inspect immutable recommendations using the conservative probability bound, price freshness, market consensus, and exact evaluation provenance.</p></div>
-    <section className="grid grid-cols-2 border border-zinc-200 bg-white md:grid-cols-4"><ValueMetric label="Recommendations" value={filtered.length.toString()} /><ValueMetric label="Average lower EV" value={averageLowerEv === null ? '—' : signedPercent(averageLowerEv)} /><ValueMetric label="Freshest price" value={freshest === null ? '—' : `${freshest.toFixed(0)}m`} /><ValueMetric label="Policy" value="VALUE only" /></section>
-    <section className="border-y border-zinc-200 bg-white p-4"><div className="mb-4 flex items-center gap-2 text-sm font-bold"><Filter aria-hidden="true" size={16} />Research controls</div><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-      <Select label="Competition" value={competition} onChange={setCompetition} options={[['ALL', 'All competitions'], ...competitions.map((value) => [value, value])]} />
-      <Select label="Market" value={market} onChange={setMarket} options={[['ALL', 'All markets'], ...markets.map((value) => [value, humanizeCode(value)])]} />
-      <NumberFilter label="Minimum lower EV (%)" value={minimumLowerEv} onChange={setMinimumLowerEv} />
-      <NumberFilter label="Minimum confidence (%)" value={minimumConfidence} onChange={setMinimumConfidence} max="100" />
-      <Select label="Rank by" value={sort} onChange={(value) => setSort(value as ValueSort)} options={[["LOWER_EV", "Conservative EV"], ["EDGE", "Probability edge"], ["CONFIDENCE", "Confidence"], ["FRESHNESS", "Freshest price"]]} />
-    </div></section>
-    {filtered.length ? <div className="space-y-4">{filtered.map((signal, index) => <ValueCard key={signal.id} event={events.get(signal.event_id)} rank={index + 1} signal={signal} onOpenEvent={onOpenEvent} />)}</div> : <EmptyValue title="No opportunities match these filters" detail="Reduce the conservative EV or confidence threshold, or choose a broader competition and market." />}
-    <div className="border-l-4 border-sky-500 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950">Model edge, line-shopping improvement, and bookmaker margin remain separate. Every recommendation is conditional on its stored price and cutoff.</div>
+    <div><p className="text-xs font-bold uppercase text-emerald-700">Upcoming evidence versus market</p><h2 className="mt-1 text-lg font-bold">Value opportunity research</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-zinc-500">Qualified recommendations and exploratory model/price disagreements are kept separate. Research-only gaps show what looks interesting and exactly why it is not yet a VALUE signal.</p></div>
+    <section className="grid grid-cols-2 border border-zinc-200 bg-white md:grid-cols-4"><ValueMetric label="Qualified VALUE" value={dashboard.signals.length.toString()} /><ValueMetric label="Research gaps" value={researchCandidates.length.toString()} /><ValueMetric label="Positive raw EV" value={positiveRawEv.toString()} /><ValueMetric label="Policy" value="Fail closed" /></section>
+    {researchCandidates.length ? <section className="space-y-4"><div><p className="text-xs font-bold uppercase text-amber-700">Upcoming watchlist</p><h3 className="mt-1 font-bold">Research-only candidates</h3><p className="mt-1 text-sm leading-6 text-zinc-500">Ranked by raw model EV before calibration. Never treat these as recommendations while any listed gate remains blocked.</p></div>{researchCandidates.map((candidate, index) => <ResearchCandidateCard candidate={candidate} key={`${candidate.output_id}-${candidate.selection_id}`} rank={index + 1} onOpenEvent={onOpenEvent} />)}</section> : null}
+    {dashboard.signals.length ? <>
+      <div><p className="text-xs font-bold uppercase text-emerald-700">Qualified set</p><h3 className="mt-1 font-bold">Calibrated VALUE recommendations</h3></div>
+      <section className="grid grid-cols-2 border border-zinc-200 bg-white md:grid-cols-3"><ValueMetric label="Recommendations shown" value={filtered.length.toString()} /><ValueMetric label="Average lower EV" value={averageLowerEv === null ? '—' : signedPercent(averageLowerEv)} /><ValueMetric label="Freshest price" value={freshest === null ? '—' : `${freshest.toFixed(0)}m`} /></section>
+      <section className="border-y border-zinc-200 bg-white p-4"><div className="mb-4 flex items-center gap-2 text-sm font-bold"><Filter aria-hidden="true" size={16} />Qualified-signal controls</div><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <Select label="Competition" value={competition} onChange={setCompetition} options={[["ALL", "All competitions"], ...competitions.map((value) => [value, value])]} />
+        <Select label="Market" value={market} onChange={setMarket} options={[["ALL", "All markets"], ...markets.map((value) => [value, humanizeCode(value)])]} />
+        <NumberFilter label="Minimum lower EV (%)" value={minimumLowerEv} onChange={setMinimumLowerEv} />
+        <NumberFilter label="Minimum confidence (%)" value={minimumConfidence} onChange={setMinimumConfidence} max="100" />
+        <Select label="Rank by" value={sort} onChange={(value) => setSort(value as ValueSort)} options={[["LOWER_EV", "Conservative EV"], ["EDGE", "Probability edge"], ["CONFIDENCE", "Confidence"], ["FRESHNESS", "Freshest price"]]} />
+      </div></section>
+      {filtered.length ? <div className="space-y-4">{filtered.map((signal, index) => <ValueCard key={signal.id} event={events.get(signal.event_id)} rank={index + 1} signal={signal} onOpenEvent={onOpenEvent} />)}</div> : <EmptyValue title="No opportunities match these filters" detail="Reduce the conservative EV or confidence threshold, or choose a broader competition and market." />}
+    </> : <EmptyValue title="No qualified VALUE recommendations yet" detail="The watchlist above remains visible while calibration, sample, uncertainty, freshness, and market-coverage gates are unresolved." />}
+    <div className="border-l-4 border-sky-500 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950">Model edge, raw expected value, conservative qualified value, line-shopping improvement, and bookmaker margin remain separate quantities.</div>
   </div>
+}
+
+function ResearchCandidateCard({ candidate, rank, onOpenEvent }: { candidate: ResearchValueCandidate; rank: number; onOpenEvent: (eventId: number) => void }) {
+  return <article className="border border-amber-200 bg-white"><div className="grid gap-4 p-5 lg:grid-cols-[minmax(260px,1fr)_repeat(5,minmax(90px,auto))] lg:items-center">
+    <div><p className="text-xs font-bold uppercase text-amber-700">Research #{rank} · not qualified</p><h4 className="mt-1 font-bold">{candidate.home_team} vs {candidate.away_team}</h4><p className="mt-1 text-sm text-zinc-600">{candidate.selection_name} · <strong>{candidate.offered_odds.toFixed(2)}</strong> at {candidate.bookmaker}</p><p className="mt-1 text-xs text-zinc-500">{candidate.competition} · {formatDateTime(candidate.kickoff_at)}</p></div>
+    <CompactMetric label="Model" value={percent(candidate.model_probability)} /><CompactMetric label="Market" value={percent(candidate.market_fair_probability)} /><CompactMetric label="Edge" value={signedPercent(candidate.probability_edge)} /><CompactMetric label="Raw EV" value={signedPercent(candidate.expected_value)} /><CompactMetric label="Lower EV" value={signedPercent(candidate.lower_expected_value)} />
+  </div><div className="grid gap-3 border-t border-amber-200 bg-amber-50 px-5 py-4 text-xs md:grid-cols-[1fr_auto] md:items-start"><div><p className="font-bold uppercase text-amber-900">Why it cannot qualify</p><ul className="mt-1 list-disc space-y-1 pl-4 text-amber-950">{candidate.qualification_blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}</ul><details className="mt-3 text-zinc-600"><summary className="cursor-pointer font-semibold">Research provenance and risks</summary><p className="mt-1">Model interval {percent(candidate.lower_probability)}–{percent(candidate.upper_probability)} · {candidate.bookmaker_count} book(s) · price age {candidate.odds_age_minutes.toFixed(0)}m</p><p>Model {candidate.model_version} ({candidate.model_evaluation_status}) · prediction #{candidate.prediction_id} · snapshot #{candidate.odds_snapshot_id}</p><p>Observed {formatDateTime(candidate.odds_observed_at)} · evidence {humanizeCode(candidate.evidence_class)}</p>{candidate.risks.map((risk) => <p className="mt-1 flex gap-1.5 text-amber-800" key={risk}><AlertTriangle aria-hidden="true" size={14} />{risk}</p>)}</details></div><button className="rounded-[5px] border border-amber-300 bg-white px-3 py-2 font-bold hover:bg-amber-100" onClick={() => onOpenEvent(candidate.event_id)} type="button">Open event</button></div>
+  </article>
 }
 
 function ValueCard({ event, rank, signal, onOpenEvent }: { event: DashboardData['events'][number] | undefined; rank: number; signal: ValueSignal; onOpenEvent: (eventId: number) => void }) {

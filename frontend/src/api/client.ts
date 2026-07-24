@@ -25,6 +25,7 @@ import type {
   ProviderJob,
   ProviderSummary,
   ReadinessCounts,
+  ResearchValueCandidate,
   SignalBacktest,
   SignalBatch,
   ValueSignal,
@@ -92,7 +93,7 @@ async function loadResource<T>(resource: DashboardResource, path: string, fallba
 }
 
 export async function loadDashboard(): Promise<DashboardData> {
-  const [status, events, providers, imports, jobs, monitoring, models, evaluations, signals, underdogs, arbitrage, backtests, readiness] = await Promise.all([
+  const [status, events, providers, imports, jobs, monitoring, models, evaluations, signals, researchCandidates, underdogs, arbitrage, backtests, readiness] = await Promise.all([
     loadResource<ProjectStatus>('status', '/api/v1/status', {
       phase: 'unavailable',
       sports: [],
@@ -107,6 +108,7 @@ export async function loadDashboard(): Promise<DashboardData> {
     loadResource<ModelVersion[]>('models', '/api/v1/models', []),
     loadResource<EvaluationRun[]>('evaluations', '/api/v1/evaluations', []),
     loadResource<ValueSignal[]>('signals', '/api/v1/recommendations', []),
+    loadResource<ResearchValueCandidate[]>('research_candidates', '/api/v1/signals/research-candidates', []),
     loadResource<ValueSignal[]>('underdogs', '/api/v1/signals/underdogs', []),
     loadResource<ArbitrageOpportunity[]>('arbitrage', '/api/v1/arbitrage/opportunities', []),
     loadResource<SignalBacktest[]>('backtests', '/api/v1/backtests', []),
@@ -116,7 +118,7 @@ export async function loadDashboard(): Promise<DashboardData> {
       bookmaker_tax_mappings: 0, bookmaker_constraints: 0, intelligence_records: 0,
     }),
   ])
-  const resources = [status, events, providers, imports, jobs, monitoring, models, evaluations, signals, underdogs, arbitrage, backtests, readiness]
+  const resources = [status, events, providers, imports, jobs, monitoring, models, evaluations, signals, researchCandidates, underdogs, arbitrage, backtests, readiness]
   const resource_errors = Object.fromEntries(
     resources.filter((result) => result.error).map((result) => [result.resource, result.error]),
   ) as DashboardData['resource_errors']
@@ -130,6 +132,7 @@ export async function loadDashboard(): Promise<DashboardData> {
     models: models.data,
     evaluations: evaluations.data,
     signals: signals.data,
+    research_candidates: researchCandidates.data,
     underdogs: underdogs.data,
     arbitrage: arbitrage.data,
     backtests: backtests.data,
