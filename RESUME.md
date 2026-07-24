@@ -81,6 +81,11 @@
   season. Its score contract is sufficiently explicit, but plan coverage and post-cancellation
   reference restrictions are not yet compatible with approving it for both live feeds. No
   subscription or adapter registration was authorized.
+- A Sportmonks review found explicit UEFA qualifying-round coverage, regulation/extra-time/
+  penalty score types, correction handling, and terms that permit storage but prohibit resale.
+  It remains unapproved because access is paid, no token is configured, and current provider
+  documentation conflicts on whether `last_processed_at` remains in fixture responses. A
+  credentialed field-only probe is required before implementation or registration.
 
 ## Next action
 

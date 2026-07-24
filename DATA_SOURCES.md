@@ -96,6 +96,24 @@ qualification competitions and the provider confirms retention/reference rights 
 with reproducible model evidence. No paid subscription or account change is authorized by this
 review.
 
+### Sportmonks provider review: 2026-07-24
+
+Sportmonks' official coverage material states that Champions League and Conference League
+qualifying rounds are available under a paid plan. Its v3 fixture contract has stable fixture,
+league, season, stage, and participant identifiers; explicit final states; and score
+descriptions that distinguish regular time, extra time, and penalty shootouts. The provider
+also documents a correction process.
+
+The terms permit storage and distribution of data returned by the service while prohibiting
+unapproved resale. Access is subscription- and league-selection-dependent. No Sportmonks token
+is currently configured, and no subscription purchase is authorized by this review.
+
+The timestamp contract still requires a credentialed schema probe. Fixture guides describe
+`last_processed_at`, but the current v3 changelog lists that field as removed. Do not approve
+or register an adapter until an authorized account confirms both target leagues, the actual
+fixture fields, correction visibility, and a source-timing strategy that does not substitute
+ingestion time for an unavailable provider update timestamp.
+
 ### Odds-API.io historical-event review: 2026-07-24
 
 The provider's official
