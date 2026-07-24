@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel
 
 from app.schemas.api import EventSummary, MarketComparison
-from app.schemas.builder import BetBuilderQuoteView
+from app.schemas.builder import BetBuilderLegView, BetBuilderQuoteView
 from app.schemas.models import ModelOutputView
 from app.schemas.signals import ValueSignalView
 
@@ -74,6 +75,46 @@ class ResearchGateView(BaseModel):
     reasons: list[str]
 
 
+class MatchSuggestionView(BaseModel):
+    rank: int
+    source_kind: Literal["single", "builder"]
+    source_id: int
+    bookmaker_code: Literal["allwyn", "novibet"]
+    bookmaker: str
+    market_type: str
+    selection_code: str
+    selection_name: str
+    line: float | None
+    legs: list[BetBuilderLegView]
+    offered_odds: float
+    model_probability: float
+    lower_probability: float
+    market_fair_probability: float | None
+    expected_value: float
+    lower_expected_value: float
+    confidence: float | None
+    conservative_score: float
+    price_observed_at: datetime
+    generated_at: datetime
+    reasons: list[str]
+    risks: list[str]
+
+
+class MatchdayBookmakerOptionView(BaseModel):
+    code: Literal["allwyn", "novibet"]
+    name: str
+    selected: bool
+    has_current_prices: bool
+    offered_market_types: list[str]
+
+
+class SuggestionMarketStatusView(BaseModel):
+    code: str
+    label: str
+    status: Literal["available", "price_only", "blocked"]
+    reason: str
+
+
 class MatchdayEventDetailView(BaseModel):
     event: EventSummary
     competition_group: str
@@ -84,6 +125,10 @@ class MatchdayEventDetailView(BaseModel):
     latest_prediction: ModelOutputView | None
     signals: list[ValueSignalView]
     builder_quotes: list[BetBuilderQuoteView]
+    suggestions: list[MatchSuggestionView]
+    selected_bookmakers: list[Literal["allwyn", "novibet"]]
+    bookmaker_options: list[MatchdayBookmakerOptionView]
+    suggestion_market_statuses: list[SuggestionMarketStatusView]
     player_research: ResearchGateView
     builder_value: ResearchGateView
     bookmaker_guidance: str

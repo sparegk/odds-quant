@@ -21,6 +21,7 @@ from app.db.models import (
     Team,
     ValueSignal,
 )
+from app.quant.match_suggestions import BookmakerCode
 from app.schemas.api import EventSummary
 from app.schemas.matchday import (
     MatchdayCompetitionView,
@@ -33,6 +34,11 @@ from app.schemas.matchday import (
 )
 from app.services.builder import list_bet_builder_quotes
 from app.services.catalog import get_event, odds_comparison
+from app.services.match_suggestions import (
+    bookmaker_options,
+    build_match_suggestions,
+    market_statuses,
+)
 from app.services.modeling import list_event_predictions
 from app.services.signals import list_value_signals
 
@@ -234,6 +240,7 @@ def get_matchday_event_detail(
     as_of: datetime | None = None,
     stale_after_seconds: int = 300,
     form_matches: int = 5,
+    selected_bookmakers: set[BookmakerCode] | None = None,
 ) -> MatchdayEventDetailView | None:
     event_summary = get_event(session, event_id)
     event = session.get(Event, event_id)
@@ -259,6 +266,21 @@ def get_matchday_event_detail(
         for quote in list_bet_builder_quotes(session, event_id=event.id)
         if _utc(quote.quoted_at) <= cutoff
     ]
+    selected = selected_bookmakers or {"allwyn", "novibet"}
+    markets = odds_comparison(
+        session,
+        event_id=event.id,
+        as_of=cutoff,
+        stale_after_seconds=stale_after_seconds,
+    )
+    suggestions, ranked_suggestions = build_match_suggestions(
+        signals=signals,
+        builder_quotes=builder_quotes,
+        selected_bookmakers=selected,
+        cutoff=cutoff,
+        max_price_age_minutes=stale_after_seconds / 60,
+        event_is_demo=event.is_demo,
+    )
 
     player_records = (
         session.scalar(
@@ -368,15 +390,14 @@ def get_matchday_event_detail(
                 form_matches,
             ),
         ],
-        markets=odds_comparison(
-            session,
-            event_id=event.id,
-            as_of=cutoff,
-            stale_after_seconds=stale_after_seconds,
-        ),
+        markets=markets,
         latest_prediction=latest_prediction,
         signals=signals,
         builder_quotes=builder_quotes,
+        suggestions=suggestions,
+        selected_bookmakers=sorted(selected),
+        bookmaker_options=bookmaker_options(markets, selected),
+        suggestion_market_statuses=market_statuses(markets, selected, ranked_suggestions),
         player_research=ResearchGateView(
             status="blocked",
             title="Player markets remain research-only",

@@ -91,7 +91,7 @@ def rank_match_suggestions(
             and candidate.price_observed_at <= candidate.generated_at <= candidate.cutoff
         )
         price_age_minutes = (
-            (candidate.generated_at - candidate.price_observed_at).total_seconds() / 60
+            (candidate.cutoff - candidate.price_observed_at).total_seconds() / 60
             if timestamps_valid and candidate.price_observed_at is not None
             else float("inf")
         )

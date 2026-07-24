@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -59,6 +59,10 @@ def matchday_event(
     event_id: int,
     database: Database,
     as_of: datetime | None = None,
+    bookmakers: Annotated[
+        list[Literal["allwyn", "novibet"]] | None,
+        Query(),
+    ] = None,
 ) -> MatchdayEventDetailView:
     _validate_as_of(as_of)
     settings = get_settings()
@@ -68,6 +72,7 @@ def matchday_event(
         as_of=as_of,
         stale_after_seconds=settings.odds_stale_after_seconds,
         form_matches=settings.matchday_form_matches,
+        selected_bookmakers=set(bookmakers or ("allwyn", "novibet")),
     )
     if detail is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")

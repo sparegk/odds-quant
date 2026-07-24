@@ -465,6 +465,26 @@ def test_matchday_detail_uses_only_pre_cutoff_form_and_fails_closed_for_player_b
     assert payload["player_research"]["status"] == "blocked"
     assert "settlement rules" in payload["player_research"]["reasons"][0]
     assert payload["builder_value"]["status"] == "blocked"
+    assert payload["selected_bookmakers"] == ["allwyn", "novibet"]
+    assert payload["suggestions"] == []
+    statuses = {item["code"]: item for item in payload["suggestion_market_statuses"]}
+    assert statuses["shots"]["status"] == "blocked"
+    assert statuses["shots_on_target"]["status"] == "blocked"
+    assert statuses["player_props"]["status"] == "blocked"
+
+    filtered = client.get(
+        f"/api/v1/matchdays/events/{target.id}",
+        params={"as_of": as_of.isoformat(), "bookmakers": "novibet"},
+    )
+    assert filtered.status_code == 200
+    assert filtered.json()["selected_bookmakers"] == ["novibet"]
+    assert (
+        client.get(
+            f"/api/v1/matchdays/events/{target.id}",
+            params={"bookmakers": "unsupported"},
+        ).status_code
+        == 422
+    )
 
 
 @pytest.mark.parametrize(

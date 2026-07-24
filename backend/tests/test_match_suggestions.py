@@ -109,3 +109,18 @@ def test_empty_bookmaker_selection_returns_no_suggestions() -> None:
         )
         == []
     )
+
+
+def test_price_must_still_be_fresh_at_matchday_cutoff() -> None:
+    ranked = rank_match_suggestions(
+        [
+            candidate(
+                price_observed_at=NOW - timedelta(minutes=11),
+                generated_at=NOW - timedelta(minutes=10),
+            )
+        ],
+        selected_bookmakers={"novibet"},
+        max_price_age_minutes=5,
+    )
+
+    assert ranked == []
