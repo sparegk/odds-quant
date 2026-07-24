@@ -494,6 +494,7 @@ def test_matchday_detail_uses_only_pre_cutoff_form_and_fails_closed_for_player_b
     } == set(audit)
     assert audit["match_result"]["present_records"] > 0
     assert audit["match_result"]["evidence"]
+    assert "leakage-safe model" in audit["match_result"]["unlock_requirements"][0]
     assert audit["lineups"]["status"] == "partial"
     assert audit["lineups"]["blockers"]
     assert audit["lineups"]["unlock_requirements"]

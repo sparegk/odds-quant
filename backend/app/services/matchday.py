@@ -185,6 +185,12 @@ def _availability_audit(
                 if source_status is not None
                 else "No compatible, timestamp-valid market evidence is stored."
             )
+        unlock_requirements = unlocks[code]
+        if code == "match_result" and snapshots:
+            unlock_requirements = [
+                "Evaluate a leakage-safe model, persist its pre-kickoff prediction, and generate "
+                "a qualified value signal against the stored price."
+            ]
         audit.append(
             AvailabilityAuditItemView(
                 code=code,
@@ -200,7 +206,7 @@ def _availability_audit(
                     f"{best_prices} selection-level best price(s) retained for inspection.",
                 ],
                 blockers=blockers,
-                unlock_requirements=unlocks[code],
+                unlock_requirements=unlock_requirements,
             )
         )
 
