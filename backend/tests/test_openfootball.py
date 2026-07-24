@@ -12,9 +12,11 @@ from sqlalchemy.orm import Session
 from app.db.models import Provider
 from app.db.session import Base
 from app.providers.openfootball import (
+    OPENFOOTBALL_CHAMPIONS_LICENSE_URL,
     OPENFOOTBALL_LICENSE_URL,
     OpenFootballImportError,
     normalize_openfootball_results,
+    normalize_openfootball_text_results,
 )
 from app.services.results_import import import_results_csv, serialize_result_rows_csv
 
@@ -130,6 +132,74 @@ def test_import_persists_open_data_provenance(session: Session) -> None:
     assert provider.is_demo is False
 
 
+def test_normalizes_unambiguous_football_text_with_explicit_aliases() -> None:
+    rows = normalize_openfootball_text_results(
+        _text_dataset(),
+        dataset_path="2025-26/clq.txt",
+        competition="UEFA Champions League Qualification",
+        country="International",
+        season="2025/26",
+        timezone="Europe/Berlin",
+        source_commit=COMMIT,
+        source_updated_at=PUBLISHED_AT,
+        team_aliases={"Kuopion PS": "Kuopion Palloseura"},
+    )
+
+    assert len(rows) == 2
+    assert rows[0].home_team == "Kuopion Palloseura"
+    assert rows[0].away_team == "FC Milsami"
+    assert rows[0].kickoff_at == datetime(2024, 7, 8, 14, 0, tzinfo=UTC)
+    assert rows[0].home_goals == 1
+    assert rows[0].away_goals == 0
+    assert rows[1].kickoff_at == datetime(2024, 7, 15, 16, 0, tzinfo=UTC)
+    assert all(row.observed_at == PUBLISHED_AT for row in rows)
+    assert all(row.provider_event_key.startswith("openfootball-champions:") for row in rows)
+
+
+def test_football_text_rejects_ambiguous_timed_result() -> None:
+    content = b"  Tue Jul 8 2024\n    16:00 Broken v Row 1-0\n"
+
+    with pytest.raises(OpenFootballImportError, match="not an unambiguous completed match"):
+        normalize_openfootball_text_results(
+            content,
+            dataset_path="2025-26/clq.txt",
+            competition="UEFA Champions League Qualification",
+            country="International",
+            season="2025/26",
+            timezone="Europe/Berlin",
+            source_commit=COMMIT,
+            source_updated_at=PUBLISHED_AT,
+        )
+
+
+def test_import_persists_champions_repository_provenance(session: Session) -> None:
+    rows = normalize_openfootball_text_results(
+        _text_dataset(),
+        dataset_path="2025-26/clq.txt",
+        competition="UEFA Champions League Qualification",
+        country="International",
+        season="2025/26",
+        timezone="Europe/Berlin",
+        source_commit=COMMIT,
+        source_updated_at=PUBLISHED_AT,
+    )
+    imported = import_results_csv(
+        session,
+        filename="openfootball-champions-clq.csv",
+        content=serialize_result_rows_csv(rows),
+        provider_slug="openfootball-champions-cc0",
+        provider_name="OpenFootball Champions League CC0 results",
+        provider_kind="open_data",
+        provider_terms_url=OPENFOOTBALL_CHAMPIONS_LICENSE_URL,
+        now=datetime(2026, 7, 22, tzinfo=UTC),
+    )
+
+    provider = session.scalar(select(Provider).where(Provider.slug == "openfootball-champions-cc0"))
+    assert imported.results_created == 2
+    assert provider is not None
+    assert provider.terms_url == OPENFOOTBALL_CHAMPIONS_LICENSE_URL
+
+
 def _dataset() -> bytes:
     return json.dumps(
         {
@@ -152,3 +222,15 @@ def _dataset() -> bytes:
             ],
         }
     ).encode()
+
+
+def _text_dataset() -> bytes:
+    return (
+        b"= UEFA Champions League - Quali 2024/25\n"
+        b"  Tue Jul 8 2024\n"
+        b"    16:00  Kuopion PS (FIN) v FC Milsami (MDA)  1-0 (0-0)\n"
+        b"           Unknown Time (AAA) v Other Team (BBB) 2-0 (1-0)\n"
+        b"  Tue Jul 15\n"
+        b"    18:00  FC Milsami (MDA) v Kuopion PS (FIN) 0-0\n"
+        b"    19:00  Extra Team (AAA) v Pen Team (BBB) 4-3 pen. 1-1 a.e.t. (0-0)\n"
+    )

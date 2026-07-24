@@ -12,9 +12,11 @@ from app.db.session import SessionLocal
 from app.providers.api_football import ApiFootballClient, ApiFootballError
 from app.providers.odds_api_io import OddsApiIoClient, OddsApiIoError
 from app.providers.openfootball import (
+    OPENFOOTBALL_CHAMPIONS_LICENSE_URL,
     OPENFOOTBALL_LICENSE_URL,
     OpenFootballImportError,
     normalize_openfootball_results,
+    normalize_openfootball_text_results,
 )
 from app.schemas.api import CollectionMonitoringView
 from app.schemas.models import EvaluateModelRequest, PredictEventRequest, TrainPoissonRequest
@@ -60,6 +62,21 @@ def _parser() -> argparse.ArgumentParser:
     openfootball.add_argument("--timezone", required=True)
     openfootball.add_argument("--source-commit", required=True)
     openfootball.add_argument("--source-updated-at", required=True, type=datetime.fromisoformat)
+    openfootball_text = commands.add_parser(
+        "import-openfootball-text-results",
+        help="normalize and import a pinned CC0 OpenFootball Football.TXT dataset",
+    )
+    openfootball_text.add_argument("path", type=Path)
+    openfootball_text.add_argument("--dataset-path", required=True)
+    openfootball_text.add_argument("--competition", required=True)
+    openfootball_text.add_argument("--country", required=True)
+    openfootball_text.add_argument("--season", required=True)
+    openfootball_text.add_argument("--timezone", required=True)
+    openfootball_text.add_argument("--source-commit", required=True)
+    openfootball_text.add_argument(
+        "--source-updated-at", required=True, type=datetime.fromisoformat
+    )
+    openfootball_text.add_argument("--team-aliases", type=Path)
     commands.add_parser(
         "probe-target-bookmakers",
         help="verify configured odds-provider coverage for required bookmakers",
@@ -155,6 +172,39 @@ def main() -> int:
                     provider_name="OpenFootball CC0 results",
                     provider_kind="open_data",
                     provider_terms_url=OPENFOOTBALL_LICENSE_URL,
+                )
+            elif args.command == "import-openfootball-text-results":
+                path = args.path
+                aliases: dict[str, str] = {}
+                if args.team_aliases is not None:
+                    raw_aliases = json.loads(args.team_aliases.read_text(encoding="utf-8"))
+                    if not isinstance(raw_aliases, dict) or any(
+                        not isinstance(key, str) or not isinstance(value, str)
+                        for key, value in raw_aliases.items()
+                    ):
+                        raise OpenFootballImportError(
+                            "team aliases file must be a JSON object of string names"
+                        )
+                    aliases = raw_aliases
+                rows = normalize_openfootball_text_results(
+                    path.read_bytes(),
+                    dataset_path=args.dataset_path,
+                    competition=args.competition,
+                    country=args.country,
+                    season=args.season,
+                    timezone=args.timezone,
+                    source_commit=args.source_commit,
+                    source_updated_at=args.source_updated_at,
+                    team_aliases=aliases,
+                )
+                result = import_results_csv(
+                    session,
+                    filename=f"openfootball-champions-{args.season}-{args.source_commit[:12]}.csv",
+                    content=serialize_result_rows_csv(rows),
+                    provider_slug="openfootball-champions-cc0",
+                    provider_name="OpenFootball Champions League CC0 results",
+                    provider_kind="open_data",
+                    provider_terms_url=OPENFOOTBALL_CHAMPIONS_LICENSE_URL,
                 )
             elif args.command == "probe-target-bookmakers":
                 settings = get_settings()
