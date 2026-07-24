@@ -178,6 +178,7 @@ def test_normalizes_domestic_football_text_without_country_codes() -> None:
             b"= Challenge League 2024/25\n"
             b"  Fri Jul 19 2024\n"
             b"    20:15  FC Aarau v FC Thun Berner Oberland  1-3 (0-2)\n"
+            b"    21:00  Awarded FC v Other FC 3-0 [awarded]\n"
         ),
         dataset_path="switzerland/2024-25_ch2.txt",
         competition="Swiss Challenge League",
@@ -193,6 +194,7 @@ def test_normalizes_domestic_football_text_without_country_codes() -> None:
     assert rows[0].away_team == "FC Thun"
     assert rows[0].home_goals == 1
     assert rows[0].away_goals == 3
+    assert len(rows) == 1
 
 
 def test_import_persists_champions_repository_provenance(session: Session) -> None:

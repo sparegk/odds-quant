@@ -167,7 +167,7 @@ def normalize_openfootball_text_results(
             continue
         if " v " not in line or not re.search(r"\d+-\d+", line):
             continue
-        if " pen." in line or " a.e.t." in line:
+        if " pen." in line or " a.e.t." in line or "[awarded]" in line:
             continue
         match = _TEXT_MATCH_PATTERN.match(line)
         if match is None:
