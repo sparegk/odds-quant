@@ -49,6 +49,13 @@
   Premier League, 45 Champions League qualification, and 317 Conference League qualification.
   Only Conference League qualification currently covers both required bookmakers, and no
   competition has explicit closing snapshots.
+- A separate coverage-gap review confirmed that global bookmaker selection is not per-league
+  availability. The accepted provider store contains Novibet `MATCH_RESULT` only for Conference
+  League qualification; Premier League and Champions League qualification currently contain
+  only Allwyn/Pamestoixima. The adapter already recognizes complete timestamped Novibet `ML`
+  and rejects incomplete or ambiguous outcomes deterministically. A new sanitized 70-event
+  probe advertised no additional target markets, so no alias expansion or validation weakening
+  is justified. Continue polling and treat these as provider-side availability gaps.
 
 ## Next action
 
