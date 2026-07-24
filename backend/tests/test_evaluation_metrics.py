@@ -67,6 +67,7 @@ def test_moving_block_bootstrap_is_deterministic_and_chronology_aware() -> None:
     assert first.block_length == 2
     assert first.observations == len(values)
     assert first.as_dict()["method"] == "moving_block_bootstrap"
+    assert first.seed == 17
 
 
 def test_moving_block_bootstrap_is_degenerate_for_constant_losses() -> None:

@@ -31,6 +31,7 @@ class BootstrapMeanInterval:
     resamples: int
     block_length: int
     observations: int
+    seed: int
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -95,6 +96,7 @@ def moving_block_mean_interval(
         resamples=resamples,
         block_length=selected_block_length,
         observations=count,
+        seed=seed,
     )
 
 

@@ -27,7 +27,11 @@ from app.db.models import (
 from app.db.session import Base
 from app.schemas.models import EvaluateModelRequest, TrainPoissonRequest
 from app.services.demo_seed import seed_demo_results
-from app.services.evaluation import EvaluationError, evaluate_model
+from app.services.evaluation import (
+    EvaluationError,
+    _policy_decision,
+    evaluate_model,
+)
 from app.services.modeling import train_poisson_model
 
 AS_OF = datetime(2026, 7, 19, 10, 0, tzinfo=UTC)
@@ -91,6 +95,28 @@ def test_walk_forward_evaluation_persists_immutable_demo_evidence(
     log_loss = run.metrics["log_loss"]
     assert isinstance(brier_score, (int, float)) and brier_score >= 0
     assert isinstance(log_loss, (int, float)) and log_loss >= 0
+    score_intervals = run.metrics["score_intervals"]
+    assert isinstance(score_intervals, dict)
+    brier_interval = score_intervals["brier_score"]
+    log_loss_interval = score_intervals["log_loss"]
+    assert isinstance(brier_interval, dict) and isinstance(log_loss_interval, dict)
+    assert brier_interval["method"] == "moving_block_bootstrap"
+    assert brier_interval["estimate"] == pytest.approx(brier_score)
+    assert log_loss_interval["estimate"] == pytest.approx(log_loss)
+    assert brier_interval["confidence_level"] == pytest.approx(0.95)
+    assert brier_interval["resamples"] == 2000
+    assert brier_interval["block_length"] == 2
+    assert isinstance(brier_interval["seed"], int)
+
+    uniform_metrics = run.benchmarks["uniform"]
+    assert uniform_metrics["brier_score"] == pytest.approx(2 / 3)
+    paired = uniform_metrics["paired_loss_difference"]
+    assert isinstance(paired, dict)
+    assert paired["definition"] == "poisson_loss_minus_benchmark_loss"
+    paired_brier = paired["brier_score"]
+    assert isinstance(paired_brier, dict)
+    assert paired_brier["estimate"] == pytest.approx(brier_score - 2 / 3)
+    assert paired_brier["observations"] == 8
     assert run.benchmarks["uniform"]["brier_score"] == pytest.approx(2 / 3)
     assert run.benchmarks["elo"]["observations"] == 8
     assert isinstance(run.benchmarks["elo"]["brier_score"], float)
@@ -111,6 +137,20 @@ def test_walk_forward_evaluation_persists_immutable_demo_evidence(
         "decay_rate": 0.0018,
         "low_score_rho_bounds": [-0.2, 0.2],
     }
+    bootstrap_config = run.config["bootstrap"]
+    assert isinstance(bootstrap_config, dict)
+    assert run.config["evaluation_method_version"] == "expanding-window-block-bootstrap-v2"
+    assert bootstrap_config["method"] == "moving_block_bootstrap"
+    assert bootstrap_config["confidence_level"] == pytest.approx(0.95)
+    assert bootstrap_config["resamples"] == 2000
+    assert len(str(bootstrap_config["seed_material_sha256"])) == 64
+    assert run.policy["version"] == "probability-calibration-v2"
+    checks = run.policy["checks"]
+    assert isinstance(checks, dict)
+    paired_log_loss = paired["log_loss"]
+    assert isinstance(paired_log_loss, dict)
+    assert checks["uniform_brier_upper_difference_below_zero"] is (paired_brier["upper"] < 0)
+    assert checks["uniform_log_loss_upper_difference_below_zero"] is (paired_log_loss["upper"] < 0)
     assert len(run.calibration) > 0
     session.refresh(model)
     assert model.evaluation_status == "unvalidated"
@@ -278,6 +318,13 @@ def test_market_benchmark_uses_only_compatible_pre_cutoff_snapshot(
     market_metrics = run.benchmarks["market_consensus"]
     assert market_metrics["observations"] == 1
     assert market_metrics["coverage"] == pytest.approx(1 / 8)
+    market_comparison = market_metrics["paired_loss_difference"]
+    assert isinstance(market_comparison, dict)
+    market_brier_difference = market_comparison["brier_score"]
+    assert isinstance(market_brier_difference, dict)
+    assert market_brier_difference["observations"] == 1
+    assert market_brier_difference["lower"] == pytest.approx(market_brier_difference["estimate"])
+    assert market_brier_difference["upper"] == pytest.approx(market_brier_difference["estimate"])
     stored = session.scalar(
         select(BacktestObservation).where(
             BacktestObservation.event_id == event.id,
@@ -314,3 +361,35 @@ def test_evaluation_rejects_future_end_and_ineligible_window(session: Session) -
             ),
             now=AS_OF,
         )
+
+
+def test_promotion_requires_confident_uniform_baseline_superiority() -> None:
+    metrics: dict[str, object] = {
+        "observations": 200,
+        "coverage": 0.95,
+        "expected_calibration_error": 0.05,
+    }
+    uniform_metrics: dict[str, object] = {
+        "paired_loss_difference": {
+            "brier_score": {"estimate": -0.02, "lower": -0.04, "upper": 0.001},
+            "log_loss": {"estimate": -0.03, "lower": -0.05, "upper": -0.002},
+        }
+    }
+
+    status, policy = _policy_decision(metrics, uniform_metrics, is_demo=False)
+
+    assert status == "calibration_failed"
+    checks = policy["checks"]
+    assert isinstance(checks, dict)
+    assert checks["uniform_brier_upper_difference_below_zero"] is False
+    assert checks["uniform_log_loss_upper_difference_below_zero"] is True
+
+    paired = uniform_metrics["paired_loss_difference"]
+    assert isinstance(paired, dict)
+    paired["brier_score"] = {"estimate": -0.02, "lower": -0.04, "upper": -0.001}
+    status, policy = _policy_decision(metrics, uniform_metrics, is_demo=False)
+
+    assert status == "calibrated"
+    checks = policy["checks"]
+    assert isinstance(checks, dict)
+    assert all(policy_check is True for policy_check in checks.values())

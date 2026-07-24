@@ -26,6 +26,7 @@ from app.quant.elo import EloConfig, EloMatchResult, elo_probabilities_as_of
 from app.quant.evaluation import (
     OUTCOMES,
     CalibrationBucket,
+    moving_block_mean_interval,
     multiclass_brier,
     multiclass_log_loss,
     summarize_probabilities,
@@ -39,14 +40,19 @@ from app.services.modeling import MODEL_KIND, competition_family_ids
 MINIMUM_PROMOTION_OBSERVATIONS = 200
 MINIMUM_PROMOTION_COVERAGE = 0.90
 MAXIMUM_PROMOTION_ECE = 0.08
+BOOTSTRAP_CONFIDENCE_LEVEL = 0.95
+BOOTSTRAP_RESAMPLES = 2000
+EVALUATION_METHOD_VERSION = "expanding-window-block-bootstrap-v2"
+
 
 PROMOTION_POLICY: dict[str, object] = {
-    "version": "probability-calibration-v1",
+    "version": "probability-calibration-v2",
     "minimum_observations": MINIMUM_PROMOTION_OBSERVATIONS,
     "minimum_coverage": MINIMUM_PROMOTION_COVERAGE,
     "maximum_expected_calibration_error": MAXIMUM_PROMOTION_ECE,
-    "require_better_than_uniform_brier": True,
-    "require_better_than_uniform_log_loss": True,
+    "bootstrap_confidence_level": BOOTSTRAP_CONFIDENCE_LEVEL,
+    "require_uniform_brier_upper_difference_below_zero": True,
+    "require_uniform_log_loss_upper_difference_below_zero": True,
     "demo_data_eligible": False,
 }
 
@@ -212,7 +218,11 @@ def evaluate_model(
     probability_rows = [
         (observation.probabilities, observation.actual_outcome) for observation in replayed
     ]
+    bootstrap_seed_material = _bootstrap_seed_material(replayed)
     metrics, buckets = summarize_probabilities(probability_rows, bins=request.calibration_bins)
+    _attach_score_intervals(
+        metrics, probability_rows, seed_material=bootstrap_seed_material, namespace="poisson"
+    )
     metrics.update(
         {
             "candidate_events": len(candidate_rows),
@@ -226,10 +236,30 @@ def evaluate_model(
         ({outcome: 1 / 3 for outcome in OUTCOMES}, actual) for _, actual in probability_rows
     ]
     uniform_metrics, _ = summarize_probabilities(uniform_rows, bins=request.calibration_bins)
+    _attach_score_intervals(
+        uniform_metrics, uniform_rows, seed_material=bootstrap_seed_material, namespace="uniform"
+    )
+    _attach_paired_loss_difference(
+        uniform_metrics,
+        probability_rows,
+        uniform_rows,
+        seed_material=bootstrap_seed_material,
+        namespace="uniform",
+    )
     elo_rows = [
         (observation.elo_probabilities, observation.actual_outcome) for observation in replayed
     ]
     elo_metrics, _ = summarize_probabilities(elo_rows, bins=request.calibration_bins)
+    _attach_score_intervals(
+        elo_metrics, elo_rows, seed_material=bootstrap_seed_material, namespace="elo"
+    )
+    _attach_paired_loss_difference(
+        elo_metrics,
+        probability_rows,
+        elo_rows,
+        seed_material=bootstrap_seed_material,
+        namespace="elo",
+    )
     dixon_coles_rows = [
         (observation.dixon_coles_probabilities, observation.actual_outcome)
         for observation in replayed
@@ -237,22 +267,47 @@ def evaluate_model(
     dixon_coles_metrics, _ = summarize_probabilities(
         dixon_coles_rows, bins=request.calibration_bins
     )
-    market_rows = [
-        (observation.market_probabilities, observation.actual_outcome)
+    _attach_score_intervals(
+        dixon_coles_metrics,
+        dixon_coles_rows,
+        seed_material=bootstrap_seed_material,
+        namespace="dixon_coles",
+    )
+    _attach_paired_loss_difference(
+        dixon_coles_metrics,
+        probability_rows,
+        dixon_coles_rows,
+        seed_material=bootstrap_seed_material,
+        namespace="dixon_coles",
+    )
+    market_pairs = [
+        (
+            observation.probabilities,
+            observation.market_probabilities,
+            observation.actual_outcome,
+        )
         for observation in replayed
         if observation.market_probabilities is not None
     ]
     market_metrics: dict[str, object] | None = None
-    if market_rows:
-        typed_market_rows = [
-            (probabilities, actual)
-            for probabilities, actual in market_rows
-            if probabilities is not None
-        ]
-        market_metrics, _ = summarize_probabilities(
-            typed_market_rows, bins=request.calibration_bins
+    if market_pairs:
+        market_model_rows = [(model_row, actual) for model_row, _, actual in market_pairs]
+        market_rows = [(market_row, actual) for _, market_row, actual in market_pairs]
+        market_metrics, _ = summarize_probabilities(market_rows, bins=request.calibration_bins)
+        market_metrics["coverage"] = len(market_rows) / len(replayed)
+        _attach_score_intervals(
+            market_metrics,
+            market_rows,
+            seed_material=bootstrap_seed_material,
+            namespace="market_consensus",
         )
-        market_metrics["coverage"] = len(typed_market_rows) / len(replayed)
+        _attach_paired_loss_difference(
+            market_metrics,
+            market_model_rows,
+            market_rows,
+            seed_material=bootstrap_seed_material,
+            namespace="market_consensus",
+        )
 
     is_demo = bool(model.is_demo or any(row.event.is_demo for row in replayed))
     evaluation_status, policy = _policy_decision(metrics, uniform_metrics, is_demo=is_demo)
@@ -268,6 +323,7 @@ def evaluate_model(
 
     config: dict[str, object] = {
         "evaluation_kind": "expanding_window_match_result",
+        "evaluation_method_version": EVALUATION_METHOD_VERSION,
         "competition_id": competition_id,
         "training_start": _utc(model.training_start).isoformat(),
         "evaluation_start": evaluation_start.isoformat(),
@@ -280,6 +336,15 @@ def evaluate_model(
         "result_known_at": reference.isoformat(),
         "outcomes": list(OUTCOMES),
         "brier_definition": "sum_squared_error_over_three_outcomes_range_0_to_2",
+        "bootstrap": {
+            "method": "moving_block_bootstrap",
+            "confidence_level": BOOTSTRAP_CONFIDENCE_LEVEL,
+            "resamples": BOOTSTRAP_RESAMPLES,
+            "block_length_rule": "round_cube_root_sample_size_minimum_1",
+            "seed_derivation": "sha256_seed_material_and_metric_namespace",
+            "seed_material_sha256": bootstrap_seed_material,
+            "paired_difference_definition": "poisson_loss_minus_benchmark_loss",
+        },
         "market_benchmark": "mean_proportional_devig_of_latest_compatible_snapshot_per_bookmaker",
         "elo_benchmark": {
             "version": "davidson-elo-v1",
@@ -515,6 +580,106 @@ def _market_consensus(
     return (sorted(row[1].id for row in chosen), consensus)
 
 
+def _attach_score_intervals(
+    metrics: dict[str, object],
+    rows: list[tuple[dict[str, float], str]],
+    *,
+    seed_material: str,
+    namespace: str,
+) -> None:
+    brier_losses = [multiclass_brier(probabilities, actual) for probabilities, actual in rows]
+    log_losses = [multiclass_log_loss(probabilities, actual) for probabilities, actual in rows]
+    metrics["score_intervals"] = {
+        "brier_score": moving_block_mean_interval(
+            brier_losses,
+            confidence_level=BOOTSTRAP_CONFIDENCE_LEVEL,
+            resamples=BOOTSTRAP_RESAMPLES,
+            seed=_derived_bootstrap_seed(seed_material, f"{namespace}:brier_score"),
+        ).as_dict(),
+        "log_loss": moving_block_mean_interval(
+            log_losses,
+            confidence_level=BOOTSTRAP_CONFIDENCE_LEVEL,
+            resamples=BOOTSTRAP_RESAMPLES,
+            seed=_derived_bootstrap_seed(seed_material, f"{namespace}:log_loss"),
+        ).as_dict(),
+    }
+
+
+def _attach_paired_loss_difference(
+    metrics: dict[str, object],
+    poisson_rows: list[tuple[dict[str, float], str]],
+    benchmark_rows: list[tuple[dict[str, float], str]],
+    *,
+    seed_material: str,
+    namespace: str,
+) -> None:
+    if len(poisson_rows) != len(benchmark_rows) or not poisson_rows:
+        raise EvaluationError("paired benchmark comparison requires aligned observations")
+    brier_differences: list[float] = []
+    log_loss_differences: list[float] = []
+    for (poisson_probabilities, poisson_actual), (benchmark_probabilities, actual) in zip(
+        poisson_rows, benchmark_rows, strict=True
+    ):
+        if poisson_actual != actual:
+            raise EvaluationError("paired benchmark comparison outcomes are not aligned")
+        brier_differences.append(
+            multiclass_brier(poisson_probabilities, actual)
+            - multiclass_brier(benchmark_probabilities, actual)
+        )
+        log_loss_differences.append(
+            multiclass_log_loss(poisson_probabilities, actual)
+            - multiclass_log_loss(benchmark_probabilities, actual)
+        )
+    metrics["paired_loss_difference"] = {
+        "definition": "poisson_loss_minus_benchmark_loss",
+        "negative_values_favor": "poisson",
+        "brier_score": moving_block_mean_interval(
+            brier_differences,
+            confidence_level=BOOTSTRAP_CONFIDENCE_LEVEL,
+            resamples=BOOTSTRAP_RESAMPLES,
+            seed=_derived_bootstrap_seed(seed_material, f"{namespace}:paired_brier_score"),
+        ).as_dict(),
+        "log_loss": moving_block_mean_interval(
+            log_loss_differences,
+            confidence_level=BOOTSTRAP_CONFIDENCE_LEVEL,
+            resamples=BOOTSTRAP_RESAMPLES,
+            seed=_derived_bootstrap_seed(seed_material, f"{namespace}:paired_log_loss"),
+        ).as_dict(),
+    }
+
+
+def _bootstrap_seed_material(replayed: list[_ReplayObservation]) -> str:
+    payload = [
+        {
+            "event_id": observation.event.id,
+            "actual_outcome": observation.actual_outcome,
+            "poisson": observation.probabilities,
+            "elo": observation.elo_probabilities,
+            "dixon_coles": observation.dixon_coles_probabilities,
+            "market_snapshot_ids": observation.market_snapshot_ids,
+            "market": observation.market_probabilities,
+        }
+        for observation in replayed
+    ]
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _derived_bootstrap_seed(seed_material: str, namespace: str) -> int:
+    digest = hashlib.sha256(f"{seed_material}:{namespace}".encode()).digest()
+    return int.from_bytes(digest[:8], "big")
+
+
+def _paired_interval_upper(metrics: dict[str, object], metric: str) -> float:
+    comparison = metrics.get("paired_loss_difference")
+    if not isinstance(comparison, dict):
+        raise EvaluationError("evaluation benchmark has no paired loss comparison")
+    interval = comparison.get(metric)
+    if not isinstance(interval, dict):
+        raise EvaluationError(f"evaluation benchmark has no paired {metric} interval")
+    return _metric_number(interval, "upper")
+
+
 def _policy_decision(
     metrics: dict[str, object],
     uniform_metrics: dict[str, object],
@@ -524,15 +689,15 @@ def _policy_decision(
     observations = _metric_number(metrics, "observations")
     coverage = _metric_number(metrics, "coverage")
     ece = _metric_number(metrics, "expected_calibration_error")
-    brier = _metric_number(metrics, "brier_score")
-    log_loss = _metric_number(metrics, "log_loss")
+    uniform_brier_upper = _paired_interval_upper(uniform_metrics, "brier_score")
+    uniform_log_loss_upper = _paired_interval_upper(uniform_metrics, "log_loss")
     checks = {
         "non_demo_data": not is_demo,
         "minimum_observations": observations >= MINIMUM_PROMOTION_OBSERVATIONS,
         "minimum_coverage": coverage >= MINIMUM_PROMOTION_COVERAGE,
         "maximum_expected_calibration_error": ece <= MAXIMUM_PROMOTION_ECE,
-        "better_than_uniform_brier": brier < _metric_number(uniform_metrics, "brier_score"),
-        "better_than_uniform_log_loss": log_loss < _metric_number(uniform_metrics, "log_loss"),
+        "uniform_brier_upper_difference_below_zero": uniform_brier_upper < 0,
+        "uniform_log_loss_upper_difference_below_zero": uniform_log_loss_upper < 0,
     }
     if is_demo:
         status = "demo_only"
@@ -661,6 +826,7 @@ def _evaluation_fingerprint(
 ) -> str:
     payload = {
         "model_version": model.version,
+        "evaluation_method_version": EVALUATION_METHOD_VERSION,
         "request": request.model_dump(mode="json"),
         "evaluation_status": evaluation_status,
         "observations": [
