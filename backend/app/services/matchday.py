@@ -21,16 +21,22 @@ from app.db.models import (
     ValueSignal,
 )
 from app.quant.match_suggestions import BookmakerCode
-from app.schemas.api import EventSummary
+from app.schemas.api import EventSummary, MarketComparison
+from app.schemas.builder import BetBuilderQuoteView
+from app.schemas.lineups import ExpectedLineupScenarioView, StoredLineupView
 from app.schemas.matchday import (
+    AvailabilityAuditItemView,
     MatchdayCompetitionView,
     MatchdayEventDetailView,
     MatchdayEventView,
     MatchdayView,
     RecentTeamResultView,
     ResearchGateView,
+    SuggestionMarketStatusView,
     TeamFormView,
 )
+from app.schemas.models import ModelOutputView
+from app.schemas.signals import ValueSignalView
 from app.services.builder import list_bet_builder_quotes
 from app.services.catalog import get_event, odds_comparison
 from app.services.lineup_projection import latest_stored_lineups, project_expected_lineups
@@ -104,6 +110,220 @@ def competition_group(name: str) -> tuple[str, str, int, bool]:
         if any(term in normalized for term in terms):
             return key, label, priority, True
     return "other", "Other tracked competitions", 999, False
+
+
+def _availability_audit(
+    *,
+    markets: list[MarketComparison],
+    market_status_items: list[SuggestionMarketStatusView],
+    team_form: list[TeamFormView],
+    latest_prediction: ModelOutputView | None,
+    signals: list[ValueSignalView],
+    builder_quotes: list[BetBuilderQuoteView],
+    stored_lineups: list[StoredLineupView],
+    lineup_projections: list[ExpectedLineupScenarioView],
+    lineup_gate: ResearchGateView,
+    player_records: int,
+    player_reasons: list[str],
+) -> list[AvailabilityAuditItemView]:
+    status_by_code = {item.code: item for item in market_status_items}
+    definitions = (
+        ("match_result", "1X2", lambda value: value == "MATCH_RESULT"),
+        ("double_chance", "Double chance", lambda value: value == "DOUBLE_CHANCE"),
+        (
+            "goals",
+            "Goals, BTTS & team totals",
+            lambda value: value in {"TOTALS", "BOTH_TEAMS_TO_SCORE", "TEAM_TOTALS", "TEAM_TOTAL"},
+        ),
+        ("corners", "Corners", lambda value: "CORNER" in value),
+        (
+            "shots",
+            "Shots",
+            lambda value: "SHOT" in value and "TARGET" not in value and "PLAYER" not in value,
+        ),
+        (
+            "shots_on_target",
+            "Shots on target",
+            lambda value: "SHOT" in value and "TARGET" in value and "PLAYER" not in value,
+        ),
+        ("player_props", "Player props", lambda value: "PLAYER" in value),
+    )
+    unlocks = {
+        "match_result": ["Import a fresh, complete 1X2 snapshot from an allowed source."],
+        "double_chance": [
+            "Import timestamped double-chance prices with matching settlement rules."
+        ],
+        "goals": ["Import timestamped totals, BTTS, or team-total prices for this event."],
+        "corners": ["Import complete corner-market prices and their settlement metadata."],
+        "shots": ["Import validated team shot markets with timestamped prices."],
+        "shots_on_target": [
+            "Import validated team shots-on-target markets with timestamped prices."
+        ],
+        "player_props": [
+            "Validate player-level targets and settlement independently before enabling outputs.",
+            "Store timestamp-valid player history with minimum minutes and position adjustment.",
+        ],
+    }
+    audit: list[AvailabilityAuditItemView] = []
+    for code, label, matches in definitions:
+        compatible = [market for market in markets if matches(market.market_type)]
+        snapshots = [snapshot for market in compatible for snapshot in market.snapshots]
+        best_prices = sum(len(market.best_prices) for market in compatible)
+        stale = sum(snapshot.is_stale for snapshot in snapshots)
+        source_status = status_by_code.get(code)
+        status = (
+            "available"
+            if source_status is not None and source_status.status == "available"
+            else "partial"
+            if compatible or snapshots
+            else "blocked"
+        )
+        blockers = []
+        if status != "available":
+            blockers.append(
+                source_status.reason
+                if source_status is not None
+                else "No compatible, timestamp-valid market evidence is stored."
+            )
+        audit.append(
+            AvailabilityAuditItemView(
+                code=code,
+                label=label,
+                status=status,
+                present_records=len(snapshots),
+                research_only=(
+                    status != "available" or (bool(snapshots) and stale == len(snapshots))
+                ),
+                evidence=[
+                    f"{len(compatible)} compatible market(s) stored.",
+                    f"{len(snapshots)} bookmaker snapshot(s), including {stale} stale.",
+                    f"{best_prices} selection-level best price(s) retained for inspection.",
+                ],
+                blockers=blockers,
+                unlock_requirements=unlocks[code],
+            )
+        )
+
+    builder_status = status_by_code.get("builder")
+    audit.append(
+        AvailabilityAuditItemView(
+            code="builder",
+            label="Bet builder",
+            status=(
+                "available"
+                if builder_status is not None and builder_status.status == "available"
+                else "partial"
+                if builder_quotes
+                else "blocked"
+            ),
+            present_records=len(builder_quotes),
+            research_only=not (builder_status is not None and builder_status.status == "available"),
+            evidence=[f"{len(builder_quotes)} timestamp-valid builder quote(s) stored."],
+            blockers=(
+                []
+                if builder_status is not None and builder_status.status == "available"
+                else [
+                    builder_status.reason
+                    if builder_status is not None
+                    else "No timestamp-valid builder quote is stored."
+                ]
+            ),
+            unlock_requirements=[
+                "Store an identical offered combination whose lower-bound expected value "
+                "is positive."
+            ],
+        )
+    )
+    prediction_records = int(latest_prediction is not None) + len(signals)
+    audit.append(
+        AvailabilityAuditItemView(
+            code="model_prediction",
+            label="Model prediction & value signals",
+            status=(
+                "available"
+                if signals
+                else "partial"
+                if latest_prediction is not None
+                else "blocked"
+            ),
+            present_records=prediction_records,
+            research_only=not bool(signals),
+            evidence=[
+                f"{int(latest_prediction is not None)} pre-kickoff prediction(s) selected.",
+                f"{len(signals)} timestamp-valid value signal(s) stored.",
+            ],
+            blockers=(
+                [] if signals else ["No qualified, timestamp-valid value signal is available."]
+            ),
+            unlock_requirements=[
+                "Persist a pre-kickoff prediction from an evaluated model and generate a "
+                "qualified signal."
+            ],
+        )
+    )
+    lineup_records = lineup_gate.available_records
+    audit.append(
+        AvailabilityAuditItemView(
+            code="lineups",
+            label="Expected & confirmed lineups",
+            status=(
+                "available"
+                if lineup_gate.status == "available"
+                else "partial"
+                if lineup_records or lineup_projections
+                else "blocked"
+            ),
+            present_records=lineup_records,
+            research_only=lineup_gate.status != "available",
+            evidence=[
+                f"{len(stored_lineups)} stored third-party lineup(s).",
+                f"{len(lineup_projections)} point-in-time fallback scenario(s).",
+                f"{lineup_records} proposed or stored starter record(s).",
+            ],
+            blockers=([] if lineup_gate.status == "available" else lineup_gate.reasons),
+            unlock_requirements=[
+                "Provide 11 position-valid starters for both teams from timestamp-valid evidence."
+            ],
+        )
+    )
+    form_records = sum(item.sample_size for item in team_form)
+    covered_form_teams = sum(item.sample_size > 0 for item in team_form)
+    audit.append(
+        AvailabilityAuditItemView(
+            code="team_form",
+            label="Team form",
+            status="available"
+            if covered_form_teams == 2
+            else "partial"
+            if form_records
+            else "blocked",
+            present_records=form_records,
+            research_only=covered_form_teams < 2,
+            evidence=[
+                f"{form_records} timestamp-valid final result(s) across "
+                f"{covered_form_teams}/2 teams."
+            ],
+            blockers=[warning for item in team_form for warning in item.warnings],
+            unlock_requirements=["Import timestamp-valid prior final results for both teams."],
+        )
+    )
+    audit.append(
+        AvailabilityAuditItemView(
+            code="player_evidence",
+            label="Player performance evidence",
+            status="partial" if player_records else "blocked",
+            present_records=player_records,
+            research_only=True,
+            evidence=[f"{player_records} timestamp-valid player performance record(s) stored."],
+            blockers=player_reasons,
+            unlock_requirements=[
+                "Add position-appropriate metrics, minimum minutes, recency and opponent "
+                "adjustment.",
+                "Pass chronological ablation and independent target/settlement validation.",
+            ],
+        )
+    )
+    return audit
 
 
 def _timezone(name: str) -> ZoneInfo:
@@ -418,29 +638,45 @@ def get_matchday_event_detail(
             ],
         )
 
+    team_form = [
+        _team_form(
+            session,
+            event,
+            event.home_team_id,
+            event_summary.home_team,
+            cutoff,
+            form_matches,
+        ),
+        _team_form(
+            session,
+            event,
+            event.away_team_id,
+            event_summary.away_team,
+            cutoff,
+            form_matches,
+        ),
+    ]
+    suggestion_market_statuses = market_statuses(markets, selected, ranked_suggestions)
+    availability_audit = _availability_audit(
+        markets=markets,
+        market_status_items=suggestion_market_statuses,
+        team_form=team_form,
+        latest_prediction=latest_prediction,
+        signals=signals,
+        builder_quotes=builder_quotes,
+        stored_lineups=stored_lineups,
+        lineup_projections=lineup_projections,
+        lineup_gate=lineup_gate,
+        player_records=player_records,
+        player_reasons=player_reasons,
+    )
+
     return MatchdayEventDetailView(
         event=event_summary,
         competition_group=group_key,
         competition_group_label=group_label,
         as_of=cutoff,
-        team_form=[
-            _team_form(
-                session,
-                event,
-                event.home_team_id,
-                event_summary.home_team,
-                cutoff,
-                form_matches,
-            ),
-            _team_form(
-                session,
-                event,
-                event.away_team_id,
-                event_summary.away_team,
-                cutoff,
-                form_matches,
-            ),
-        ],
+        team_form=team_form,
         markets=markets,
         latest_prediction=latest_prediction,
         signals=signals,
@@ -448,7 +684,8 @@ def get_matchday_event_detail(
         suggestions=suggestions,
         selected_bookmakers=sorted(selected),
         bookmaker_options=bookmaker_options(markets, selected),
-        suggestion_market_statuses=market_statuses(markets, selected, ranked_suggestions),
+        suggestion_market_statuses=suggestion_market_statuses,
+        availability_audit=availability_audit,
         stored_lineups=stored_lineups,
         lineup_projections=lineup_projections,
         lineup_research=lineup_gate,

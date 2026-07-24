@@ -116,6 +116,17 @@ class SuggestionMarketStatusView(BaseModel):
     reason: str
 
 
+class AvailabilityAuditItemView(BaseModel):
+    code: str
+    label: str
+    status: Literal["available", "partial", "blocked"]
+    present_records: int
+    research_only: bool
+    evidence: list[str]
+    blockers: list[str]
+    unlock_requirements: list[str]
+
+
 class MatchdayEventDetailView(BaseModel):
     event: EventSummary
     competition_group: str
@@ -130,6 +141,7 @@ class MatchdayEventDetailView(BaseModel):
     selected_bookmakers: list[Literal["allwyn", "novibet"]]
     bookmaker_options: list[MatchdayBookmakerOptionView]
     suggestion_market_statuses: list[SuggestionMarketStatusView]
+    availability_audit: list[AvailabilityAuditItemView]
     stored_lineups: list[StoredLineupView]
     lineup_projections: list[ExpectedLineupScenarioView]
     lineup_research: ResearchGateView

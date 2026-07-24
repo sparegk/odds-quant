@@ -477,6 +477,27 @@ def test_matchday_detail_uses_only_pre_cutoff_form_and_fails_closed_for_player_b
     assert statuses["shots"]["status"] == "blocked"
     assert statuses["shots_on_target"]["status"] == "blocked"
     assert statuses["player_props"]["status"] == "blocked"
+    audit = {item["code"]: item for item in payload["availability_audit"]}
+    assert {
+        "match_result",
+        "double_chance",
+        "goals",
+        "builder",
+        "corners",
+        "shots",
+        "shots_on_target",
+        "player_props",
+        "model_prediction",
+        "lineups",
+        "team_form",
+        "player_evidence",
+    } == set(audit)
+    assert audit["match_result"]["present_records"] > 0
+    assert audit["match_result"]["evidence"]
+    assert audit["lineups"]["status"] == "partial"
+    assert audit["lineups"]["blockers"]
+    assert audit["lineups"]["unlock_requirements"]
+    assert audit["player_props"]["research_only"] is True
 
     filtered = client.get(
         f"/api/v1/matchdays/events/{target.id}",
