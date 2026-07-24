@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { Matchday, MatchdayEventDetail } from '../types'
+import type { Matchday, MatchdayCompetition, MatchdayEventDetail } from '../types'
 import { MatchdayResearch } from './MatchdayResearch'
 
 const apiMocks = vi.hoisted(() => ({
@@ -59,6 +59,33 @@ const schedule: Matchday = {
     },
   ],
   data_note: 'Only imported, timestamped fixtures are shown.',
+}
+
+const baseCompetition = schedule.competitions[0] as MatchdayCompetition
+
+const scheduleWithUnpricedFirst: Matchday = {
+  ...schedule,
+  total_events: 2,
+  competitions: [
+    {
+      ...baseCompetition,
+      events: [
+        {
+          event: {
+            ...event,
+            id: 41,
+            provider_event_key: 'epl-41',
+            home_team: 'Unpriced FC',
+          },
+          market_count: 0,
+          bookmaker_count: 0,
+          latest_prediction_at: null,
+          qualified_signal_count: 0,
+        },
+        ...baseCompetition.events,
+      ],
+    },
+  ],
 }
 
 const detail: MatchdayEventDetail = {
@@ -236,6 +263,20 @@ const detail: MatchdayEventDetail = {
 }
 
 describe('MatchdayResearch', () => {
+  it('opens the first fixture with stored bookmaker odds', async () => {
+    apiMocks.loadMatchday.mockResolvedValue(scheduleWithUnpricedFirst)
+    apiMocks.loadMatchdayEvent.mockResolvedValue(detail)
+    const selectEvent = vi.fn()
+
+    render(<MatchdayResearch onSelectEvent={selectEvent} />)
+
+    await waitFor(() => {
+      expect(apiMocks.loadMatchdayEvent).toHaveBeenCalledWith(42, ['allwyn', 'novibet'])
+    })
+    expect(selectEvent).toHaveBeenCalledWith(42)
+    expect(apiMocks.loadMatchdayEvent).not.toHaveBeenCalledWith(41, expect.anything())
+  })
+
   it('shows filtered ranked suggestions, app coverage, and fail-closed markets', async () => {
     apiMocks.loadMatchday.mockResolvedValue(schedule)
     apiMocks.loadMatchdayEvent.mockResolvedValue(detail)

@@ -99,7 +99,7 @@ export async function loadDashboard(): Promise<DashboardData> {
       data_mode: 'unknown',
       automated_betting: false,
     }),
-    loadResource<EventSummary[]>('events', '/api/v1/events?include_past=true', []),
+    loadResource<EventSummary[]>('events', '/api/v1/events?limit=200', []),
     loadResource<ProviderSummary[]>('providers', '/api/v1/providers', []),
     loadResource<ImportJob[]>('imports', '/api/v1/imports', []),
     loadResource<ProviderJob[]>('jobs', '/api/v1/jobs', []),

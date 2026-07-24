@@ -14,8 +14,10 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { loadMatchday, loadMatchdayEvent } from '../api/client'
 import { formatDateTime, humanizeCode } from '../lib/format'
+import { nextGoodMatchdayDate } from '../lib/matchdays'
 import type {
   BetBuilderQuote,
+  EventSummary,
   Matchday,
   MatchdayBookmakerCode,
   MatchdayCompetition,
@@ -69,13 +71,31 @@ function signedPercentage(value: number): string {
 }
 
 function findFirstEvent(competitions: MatchdayCompetition[]): number | null {
-  return competitions[0]?.events[0]?.event.id ?? null
+  const events = competitions.flatMap((competition) => competition.events)
+  return (
+    events.find((item) => item.market_count > 0 && item.bookmaker_count > 0)?.event.id ??
+    events.find((item) => item.market_count > 0)?.event.id ??
+    events[0]?.event.id ??
+    null
+  )
 }
 
-export function MatchdayResearch({ onSelectEvent }: { onSelectEvent: (eventId: number) => void }) {
-  const [date, setDate] = useState(() => localDateString(new Date()))
+export function MatchdayResearch({
+  events = [],
+  onSelectEvent,
+}: {
+  events?: EventSummary[]
+  onSelectEvent: (eventId: number) => void
+}) {
   const [timezone] = useState(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Athens',
+  )
+  const nextGoodDate = useMemo(
+    () => nextGoodMatchdayDate(events, timezone),
+    [events, timezone],
+  )
+  const [date, setDate] = useState(
+    () => nextGoodMatchdayDate(events, timezone) ?? localDateString(new Date()),
   )
   const [filter, setFilter] = useState<(typeof competitionFilters)[number]['key']>('all')
   const [schedule, setSchedule] = useState<Matchday | null>(null)
@@ -186,6 +206,15 @@ export function MatchdayResearch({ onSelectEvent }: { onSelectEvent: (eventId: n
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {nextGoodDate ? (
+              <button
+                className="hidden h-10 border border-emerald-700 bg-emerald-50 px-3 text-xs font-bold text-emerald-800 hover:bg-emerald-100 sm:block"
+                onClick={() => chooseDate(nextGoodDate)}
+                type="button"
+              >
+                Next good matchday
+              </button>
+            ) : null}
             <button
               aria-label="Previous day"
               className="grid h-10 w-10 place-items-center border border-zinc-300 hover:bg-zinc-50"
@@ -214,6 +243,12 @@ export function MatchdayResearch({ onSelectEvent }: { onSelectEvent: (eventId: n
             </button>
           </div>
         </div>
+        {nextGoodDate ? (
+          <div className="border-b border-emerald-200 bg-emerald-50 px-5 py-3 text-xs leading-5 text-emerald-950">
+            <strong>Next useful slate: {nextGoodDate}.</strong> This prioritizes the earliest future,
+            non-demo featured competition with stored prices.
+          </div>
+        ) : null}
         <BookmakerSettings mode={bookmakerMode} onChange={chooseBookmakerMode} />
         <div className="flex gap-2 overflow-x-auto p-3" aria-label="Competition filters">
           {competitionFilters.map((item) => (

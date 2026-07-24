@@ -296,7 +296,7 @@ function ActiveView(props: ActiveViewProps) {
     case 'overview':
       return <Overview dashboard={props.dashboard} onSelectEvent={props.onSelectEvent} />
     case 'matchday':
-      return <MatchdayResearch onSelectEvent={props.onSelectEvent} />
+      return <MatchdayResearch events={props.dashboard.events} onSelectEvent={props.onSelectEvent} />
     case 'event':
       return <EventMarkets dashboard={props.dashboard} events={props.dashboard.events} selectedEventId={props.selectedEventId} markets={props.markets} loading={props.comparisonLoading} error={props.comparisonError} onSelectEvent={props.onSelectEvent} onOpenComparison={() => navigateTo('comparison')} />
     case 'comparison':
