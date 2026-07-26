@@ -3,16 +3,33 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Event, Market, ModelEventOutput, ModelVersion, OddsSnapshot, Provider
+from app.db.models import (
+    Event,
+    LineupMember,
+    LineupSnapshot,
+    Market,
+    ModelEventOutput,
+    ModelVersion,
+    OddsSnapshot,
+    Provider,
+)
 from app.schemas.models import PredictEventRequest
 from app.services.modeling import ModelingError, predict_event
 
 
 @dataclass(frozen=True)
 class PredictionRefreshSummary:
+    eligible_events: int
+    predictions_created: int
+    predictions_reused: int
+    events_skipped: int
+
+
+@dataclass(frozen=True)
+class ConfirmedLineupRefreshSummary:
     eligible_events: int
     predictions_created: int
     predictions_reused: int
@@ -107,6 +124,127 @@ def refresh_upcoming_predictions(
         predictions_reused=reused,
         events_skipped=skipped,
     )
+
+
+def refresh_confirmed_lineup_predictions(
+    session: Session,
+    *,
+    as_of: datetime,
+    horizon_hours: int = 168,
+) -> ConfirmedLineupRefreshSummary:
+    cutoff = _utc(as_of)
+    horizon = cutoff + timedelta(hours=horizon_hours)
+    event_ids = list(
+        session.scalars(
+            select(Event.id)
+            .join(LineupSnapshot, LineupSnapshot.event_id == Event.id)
+            .where(
+                Event.status == "scheduled",
+                Event.is_demo.is_(False),
+                Event.kickoff_at > cutoff,
+                Event.kickoff_at <= horizon,
+                LineupSnapshot.lineup_type == "confirmed",
+                LineupSnapshot.observed_at <= cutoff,
+                LineupSnapshot.source_updated_at.is_not(None),
+                LineupSnapshot.source_updated_at <= cutoff,
+            )
+            .distinct()
+            .order_by(Event.kickoff_at, Event.id)
+        )
+    )
+    models = _latest_models_by_competition(session, cutoff)
+    created = 0
+    reused = 0
+    skipped = 0
+    for event_id in event_ids:
+        event = session.get(Event, event_id)
+        model = models.get(event.competition_id) if event is not None else None
+        if event is None or model is None:
+            skipped += 1
+            continue
+        lineup_ids = _latest_complete_confirmed_lineups(session, event, cutoff)
+        if lineup_ids is None:
+            skipped += 1
+            continue
+        existing = session.scalar(
+            select(ModelEventOutput.id).where(
+                ModelEventOutput.event_id == event.id,
+                ModelEventOutput.model_version_id == model.id,
+                ModelEventOutput.predicted_at == cutoff,
+                ModelEventOutput.evidence_class == "confirmed_lineup_context_unadjusted",
+            )
+        )
+        output = predict_event(
+            session,
+            model.id,
+            PredictEventRequest(event_id=event.id, predicted_at=cutoff, inputs_as_of=cutoff),
+            now=cutoff,
+            lineup_snapshot_ids=lineup_ids,
+        )
+        if output.evidence_class != "confirmed_lineup_context_unadjusted":
+            skipped += 1
+        elif existing is None:
+            created += 1
+        else:
+            reused += 1
+    return ConfirmedLineupRefreshSummary(len(event_ids), created, reused, skipped)
+
+
+def _latest_models_by_competition(session: Session, cutoff: datetime) -> dict[int, ModelVersion]:
+    models = session.scalars(
+        select(ModelVersion)
+        .where(
+            ModelVersion.status == "trained",
+            ModelVersion.is_demo.is_(False),
+            ModelVersion.training_end <= cutoff,
+        )
+        .order_by(ModelVersion.created_at.desc(), ModelVersion.id.desc())
+    )
+    result: dict[int, ModelVersion] = {}
+    for model in models:
+        competition_id = model.config.get("competition_id")
+        if isinstance(competition_id, int):
+            result.setdefault(competition_id, model)
+    return result
+
+
+def _latest_complete_confirmed_lineups(
+    session: Session, event: Event, cutoff: datetime
+) -> list[int] | None:
+    candidates = session.scalars(
+        select(LineupSnapshot)
+        .join(Provider, Provider.id == LineupSnapshot.provider_id)
+        .where(
+            LineupSnapshot.event_id == event.id,
+            LineupSnapshot.lineup_type == "confirmed",
+            LineupSnapshot.observed_at <= cutoff,
+            LineupSnapshot.source_updated_at.is_not(None),
+            LineupSnapshot.source_updated_at <= cutoff,
+            Provider.is_demo.is_(False),
+        )
+        .order_by(
+            LineupSnapshot.team_id,
+            LineupSnapshot.observed_at.desc(),
+            LineupSnapshot.id.desc(),
+        )
+    )
+    latest: dict[int, int] = {}
+    for lineup in candidates:
+        if lineup.team_id in latest:
+            continue
+        starters = session.scalar(
+            select(func.count())
+            .select_from(LineupMember)
+            .where(
+                LineupMember.lineup_snapshot_id == lineup.id,
+                LineupMember.starter.is_(True),
+            )
+        )
+        if starters == 11:
+            latest[lineup.team_id] = lineup.id
+    if set(latest) != {event.home_team_id, event.away_team_id}:
+        return None
+    return [latest[event.home_team_id], latest[event.away_team_id]]
 
 
 def _utc(value: datetime) -> datetime:

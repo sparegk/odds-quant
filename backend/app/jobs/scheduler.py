@@ -30,6 +30,7 @@ from app.services.fixture_import import import_provider_fixtures
 from app.services.odds_import import import_odds_csv, serialize_odds_rows_csv
 from app.services.research_pipeline import (
     PredictionRefreshSummary,
+    refresh_confirmed_lineup_predictions,
     refresh_upcoming_predictions,
 )
 
@@ -405,6 +406,12 @@ def poll_api_football_intelligence(
                     on_date=current.date(),
                     now=current,
                 )
+        prediction_cutoff = current if now is not None else datetime.now(UTC)
+        with session_factory() as prediction_session:
+            lineup_prediction_summary = refresh_confirmed_lineup_predictions(
+                prediction_session,
+                as_of=prediction_cutoff,
+            )
         message = (
             f"Matched {summary.fixtures_matched}/{summary.fixtures_seen} API-Football fixtures; "
             f"imported {summary.lineups_imported} lineups, "
@@ -417,7 +424,15 @@ def poll_api_football_intelligence(
             "completed",
             message,
             current,
-            metrics=summary.model_dump(mode="json"),
+            metrics={
+                **summary.model_dump(mode="json"),
+                "confirmed_lineup_prediction_refresh": {
+                    "eligible_events": lineup_prediction_summary.eligible_events,
+                    "predictions_created": lineup_prediction_summary.predictions_created,
+                    "predictions_reused": lineup_prediction_summary.predictions_reused,
+                    "events_skipped": lineup_prediction_summary.events_skipped,
+                },
+            },
         )
     except Exception as exc:
         error_type = type(exc).__name__

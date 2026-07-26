@@ -164,6 +164,11 @@ def list_research_value_candidates(
                     risks.append("Market consensus currently comes from one bookmaker.")
                 if output.evidence_class == "team_baseline":
                     risks.append("The prediction has no confirmed-lineup adjustment.")
+                elif output.evidence_class == "confirmed_lineup_context_unadjusted":
+                    risks.append(
+                        "Confirmed lineups are retained as context, but no validated "
+                        "player-strength adjustment is applied."
+                    )
                 candidates.append(
                     ResearchValueCandidateView(
                         event_id=event.id,

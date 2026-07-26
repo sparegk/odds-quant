@@ -176,6 +176,7 @@ const detail: MatchdayEventDetail = {
     predicted_at: '2026-07-21T11:00:00Z',
     inputs_as_of: '2026-07-21T11:00:00Z',
     evidence_class: 'team_baseline',
+    lineup_snapshot_ids: [],
     home_lambda: 1.5,
     away_lambda: 0.9,
     sample_size: 500,

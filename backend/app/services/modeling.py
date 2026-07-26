@@ -6,17 +6,21 @@ import math
 from datetime import UTC, datetime
 
 import numpy as np
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.models import (
     Competition,
     Event,
+    LineupMember,
+    LineupSnapshot,
     Market,
     MatchResult,
     ModelEventOutput,
+    ModelOutputLineupSnapshot,
     ModelPrediction,
     ModelVersion,
+    Provider,
     Selection,
 )
 from app.quant.odds import fair_odds
@@ -144,6 +148,7 @@ def predict_event(
     request: PredictEventRequest,
     *,
     now: datetime | None = None,
+    lineup_snapshot_ids: list[int] | None = None,
 ) -> ModelOutputView:
     model = session.get(ModelVersion, model_id)
     if model is None:
@@ -166,6 +171,13 @@ def predict_event(
     competition_id = _config_int(model.config, "competition_id")
     if event.competition_id != competition_id:
         raise ModelingError("event competition does not match the model competition")
+
+    confirmed_lineups = _validated_confirmed_lineups(
+        session,
+        event=event,
+        cutoff=inputs_as_of,
+        lineup_snapshot_ids=lineup_snapshot_ids,
+    )
 
     existing = session.scalar(
         select(ModelEventOutput).where(
@@ -194,11 +206,13 @@ def predict_event(
     output = ModelEventOutput(
         event_id=event.id,
         model_version_id=model.id,
-        lineup_snapshot_id=None,
+        lineup_snapshot_id=(confirmed_lineups[-1].id if confirmed_lineups else None),
         matchup_feature_snapshot_id=None,
         predicted_at=predicted_at,
         inputs_as_of=inputs_as_of,
-        evidence_class="team_baseline",
+        evidence_class=(
+            "confirmed_lineup_context_unadjusted" if confirmed_lineups else "team_baseline"
+        ),
         home_lambda=home_lambda,
         away_lambda=away_lambda,
         score_matrix=matrix.tolist(),
@@ -206,9 +220,62 @@ def predict_event(
     )
     session.add(output)
     session.flush()
+    for lineup in confirmed_lineups:
+        session.add(
+            ModelOutputLineupSnapshot(
+                output_id=output.id,
+                lineup_snapshot_id=lineup.id,
+            )
+        )
     _persist_selection_predictions(session, output, event, matrix)
     session.commit()
     return _output_view(session, output, model)
+
+
+def _validated_confirmed_lineups(
+    session: Session,
+    *,
+    event: Event,
+    cutoff: datetime,
+    lineup_snapshot_ids: list[int] | None,
+) -> list[LineupSnapshot]:
+    if lineup_snapshot_ids is None:
+        return []
+    if len(set(lineup_snapshot_ids)) != 2:
+        raise ModelingError("confirmed prediction requires exactly two distinct lineups")
+    lineups = list(
+        session.scalars(
+            select(LineupSnapshot)
+            .join(Provider, Provider.id == LineupSnapshot.provider_id)
+            .where(
+                LineupSnapshot.id.in_(lineup_snapshot_ids),
+                LineupSnapshot.event_id == event.id,
+                LineupSnapshot.lineup_type == "confirmed",
+                LineupSnapshot.observed_at <= cutoff,
+                LineupSnapshot.source_updated_at.is_not(None),
+                LineupSnapshot.source_updated_at <= cutoff,
+                Provider.is_demo.is_(False),
+            )
+            .order_by(LineupSnapshot.team_id, LineupSnapshot.id)
+        )
+    )
+    if len(lineups) != 2 or {item.team_id for item in lineups} != {
+        event.home_team_id,
+        event.away_team_id,
+    }:
+        raise ModelingError("confirmed lineups must cover both event teams before cutoff")
+    for lineup in lineups:
+        starters = session.scalar(
+            select(func.count())
+            .select_from(LineupMember)
+            .where(
+                LineupMember.lineup_snapshot_id == lineup.id,
+                LineupMember.starter.is_(True),
+            )
+        )
+        if starters != 11:
+            raise ModelingError("confirmed lineup must contain exactly 11 starters")
+    return lineups
 
 
 def list_models(session: Session) -> list[ModelVersionView]:
@@ -350,6 +417,13 @@ def _output_view(
         .where(ModelPrediction.output_id == output.id)
         .order_by(Market.id, Selection.id)
     ).all()
+    lineup_snapshot_ids = list(
+        session.scalars(
+            select(ModelOutputLineupSnapshot.lineup_snapshot_id)
+            .where(ModelOutputLineupSnapshot.output_id == output.id)
+            .order_by(ModelOutputLineupSnapshot.lineup_snapshot_id)
+        )
+    )
     return ModelOutputView(
         id=output.id,
         event_id=output.event_id,
@@ -358,6 +432,7 @@ def _output_view(
         predicted_at=_utc(output.predicted_at),
         inputs_as_of=_utc(output.inputs_as_of),
         evidence_class=output.evidence_class,
+        lineup_snapshot_ids=lineup_snapshot_ids,
         home_lambda=output.home_lambda,
         away_lambda=output.away_lambda,
         sample_size=output.sample_size,

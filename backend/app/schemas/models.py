@@ -107,6 +107,7 @@ class ModelOutputView(BaseModel):
     predicted_at: datetime
     inputs_as_of: datetime
     evidence_class: str
+    lineup_snapshot_ids: list[int]
     home_lambda: float
     away_lambda: float
     sample_size: int

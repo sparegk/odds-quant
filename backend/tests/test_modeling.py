@@ -8,7 +8,18 @@ import pytest
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Competition, Event, MatchResult, ModelPrediction
+from app.db.models import (
+    Competition,
+    Event,
+    LineupMember,
+    LineupSnapshot,
+    MatchResult,
+    ModelOutputLineupSnapshot,
+    ModelPrediction,
+    ModelVersion,
+    Player,
+    Provider,
+)
 from app.db.session import Base
 from app.schemas.models import PredictEventRequest, TrainPoissonRequest
 from app.services.demo_seed import build_demo_results_csv, seed_demo_data, seed_demo_results
@@ -41,6 +52,61 @@ def _training_request(session: Session) -> TrainPoissonRequest:
     )
 
 
+def _store_confirmed_lineups(session: Session, event: Event, published_at: datetime) -> list[int]:
+    competition = session.get_one(Competition, event.competition_id)
+    provider = Provider(
+        slug="confirmed-lineup-test",
+        name="Confirmed lineup test",
+        kind="licensed_api",
+        is_demo=False,
+        terms_url="https://example.test/terms",
+        capabilities={"lineups": True},
+    )
+    session.add(provider)
+    session.flush()
+    ids: list[int] = []
+    for team_index, team_id in enumerate((event.home_team_id, event.away_team_id)):
+        lineup = LineupSnapshot(
+            event_id=event.id,
+            team_id=team_id,
+            coach_id=None,
+            provider_id=provider.id,
+            lineup_type="confirmed",
+            formation="4-3-3",
+            source_updated_at=published_at,
+            observed_at=published_at,
+            confidence=1,
+        )
+        session.add(lineup)
+        session.flush()
+        ids.append(lineup.id)
+        for player_index in range(11):
+            player = Player(
+                sport_id=competition.sport_id,
+                provider_id=provider.id,
+                provider_player_key=f"{team_index}-{player_index}",
+                name=f"Player {team_index}-{player_index}",
+                position="unknown",
+                preferred_side=None,
+                birth_year=None,
+                is_demo=False,
+            )
+            session.add(player)
+            session.flush()
+            session.add(
+                LineupMember(
+                    lineup_snapshot_id=lineup.id,
+                    player_id=player.id,
+                    starter=True,
+                    position="unknown",
+                    role=None,
+                    expected_probability=None,
+                )
+            )
+    session.commit()
+    return ids
+
+
 def test_training_and_prediction_are_versioned_and_persisted(session: Session) -> None:
     model = train_poisson_model(session, _training_request(session), now=AS_OF)
     target = session.scalar(
@@ -70,6 +136,47 @@ def test_training_and_prediction_are_versioned_and_persisted(session: Session) -
     assert sum(output.derived_probabilities["TOTAL_GOALS_2.5"].values()) == pytest.approx(1)
     assert len(output.predictions) == 3
     assert session.scalar(select(func.count()).select_from(ModelPrediction)) == 3
+
+
+def test_confirmed_lineups_create_a_separate_unadjusted_context_version(
+    session: Session,
+) -> None:
+    model = train_poisson_model(session, _training_request(session), now=AS_OF)
+    target = session.scalar(
+        select(Event).where(Event.status == "scheduled").order_by(Event.kickoff_at)
+    )
+    assert target is not None
+    baseline = predict_event(
+        session,
+        model.id,
+        PredictEventRequest(event_id=target.id, predicted_at=AS_OF, inputs_as_of=AS_OF),
+        now=AS_OF,
+    )
+    target.is_demo = False
+    session.get_one(ModelVersion, model.id).is_demo = False
+    session.commit()
+    confirmed_at = AS_OF + timedelta(minutes=1)
+    lineup_ids = _store_confirmed_lineups(session, target, confirmed_at)
+
+    confirmed = predict_event(
+        session,
+        model.id,
+        PredictEventRequest(
+            event_id=target.id,
+            predicted_at=confirmed_at,
+            inputs_as_of=confirmed_at,
+        ),
+        now=confirmed_at,
+        lineup_snapshot_ids=lineup_ids,
+    )
+
+    assert baseline.evidence_class == "team_baseline"
+    assert baseline.lineup_snapshot_ids == []
+    assert confirmed.evidence_class == "confirmed_lineup_context_unadjusted"
+    assert confirmed.lineup_snapshot_ids == sorted(lineup_ids)
+    assert confirmed.home_lambda == baseline.home_lambda
+    assert confirmed.away_lambda == baseline.away_lambda
+    assert session.scalar(select(func.count()).select_from(ModelOutputLineupSnapshot)) == 2
 
 
 def test_post_cutoff_correction_cannot_change_training_data(session: Session) -> None:

@@ -140,6 +140,7 @@ export interface ModelOutput {
   predicted_at: string
   inputs_as_of: string
   evidence_class: string
+  lineup_snapshot_ids: number[]
   home_lambda: number
   away_lambda: number
   sample_size: number

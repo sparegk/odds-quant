@@ -537,6 +537,16 @@ class ModelEventOutput(Base):
     )
 
 
+class ModelOutputLineupSnapshot(Base):
+    __tablename__ = "model_output_lineup_snapshots"
+    output_id: Mapped[int] = mapped_column(
+        ForeignKey("model_event_outputs.id", ondelete="CASCADE"), primary_key=True
+    )
+    lineup_snapshot_id: Mapped[int] = mapped_column(
+        ForeignKey("lineup_snapshots.id"), primary_key=True
+    )
+
+
 class ModelPrediction(Base):
     __tablename__ = "model_predictions"
     id: Mapped[int] = mapped_column(primary_key=True)
