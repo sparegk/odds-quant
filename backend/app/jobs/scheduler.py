@@ -28,6 +28,10 @@ from app.services.api_football_collection import collect_api_football_intelligen
 from app.services.demo_seed import seed_demo_data
 from app.services.fixture_import import import_provider_fixtures
 from app.services.odds_import import import_odds_csv, serialize_odds_rows_csv
+from app.services.research_pipeline import (
+    PredictionRefreshSummary,
+    refresh_upcoming_predictions,
+)
 
 logger = logging.getLogger("oddsquant.worker")
 SessionFactory = Callable[[], Session]
@@ -119,7 +123,9 @@ def run_provider_collection(
         fixtures = _collect_fixtures(provider_adapter)
         rows = list(provider_adapter.collect_odds())
         collected_at = datetime.now(UTC)
+        prediction_cutoff = max([started_at, *(_utc(row.observed_at) for row in rows)])
         fixture_result = None
+        prediction_summary = None
         if fixtures or rows:
             with session_factory() as import_session:
                 fixture_result = import_provider_fixtures(
@@ -146,6 +152,12 @@ def run_provider_collection(
                     )
                 else:
                     import_session.commit()
+        if rows:
+            with session_factory() as prediction_session:
+                prediction_summary = refresh_upcoming_predictions(
+                    prediction_session,
+                    as_of=prediction_cutoff,
+                )
         fixture_message = ""
         if fixture_result is not None and fixture_result.fixtures_received:
             fixture_message = (
@@ -168,7 +180,7 @@ def run_provider_collection(
             "completed",
             message,
             started_at,
-            metrics=_collection_metrics(fixtures, rows),
+            metrics=_collection_metrics(fixtures, rows, prediction_summary),
         )
     except Exception as exc:
         error_type = type(exc).__name__
@@ -196,7 +208,9 @@ def _collect_fixtures(provider: OddsProvider) -> list[FixtureImportRow]:
 
 
 def _collection_metrics(
-    fixtures: list[FixtureImportRow], rows: list[OddsImportRow]
+    fixtures: list[FixtureImportRow],
+    rows: list[OddsImportRow],
+    prediction_summary: PredictionRefreshSummary | None = None,
 ) -> dict[str, object]:
     fixture_counts = Counter(item.competition for item in fixtures)
     price_counts: dict[str, Counter[str]] = {}
@@ -209,11 +223,19 @@ def _collection_metrics(
         }
         for competition in sorted(set(fixture_counts) | set(price_counts))
     }
-    return {
+    metrics: dict[str, object] = {
         "fixtures_received": len(fixtures),
         "prices_received": len(rows),
         "competitions": competitions,
     }
+    if prediction_summary is not None:
+        metrics["prediction_refresh"] = {
+            "eligible_events": prediction_summary.eligible_events,
+            "predictions_created": prediction_summary.predictions_created,
+            "predictions_reused": prediction_summary.predictions_reused,
+            "events_skipped": prediction_summary.events_skipped,
+        }
+    return metrics
 
 
 def _finish_job(

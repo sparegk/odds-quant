@@ -30,6 +30,7 @@ from app.schemas.fixtures import FixtureImportRow
 from app.schemas.odds import OddsImportRow
 from app.services.demo_seed import build_demo_odds_csv
 from app.services.odds_import import parse_odds_csv
+from app.services.research_pipeline import PredictionRefreshSummary
 
 AS_OF = datetime(2026, 7, 19, 10, 0, tzinfo=UTC)
 LOG_SECRET = "credential-that-must-never-be-logged"
@@ -109,6 +110,29 @@ def test_registered_provider_collection_records_completed_job(
             }
         }
         assert session.scalar(select(func.count()).select_from(OddsSnapshot)) == 8
+
+
+def test_collection_refreshes_predictions_at_the_source_cutoff(
+    sessions: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    observed_at = AS_OF + timedelta(seconds=3)
+    rows = [row.model_copy(update={"observed_at": observed_at}) for row in _provider_rows()]
+    calls: list[datetime] = []
+
+    def refresh(session: Session, *, as_of: datetime) -> PredictionRefreshSummary:
+        calls.append(as_of)
+        return PredictionRefreshSummary(0, 0, 0, 0)
+
+    monkeypatch.setattr("app.jobs.scheduler.refresh_upcoming_predictions", refresh)
+
+    job_id = run_provider_collection(
+        FakeLicensedProvider(rows), session_factory=sessions, now=AS_OF
+    )
+
+    assert calls == [observed_at]
+    with sessions() as session:
+        job = session.get_one(ProviderJob, job_id)
+        assert job.metrics["prediction_refresh"]["predictions_created"] == 0
 
 
 def test_registered_provider_persists_fixture_without_supported_odds(
