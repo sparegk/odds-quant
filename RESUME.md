@@ -131,6 +131,12 @@ team-history paths. The restored scheduler completed fresh jobs `58` and `59`, c
 provider freshness blockers; the expected warning for earlier Odds-API.io failures remains until
 those jobs age out of the recent-job window.
 
+Scheduled Odds-API.io job `64` provided the first live post-deployment proof of the bounded
+reason metrics: 42 eligible events produced 3 predictions and 39 fail-closed skips. The reasons
+were 33 `insufficient_home_team_home_history` and 6
+`insufficient_away_team_away_history`, exactly summing to the stored skip count. The preceding
+scheduled job `62` failed with a sanitized `OddsApiIoError`; no rapid retry was issued.
+
 The five activation boxes are complete and pushed as focused commits: migration/scheduler
 activation `9f9ec05`, sanitized probes `5f65998`, consecutive live batches `d005fd1`, prediction
 metrics `196d645`, and watchlist audit (the commit containing this checkpoint). The scheduler is
@@ -138,8 +144,32 @@ still running in the background. On the next session, start with `git status -sb
 `python -m app.cli monitor-collection --fail-on-alerts` from `backend`. The expected remaining
 operational condition is a temporary repeated-failure warning until the earlier probe-time
 failures age out of the recent-job window; do not retry faster than the configured interval.
-After monitoring is clear, the next development checkpoint is explicit fail-closed skip-reason
-observability for the 39 skipped events, with deterministic tests and a separate commit/push.
+The skip-reason checkpoint is now complete; use the continuation checklist below rather than
+repeating that work.
+
+### Next-session continuation checklist (2026-07-27)
+
+- [x] Verify a scheduler-owned live Odds batch persists bounded reasons for every skipped event.
+  Job `64` is the proof: 33 home-history plus 6 away-history skips equal all 39 skips. Commit and
+  push this evidence before starting the next box if it is not already the tip of `main`.
+- [ ] Expose the latest prediction-refresh summary and bounded `skip_reasons` directly in both
+  `python -m app.cli monitor-collection` and `GET /api/v1/data/monitoring`. Add deterministic API,
+  service, and CLI/serialization tests. Run relevant backend checks, then make a focused commit
+  and push `main`.
+- [ ] Use the live 33/6 reason split to create a fail-closed, lawful UEFA historical-result and
+  chronological-training coverage plan or implementation checkpoint. Do not lower the minimum
+  eight venue-specific matches, mix competition identities, fabricate timestamps, or register a
+  paid/unapproved provider. Add deterministic tests for any code behavior, then commit and push.
+- [ ] Keep the scheduler polling only at its configured interval until the old failure jobs,
+  including sanitized failed job `62`, age out of the recent-job window. Require
+  `monitor-collection --fail-on-alerts` to exit successfully, confirm target bookmaker coverage
+  has not regressed, and confirm player props and inferred closing prices remain blocked. Record
+  the clean live evidence in this file, then commit and push.
+
+At handoff time the hidden scheduler process was active as PID `14120`. Always verify the process
+rather than assuming the PID survived. Start the next session with `git status -sb`, `git log -1
+--oneline`, a process check, and `python -m app.cli monitor-collection --fail-on-alerts`. Do not
+manually accelerate provider retries.
 
 The scheduled odds workflow now refreshes cutoff-safe baseline predictions for upcoming priced
 fixtures, reports research-watchlist availability, and reuses an output when the exact cutoff is
