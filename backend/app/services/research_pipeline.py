@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections import Counter
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select
@@ -28,6 +29,7 @@ class PredictionRefreshSummary:
     predictions_reused: int
     events_skipped: int
     research_candidates_available: int = 0
+    skip_reasons: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -85,14 +87,17 @@ def refresh_upcoming_predictions(
 
     created = 0
     reused = 0
-    skipped = 0
+    skip_reasons: Counter[str] = Counter()
     for event_id in event_ids:
         event = session.get(Event, event_id)
         selected_model = (
             models_by_competition.get(event.competition_id) if event is not None else None
         )
-        if event is None or selected_model is None:
-            skipped += 1
+        if event is None:
+            skip_reasons["event_not_found"] += 1
+            continue
+        if selected_model is None:
+            skip_reasons["no_cutoff_valid_trained_model"] += 1
             continue
         existing_id = session.scalar(
             select(ModelEventOutput.id).where(
@@ -114,8 +119,8 @@ def refresh_upcoming_predictions(
                 ),
                 now=cutoff,
             )
-        except ModelingError:
-            skipped += 1
+        except ModelingError as exc:
+            skip_reasons[_modeling_skip_reason(exc)] += 1
             continue
         if existing_id is None:
             created += 1
@@ -125,9 +130,29 @@ def refresh_upcoming_predictions(
         eligible_events=len(event_ids),
         predictions_created=created,
         predictions_reused=reused,
-        events_skipped=skipped,
+        events_skipped=sum(skip_reasons.values()),
         research_candidates_available=_research_candidate_count(session, cutoff, horizon_hours),
+        skip_reasons=dict(sorted(skip_reasons.items())),
     )
+
+
+def _modeling_skip_reason(exc: ModelingError) -> str:
+    message = str(exc)
+    if message.startswith("insufficient home team at home history:"):
+        return "insufficient_home_team_home_history"
+    if message.startswith("insufficient away team away history:"):
+        return "insufficient_away_team_away_history"
+    return {
+        "model version not found": "model_version_not_found",
+        "model version is not an active Poisson team-strength model": "model_not_active",
+        "event not found": "event_not_found",
+        "prediction must be generated before kickoff": "cutoff_not_before_kickoff",
+        "inputs_as_of cannot be after predicted_at": "inputs_after_prediction",
+        "model training window ends after the prediction input cutoff": (
+            "model_training_after_cutoff"
+        ),
+        "event competition does not match the model competition": ("model_competition_mismatch"),
+    }.get(message, "modeling_validation_failed")
 
 
 def refresh_confirmed_lineup_predictions(

@@ -124,7 +124,14 @@ def test_collection_refreshes_predictions_at_the_source_cutoff(
 
     def refresh(session: Session, *, as_of: datetime) -> PredictionRefreshSummary:
         calls.append(as_of)
-        return PredictionRefreshSummary(0, 0, 0, 0, 2)
+        return PredictionRefreshSummary(
+            2,
+            0,
+            0,
+            2,
+            2,
+            {"insufficient_home_team_home_history": 2},
+        )
 
     monkeypatch.setattr("app.jobs.scheduler.refresh_upcoming_predictions", refresh)
 
@@ -138,6 +145,8 @@ def test_collection_refreshes_predictions_at_the_source_cutoff(
         refresh_metrics = job.metrics["prediction_refresh"]
         assert isinstance(refresh_metrics, dict)
         assert refresh_metrics["predictions_created"] == 0
+        assert refresh_metrics["events_skipped"] == 2
+        assert refresh_metrics["skip_reasons"] == {"insufficient_home_team_home_history": 2}
         assert refresh_metrics["research_candidates_available"] == 2
 
 

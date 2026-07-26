@@ -88,3 +88,35 @@ def test_refresh_rejects_future_prices_and_is_idempotent_at_exact_cutoff(
     assert repeated.predictions_created == 0
     assert repeated.predictions_reused == scheduled
     assert session.scalar(select(func.count()).select_from(ModelEventOutput)) == scheduled
+
+
+def test_refresh_reports_missing_model_skip_reasons(session: Session) -> None:
+    model = _make_research_data_live(session)
+    model.status = "unvalidated"
+    session.commit()
+
+    summary = refresh_upcoming_predictions(session, as_of=AS_OF)
+
+    assert summary.eligible_events > 0
+    assert summary.events_skipped == summary.eligible_events
+    assert summary.skip_reasons == {
+        "no_cutoff_valid_trained_model": summary.eligible_events,
+    }
+    assert sum(summary.skip_reasons.values()) == summary.events_skipped
+
+
+def test_refresh_reports_insufficient_team_history_without_error_text(
+    session: Session,
+) -> None:
+    model = _make_research_data_live(session)
+    model.config = {**model.config, "minimum_team_matches": 10_000}
+    session.commit()
+
+    summary = refresh_upcoming_predictions(session, as_of=AS_OF)
+
+    assert summary.eligible_events > 0
+    assert summary.events_skipped == summary.eligible_events
+    assert summary.skip_reasons == {
+        "insufficient_home_team_home_history": summary.eligible_events,
+    }
+    assert all("matches" not in reason for reason in summary.skip_reasons)

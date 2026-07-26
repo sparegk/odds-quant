@@ -123,6 +123,14 @@
 
 ### Resume checkpoint: live workflow activation
 
+Explicit fail-closed prediction skip-reason observability is now implemented. Baseline refresh
+summaries and persisted provider-job metrics retain bounded aggregate reason codes whose counts
+sum to `events_skipped`; raw modeling exception text and variable match counts are not persisted.
+Deterministic coverage includes the missing cutoff-valid model and insufficient venue-specific
+team-history paths. The restored scheduler completed fresh jobs `58` and `59`, clearing both
+provider freshness blockers; the expected warning for earlier Odds-API.io failures remains until
+those jobs age out of the recent-job window.
+
 The five activation boxes are complete and pushed as focused commits: migration/scheduler
 activation `9f9ec05`, sanitized probes `5f65998`, consecutive live batches `d005fd1`, prediction
 metrics `196d645`, and watchlist audit (the commit containing this checkpoint). The scheduler is

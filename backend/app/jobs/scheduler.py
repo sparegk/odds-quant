@@ -235,6 +235,7 @@ def _collection_metrics(
             "predictions_created": prediction_summary.predictions_created,
             "predictions_reused": prediction_summary.predictions_reused,
             "events_skipped": prediction_summary.events_skipped,
+            "skip_reasons": prediction_summary.skip_reasons,
             "research_candidates_available": (prediction_summary.research_candidates_available),
         }
     return metrics
