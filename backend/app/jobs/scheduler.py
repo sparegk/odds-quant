@@ -235,6 +235,7 @@ def _collection_metrics(
             "predictions_created": prediction_summary.predictions_created,
             "predictions_reused": prediction_summary.predictions_reused,
             "events_skipped": prediction_summary.events_skipped,
+            "research_candidates_available": (prediction_summary.research_candidates_available),
         }
     return metrics
 
@@ -431,6 +432,9 @@ def poll_api_football_intelligence(
                     "predictions_created": lineup_prediction_summary.predictions_created,
                     "predictions_reused": lineup_prediction_summary.predictions_reused,
                     "events_skipped": lineup_prediction_summary.events_skipped,
+                    "research_candidates_available": (
+                        lineup_prediction_summary.research_candidates_available
+                    ),
                 },
             },
         )

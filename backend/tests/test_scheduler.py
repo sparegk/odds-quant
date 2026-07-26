@@ -30,7 +30,10 @@ from app.schemas.fixtures import FixtureImportRow
 from app.schemas.odds import OddsImportRow
 from app.services.demo_seed import build_demo_odds_csv
 from app.services.odds_import import parse_odds_csv
-from app.services.research_pipeline import PredictionRefreshSummary
+from app.services.research_pipeline import (
+    PredictionRefreshSummary,
+    refresh_upcoming_predictions,
+)
 
 AS_OF = datetime(2026, 7, 19, 10, 0, tzinfo=UTC)
 LOG_SECRET = "credential-that-must-never-be-logged"
@@ -121,7 +124,7 @@ def test_collection_refreshes_predictions_at_the_source_cutoff(
 
     def refresh(session: Session, *, as_of: datetime) -> PredictionRefreshSummary:
         calls.append(as_of)
-        return PredictionRefreshSummary(0, 0, 0, 0)
+        return PredictionRefreshSummary(0, 0, 0, 0, 2)
 
     monkeypatch.setattr("app.jobs.scheduler.refresh_upcoming_predictions", refresh)
 
@@ -132,7 +135,24 @@ def test_collection_refreshes_predictions_at_the_source_cutoff(
     assert calls == [observed_at]
     with sessions() as session:
         job = session.get_one(ProviderJob, job_id)
-        assert job.metrics["prediction_refresh"]["predictions_created"] == 0
+        refresh_metrics = job.metrics["prediction_refresh"]
+        assert isinstance(refresh_metrics, dict)
+        assert refresh_metrics["predictions_created"] == 0
+        assert refresh_metrics["research_candidates_available"] == 2
+
+
+def test_prediction_refresh_counts_the_api_watchlist_candidates(
+    sessions: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "app.services.research_pipeline.list_research_value_candidates",
+        lambda *args, **kwargs: [object(), object(), object()],
+    )
+
+    with sessions() as session:
+        summary = refresh_upcoming_predictions(session, as_of=AS_OF)
+
+    assert summary.research_candidates_available == 3
 
 
 def test_registered_provider_persists_fixture_without_supported_odds(

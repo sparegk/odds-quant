@@ -18,6 +18,7 @@ from app.db.models import (
 )
 from app.schemas.models import PredictEventRequest
 from app.services.modeling import ModelingError, predict_event
+from app.services.signals import list_research_value_candidates
 
 
 @dataclass(frozen=True)
@@ -26,6 +27,7 @@ class PredictionRefreshSummary:
     predictions_created: int
     predictions_reused: int
     events_skipped: int
+    research_candidates_available: int = 0
 
 
 @dataclass(frozen=True)
@@ -34,6 +36,7 @@ class ConfirmedLineupRefreshSummary:
     predictions_created: int
     predictions_reused: int
     events_skipped: int
+    research_candidates_available: int = 0
 
 
 def refresh_upcoming_predictions(
@@ -123,6 +126,7 @@ def refresh_upcoming_predictions(
         predictions_created=created,
         predictions_reused=reused,
         events_skipped=skipped,
+        research_candidates_available=_research_candidate_count(session, cutoff, horizon_hours),
     )
 
 
@@ -187,7 +191,24 @@ def refresh_confirmed_lineup_predictions(
             created += 1
         else:
             reused += 1
-    return ConfirmedLineupRefreshSummary(len(event_ids), created, reused, skipped)
+    return ConfirmedLineupRefreshSummary(
+        len(event_ids),
+        created,
+        reused,
+        skipped,
+        _research_candidate_count(session, cutoff, horizon_hours),
+    )
+
+
+def _research_candidate_count(session: Session, cutoff: datetime, horizon_hours: int) -> int:
+    return len(
+        list_research_value_candidates(
+            session,
+            as_of=cutoff,
+            horizon_hours=horizon_hours,
+            limit=1000,
+        )
+    )
 
 
 def _latest_models_by_competition(session: Session, cutoff: datetime) -> dict[int, ModelVersion]:
