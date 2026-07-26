@@ -97,6 +97,10 @@
 
 ## Next action
 
+- On 2026-07-26, the configured local database upgraded from `d4e5f6a7b8c9` through
+  `e5f6a7b8c9d0` to `f6a7b8c9d0e1`. The hidden scheduler worker was restarted from the
+  migrated checkout and remained active after its startup check.
+
 The scheduled odds workflow now refreshes cutoff-safe baseline predictions for upcoming priced
 fixtures, reports research-watchlist availability, and reuses an output when the exact cutoff is
 polled again. API-Football intelligence polling creates a separate
