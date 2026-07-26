@@ -111,6 +111,10 @@
   107/108 snapshots. Odds-API.io and API-Football both reported healthy with no provider
   blockers; monitoring retained a warning for the earlier failures still present in its recent
   job window.
+- Persisted metrics for jobs `53` and `55` each reported 42 eligible upcoming priced events,
+  3 newly versioned predictions, 39 fail-closed skips, and 5 research-watchlist candidates.
+  A deterministic database assertion confirmed all six recent outputs satisfy
+  `inputs_as_of <= predicted_at < kickoff`.
 
 The scheduled odds workflow now refreshes cutoff-safe baseline predictions for upcoming priced
 fixtures, reports research-watchlist availability, and reuses an output when the exact cutoff is
