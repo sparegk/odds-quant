@@ -115,6 +115,23 @@
   3 newly versioned predictions, 39 fail-closed skips, and 5 research-watchlist candidates.
   A deterministic database assertion confirmed all six recent outputs satisfy
   `inputs_as_of <= predicted_at < kickoff`.
+- A post-batch watchlist audit found 5 fresh research-only candidates across Champions League
+  and Conference League qualification. Every candidate retained cutoff-valid prediction and
+  price evidence and was approximately two minutes old. All 5 remained blocked by missing
+  qualifying chronological calibration and fewer than 8 venue-specific matches per team; 3
+  also failed conservative EV, and 1 additionally missed the raw-EV and model-edge thresholds.
+
+### Resume checkpoint: live workflow activation
+
+The five activation boxes are complete and pushed as focused commits: migration/scheduler
+activation `9f9ec05`, sanitized probes `5f65998`, consecutive live batches `d005fd1`, prediction
+metrics `196d645`, and watchlist audit (the commit containing this checkpoint). The scheduler is
+still running in the background. On the next session, start with `git status -sb`, then run
+`python -m app.cli monitor-collection --fail-on-alerts` from `backend`. The expected remaining
+operational condition is a temporary repeated-failure warning until the earlier probe-time
+failures age out of the recent-job window; do not retry faster than the configured interval.
+After monitoring is clear, the next development checkpoint is explicit fail-closed skip-reason
+observability for the 39 skipped events, with deterministic tests and a separate commit/push.
 
 The scheduled odds workflow now refreshes cutoff-safe baseline predictions for upcoming priced
 fixtures, reports research-watchlist availability, and reuses an output when the exact cutoff is
