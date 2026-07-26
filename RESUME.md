@@ -100,6 +100,11 @@
 - On 2026-07-26, the configured local database upgraded from `d4e5f6a7b8c9` through
   `e5f6a7b8c9d0` to `f6a7b8c9d0e1`. The hidden scheduler worker was restarted from the
   migrated checkout and remained active after its startup check.
+- A 2026-07-26 sanitized provider probe again returned `complete: true` for Allwyn /
+  Pamestoixima and Novibet. The bet-builder probe checked 78 events, retained implemented
+  Novibet `Corners Totals`, and classified Allwyn `Corners Totals` plus `Corners Totals HT`
+  as discovery-only pending independent target and settlement validation. Player-prop
+  ingestion remained disabled, and the probe returned no raw values.
 
 The scheduled odds workflow now refreshes cutoff-safe baseline predictions for upcoming priced
 fixtures, reports research-watchlist availability, and reuses an output when the exact cutoff is
