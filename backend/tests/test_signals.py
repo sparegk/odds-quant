@@ -208,6 +208,43 @@ def test_research_candidates_reject_predictions_after_the_requested_cutoff(
     )
 
 
+def test_research_watchlist_marks_prices_stale_after_exact_sixty_minute_limit(
+    session: Session,
+) -> None:
+    model, output, event = _prepared_output(session)
+    for provider in session.scalars(select(Provider)).all():
+        provider.is_demo = False
+    for bookmaker in session.scalars(select(Bookmaker)).all():
+        bookmaker.is_demo = False
+    event.is_demo = False
+    model.is_demo = False
+    away_prediction = session.scalar(
+        select(ModelPrediction)
+        .join(Selection, Selection.id == ModelPrediction.selection_id)
+        .where(ModelPrediction.output_id == output.id, Selection.code == "AWAY")
+    )
+    assert away_prediction is not None
+    away_prediction.probability = 0.45
+    away_prediction.lower_probability = 0.30
+    away_prediction.upper_probability = 0.55
+    away_prediction.fair_odds = 1 / 0.45
+    session.commit()
+
+    fresh = list_research_value_candidates(
+        session, as_of=AS_OF + timedelta(minutes=60), horizon_hours=48
+    )
+    stale = list_research_value_candidates(
+        session, as_of=AS_OF + timedelta(minutes=60, seconds=1), horizon_hours=48
+    )
+
+    fresh_away = next(item for item in fresh if item.selection_code == "AWAY")
+    stale_away = next(item for item in stale if item.selection_code == "AWAY")
+    assert fresh_away.is_stale is False
+    assert "older than 60 minutes" not in " ".join(fresh_away.qualification_blockers)
+    assert stale_away.is_stale is True
+    assert "older than 60 minutes" in " ".join(stale_away.qualification_blockers)
+
+
 def test_calibrated_signal_generation_is_persisted_and_idempotent(
     session: Session,
 ) -> None:

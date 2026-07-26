@@ -97,6 +97,15 @@
 
 ## Next action
 
+The scheduled odds workflow now refreshes cutoff-safe baseline predictions for upcoming priced
+fixtures, reports research-watchlist availability, and reuses an output when the exact cutoff is
+polled again. API-Football intelligence polling creates a separate
+`confirmed_lineup_context_unadjusted` output only after both complete confirmed XIs have original
+publication timestamps at or before the cutoff. Both lineup snapshot IDs are retained; model
+probabilities remain unchanged until player-strength adjustments are independently validated.
+Deterministic tests cover future-price exclusion, future-lineup exclusion, exact-cutoff
+idempotency, the 60-minute stale-price boundary, and baseline/confirmed version separation.
+
 Keep the restored scheduler collecting UEFA fixtures and supported team markets, and monitor
 provider jobs for renewed throttling or coverage regressions. Do not ingest player props when
 they first appear. First obtain stable provider player IDs, a licensed timestamped player

@@ -530,7 +530,13 @@ class ModelEventOutput(Base):
     score_matrix: Mapped[list[list[float]]] = mapped_column(JSON)
     sample_size: Mapped[int] = mapped_column(Integer)
     __table_args__ = (
-        UniqueConstraint("event_id", "model_version_id", "predicted_at"),
+        UniqueConstraint(
+            "event_id",
+            "model_version_id",
+            "predicted_at",
+            "evidence_class",
+            name="uq_model_event_outputs_event_model_time_evidence",
+        ),
         CheckConstraint("inputs_as_of <= predicted_at"),
         CheckConstraint("home_lambda > 0 AND away_lambda > 0"),
         CheckConstraint("sample_size > 0"),

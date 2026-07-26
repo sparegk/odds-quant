@@ -178,12 +178,14 @@ def predict_event(
         cutoff=inputs_as_of,
         lineup_snapshot_ids=lineup_snapshot_ids,
     )
+    evidence_class = "confirmed_lineup_context_unadjusted" if confirmed_lineups else "team_baseline"
 
     existing = session.scalar(
         select(ModelEventOutput).where(
             ModelEventOutput.event_id == event.id,
             ModelEventOutput.model_version_id == model.id,
             ModelEventOutput.predicted_at == predicted_at,
+            ModelEventOutput.evidence_class == evidence_class,
         )
     )
     if existing is not None:
@@ -210,9 +212,7 @@ def predict_event(
         matchup_feature_snapshot_id=None,
         predicted_at=predicted_at,
         inputs_as_of=inputs_as_of,
-        evidence_class=(
-            "confirmed_lineup_context_unadjusted" if confirmed_lineups else "team_baseline"
-        ),
+        evidence_class=evidence_class,
         home_lambda=home_lambda,
         away_lambda=away_lambda,
         score_matrix=matrix.tolist(),

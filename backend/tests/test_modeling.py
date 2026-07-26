@@ -14,6 +14,7 @@ from app.db.models import (
     LineupMember,
     LineupSnapshot,
     MatchResult,
+    ModelEventOutput,
     ModelOutputLineupSnapshot,
     ModelPrediction,
     ModelVersion,
@@ -155,10 +156,21 @@ def test_confirmed_lineups_create_a_separate_unadjusted_context_version(
     target.is_demo = False
     session.get_one(ModelVersion, model.id).is_demo = False
     session.commit()
-    confirmed_at = AS_OF + timedelta(minutes=1)
+    confirmed_at = AS_OF
     lineup_ids = _store_confirmed_lineups(session, target, confirmed_at)
 
     confirmed = predict_event(
+        session,
+        model.id,
+        PredictEventRequest(
+            event_id=target.id,
+            predicted_at=confirmed_at,
+            inputs_as_of=confirmed_at,
+        ),
+        now=confirmed_at,
+        lineup_snapshot_ids=lineup_ids,
+    )
+    repeated = predict_event(
         session,
         model.id,
         PredictEventRequest(
@@ -174,9 +186,11 @@ def test_confirmed_lineups_create_a_separate_unadjusted_context_version(
     assert baseline.lineup_snapshot_ids == []
     assert confirmed.evidence_class == "confirmed_lineup_context_unadjusted"
     assert confirmed.lineup_snapshot_ids == sorted(lineup_ids)
+    assert repeated.id == confirmed.id
     assert confirmed.home_lambda == baseline.home_lambda
     assert confirmed.away_lambda == baseline.away_lambda
     assert session.scalar(select(func.count()).select_from(ModelOutputLineupSnapshot)) == 2
+    assert session.scalar(select(func.count()).select_from(ModelEventOutput)) == 2
 
 
 def test_post_cutoff_correction_cannot_change_training_data(session: Session) -> None:
@@ -205,6 +219,33 @@ def test_post_cutoff_correction_cannot_change_training_data(session: Session) ->
     assert repeated.id == original.id
     assert repeated.data_fingerprint == original.data_fingerprint
     assert repeated.sample_size == 32
+
+
+def test_confirmed_lineup_published_after_cutoff_cannot_enter_prediction(
+    session: Session,
+) -> None:
+    model = train_poisson_model(session, _training_request(session), now=AS_OF)
+    target = session.scalar(
+        select(Event).where(Event.status == "scheduled").order_by(Event.kickoff_at)
+    )
+    assert target is not None
+    target.is_demo = False
+    session.get_one(ModelVersion, model.id).is_demo = False
+    session.commit()
+    lineup_ids = _store_confirmed_lineups(session, target, AS_OF + timedelta(seconds=1))
+
+    with pytest.raises(ModelingError, match="before cutoff"):
+        predict_event(
+            session,
+            model.id,
+            PredictEventRequest(
+                event_id=target.id,
+                predicted_at=AS_OF,
+                inputs_as_of=AS_OF,
+            ),
+            now=AS_OF,
+            lineup_snapshot_ids=lineup_ids,
+        )
 
 
 def test_prediction_at_or_after_kickoff_is_rejected(session: Session) -> None:

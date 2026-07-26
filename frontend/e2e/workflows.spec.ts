@@ -17,7 +17,7 @@ const evaluation = {
 }
 const output = {
   id: 32, event_id: 7, model_version_id: 12, model_version: 'poisson-e2e', predicted_at: now, inputs_as_of: now, evidence_class: 'external',
-  home_lambda: 1.4, away_lambda: 0.9, sample_size: 120, score_matrix: [], derived_probabilities: {}, predictions: [],
+  lineup_snapshot_ids: [], home_lambda: 1.4, away_lambda: 0.9, sample_size: 120, score_matrix: [], derived_probabilities: {}, predictions: [],
 }
 const backtest = {
   id: 42, model_version_id: 12, model_version: 'poisson-e2e', status: 'completed', evaluation_start: '2026-01-01T00:00:00Z', evaluation_end: now,
@@ -54,6 +54,7 @@ async function mockApi(page: Page) {
     if (path === '/api/v1/backtests') return json(route, [backtest])
     if (path === '/api/v1/readiness') return json(route, { events: 1, odds_snapshots: 1, final_results: 20, model_versions: 1, predictions: 1, non_demo_calibrated_evaluations: 1, signals: 1, signal_backtests: 1, bookmaker_tax_mappings: 1, bookmaker_constraints: 1, intelligence_records: 0 })
     if (path === '/api/v1/data/coverage') return json(route, { minimum_evaluation_results: 200, required_bookmakers: ['Allwyn / Pamestoixima', 'Novibet'], total_events: 1, permitted_events: 1, permitted_final_results: 20, permitted_odds_snapshots: 1, permitted_closing_snapshots: 0, competitions: [{ competition_id: 3, competition: 'Test League', country: 'GB', season: '2025/26', total_events: 1, permitted_events: 1, permitted_teams: 2, permitted_final_results: 20, permitted_odds_snapshots: 1, permitted_closing_snapshots: 0, covered_required_bookmakers: ['Novibet'], missing_required_bookmakers: ['Allwyn / Pamestoixima'], first_result_kickoff_at: '2026-01-01T12:00:00Z', last_result_kickoff_at: now, closing_event_coverage: 0, evaluation_ready: false, blockers: ['fewer_than_200_final_results', 'no_closing_prices', 'missing_required_bookmakers'] }] })
+    if (path === '/api/v1/data/monitoring') return json(route, null)
     if (path === '/api/v1/arbitrage/settings') return json(route, { bookmakers: [{ id: 2, slug: 'beacon', name: 'Beacon', is_demo: false }], tax_profiles: [], constraints: [] })
     if (path === '/api/v1/odds/comparison') return json(route, [])
     return json(route, [])
@@ -75,7 +76,7 @@ test('imports odds and completes the model-to-signal workflow', async ({ page })
   await page.evaluate(() => { window.location.hash = 'models' })
   await expect(page.locator('header h1')).toHaveText('Model performance')
   await expect(page.getByText('Chronological Elo')).toBeVisible()
-  await expect(page.getByRole('cell', { name: 'Dixon–Coles' })).toBeVisible()
+  await expect(page.getByRole('cell', { name: 'Dixon-Coles' })).toBeVisible()
   await page.getByLabel('Training start').fill('2025-01-01T00:00')
   await page.getByLabel('Training end').fill('2026-07-01T12:00')
   await page.getByRole('button', { name: 'Train model' }).click()
