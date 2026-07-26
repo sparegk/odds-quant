@@ -105,6 +105,12 @@
   Novibet `Corners Totals`, and classified Allwyn `Corners Totals` plus `Corners Totals HT`
   as discovery-only pending independent target and settlement validation. Player-prop
   ingestion remained disabled, and the probe returned no raw values.
+- After the probes triggered transient provider failures, retries were held to the configured
+  interval rather than looped rapidly. Odds-API.io jobs `53` and `55` then completed
+  consecutively, each observing 78 fixtures and atomically importing 308/310 prices across
+  107/108 snapshots. Odds-API.io and API-Football both reported healthy with no provider
+  blockers; monitoring retained a warning for the earlier failures still present in its recent
+  job window.
 
 The scheduled odds workflow now refreshes cutoff-safe baseline predictions for upcoming priced
 fixtures, reports research-watchlist availability, and reuses an output when the exact cutoff is
