@@ -1,8 +1,9 @@
 {
   "name": "oddsquant-site",
   "private": true,
+  "type": "module",
   "version": "0.1.0",
   "scripts": {
-    "build": "npm --prefix frontend ci && npm --prefix frontend run build -- --outDir ../dist --emptyOutDir"
+    "build": "npm --prefix frontend ci && npm --prefix frontend run build -- --outDir ../dist --emptyOutDir && node scripts/prepare-sites.mjs"
   }
 }
