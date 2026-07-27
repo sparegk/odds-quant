@@ -279,5 +279,6 @@ infer closing flags, or enable player props before their independent validation 
   proxy end to end. Matchday returned 14 events; stable deep link `/matches/1256` returned HTTP
   200 and its detail API retained two price markets, a latest model prediction, an explicit
   blocked builder gate with zero stored quotes, and a non-empty evidence note.
-- [ ] Review whether the completed owner-only site should be made public; do not change access
-  without explicit approval.
+- [x] Review production access and retain owner-only mode: exactly one allowed user and no groups.
+  Do not make this Quick-Tunnel-backed deployment public without a separate explicit approval and
+  a durable origin with appropriate uptime and operational controls.
