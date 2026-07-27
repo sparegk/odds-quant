@@ -45,7 +45,7 @@ export const navigationGroups: readonly NavigationGroup[] = [
     label: 'Matches',
     items: [
       { key: 'matchday', label: 'Matchday', icon: CalendarDays },
-      { key: 'event', label: 'Event markets', icon: CalendarDays },
+      { key: 'event', label: 'Match detail', icon: CalendarDays },
       { key: 'comparison', label: 'Odds comparison', icon: GitCompareArrows },
     ],
   },

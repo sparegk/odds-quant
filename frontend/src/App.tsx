@@ -16,7 +16,7 @@ import { BankrollResearch } from './components/BankrollResearch'
 import { MatchdayResearch } from './components/MatchdayResearch'
 import { UnderdogScanner } from './components/UnderdogScanner'
 import { ValueOpportunities } from './components/ValueOpportunities'
-import { EventMarkets } from './components/EventMarkets'
+import { MatchDetailPage } from './components/MatchDetailPage'
 import { ModelPerformance } from './components/ModelPerformance'
 import { DataOperations } from './components/DataOperations'
 import { ArbitrageSettings } from './components/ArbitrageSettings'
@@ -287,7 +287,7 @@ function ActiveView(props: ActiveViewProps) {
     case 'matchday':
       return <MatchdayResearch events={props.dashboard.events} onSelectEvent={props.onSelectEvent} />
     case 'event':
-      return <EventMarkets dashboard={props.dashboard} events={props.dashboard.events} selectedEventId={props.selectedEventId} markets={props.markets} loading={props.comparisonLoading} error={props.comparisonError} onSelectEvent={props.onSelectEvent} onOpenComparison={() => navigateToView('comparison')} />
+      return <MatchDetailPage events={props.dashboard.events} selectedEventId={props.selectedEventId} onSelectEvent={props.onSelectEvent} onOpenBuilder={() => navigateToView('builder')} onOpenComparison={() => navigateToView('comparison')} />
     case 'comparison':
       return <OddsComparison {...props} />
     case 'data':

@@ -253,7 +253,7 @@ infer closing flags, or enable player props before their independent validation 
   Analytics, Admin, and About groups. Deterministic navigation tests, the full frontend unit suite,
   lint, production build, and Playwright workflows pass.
 - [x] Add stable, shareable event deep links that preserve the selected match across refreshes.
-- [ ] Unify kickoff, bookmaker prices, model evidence, availability gates, and builder research in
+- [x] Unify kickoff, bookmaker prices, model evidence, availability gates, and builder research in
   one coherent match-detail experience.
 - [ ] Build a mobile-first navigation and responsive match/price layouts.
 - [ ] Improve loading, empty, and recoverable error states with actionable language.

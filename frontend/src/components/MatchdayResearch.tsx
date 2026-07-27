@@ -406,7 +406,7 @@ function FixtureButton({ item, active, onSelect }: { item: MatchdayEvent; active
   )
 }
 
-function MatchDetail({ detail }: { detail: MatchdayEventDetail }) {
+export function MatchDetail({ detail }: { detail: MatchdayEventDetail }) {
   const likely = [...(detail.latest_prediction?.predictions ?? [])].sort((left, right) => right.probability - left.probability)
   const bestPrices = detail.markets.flatMap((market) => market.best_prices.map((price) => ({ market, price })))
   const builderQuotes = [...detail.builder_quotes].sort((left, right) => (right.lower_expected_value ?? -1) - (left.lower_expected_value ?? -1))

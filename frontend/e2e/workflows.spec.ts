@@ -24,6 +24,38 @@ const backtest = {
   fingerprint: 'backtest-fingerprint', evaluation_status: 'research_only', is_demo: false, config: {}, policy: {}, metrics: { bet_count: 1, net_profit_units: 0.8, roi: 0.08, maximum_drawdown_units: 0 },
   observations: [{ id: 1, event_id: 7, selection_id: 1, prediction_id: 32, odds_snapshot_id: 5, predicted_at: now, settled_at: now, market_type: 'moneyline_3way', selection_code: 'HOME', decimal_odds: 1.8, model_probability: 0.6, lower_probability: 0.55, expected_value: 0.08, settlement: 'won', stake: 10, profit_units: 8 }], created_at: now,
 }
+const blockedGate = {
+  status: 'blocked', title: 'Evidence remains blocked', available_records: 0, reasons: ['Timestamp-valid evidence is not stored.'],
+}
+const matchDetail = {
+  event,
+  competition_group: 'premier-league',
+  competition_group_label: 'Premier League',
+  as_of: now,
+  team_form: [],
+  markets: [],
+  latest_prediction: null,
+  signals: [],
+  builder_quotes: [],
+  suggestions: [],
+  selected_bookmakers: ['allwyn', 'novibet'],
+  bookmaker_options: [
+    { code: 'allwyn', name: 'Allwyn', selected: true, has_current_prices: false, offered_market_types: [] },
+    { code: 'novibet', name: 'Novibet', selected: true, has_current_prices: false, offered_market_types: [] },
+  ],
+  suggestion_market_statuses: [],
+  availability_audit: [
+    { code: 'lineups', label: 'Lineups', status: 'blocked', present_records: 0, research_only: true, evidence: ['No lineup stored.'], blockers: ['Publication evidence is unavailable.'], unlock_requirements: ['Import timestamped lineup evidence.'] },
+    { code: 'builder', label: 'Builder research', status: 'blocked', present_records: 0, research_only: true, evidence: ['No quote stored.'], blockers: ['No model output is available.'], unlock_requirements: ['Persist a pre-kickoff prediction.'] },
+  ],
+  stored_lineups: [],
+  lineup_projections: [],
+  lineup_research: blockedGate,
+  player_research: { ...blockedGate, title: 'Player markets remain research-only' },
+  builder_value: { ...blockedGate, title: 'No verified builder value' },
+  bookmaker_guidance: 'Compare exact timestamp-valid prices.',
+  evidence_note: 'High probability is not the same as value.',
+}
 
 async function json(route: Route, body: unknown, status = 200) {
   await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
@@ -57,6 +89,7 @@ async function mockApi(page: Page) {
     if (path === '/api/v1/data/monitoring') return json(route, null)
     if (path === '/api/v1/arbitrage/settings') return json(route, { bookmakers: [{ id: 2, slug: 'beacon', name: 'Beacon', is_demo: false }], tax_profiles: [], constraints: [] })
     if (path === '/api/v1/odds/comparison') return json(route, [])
+    if (path === '/api/v1/matchdays/events/7') return json(route, matchDetail)
     return json(route, [])
   })
 }
@@ -70,13 +103,16 @@ test.beforeEach(async ({ page }) => {
 test('opens and refreshes a shareable match URL', async ({ page }) => {
   await page.goto('/matches/7')
   await expect(page).toHaveURL(/\/matches\/7$/)
-  await expect(page.locator('header h1')).toHaveText('Event markets')
-  await expect(page.getByLabel('Event')).toHaveValue('7')
+  await expect(page.locator('header h1')).toHaveText('Match detail')
+  await expect(page.getByLabel('Match')).toHaveValue('7')
+  await expect(page.getByRole('heading', { name: 'North FC vs South FC' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Availability evidence explorer' })).toBeVisible()
+  await expect(page.getByText('No verified builder value')).toBeVisible()
 
   await page.reload()
   await expect(page).toHaveURL(/\/matches\/7$/)
-  await expect(page.locator('header h1')).toHaveText('Event markets')
-  await expect(page.getByLabel('Event')).toHaveValue('7')
+  await expect(page.locator('header h1')).toHaveText('Match detail')
+  await expect(page.getByLabel('Match')).toHaveValue('7')
 })
 
 test('imports odds and completes the model-to-signal workflow', async ({ page }) => {
