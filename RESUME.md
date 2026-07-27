@@ -165,10 +165,13 @@ API, service-validation, and CLI JSON tests cover the behavior; the full backend
   `python -m app.cli monitor-collection` and `GET /api/v1/data/monitoring`. Add deterministic API,
   service, and CLI/serialization tests. Run relevant backend checks, then make a focused commit
   and push `main`.
-- [ ] Use the live 33/6 reason split to create a fail-closed, lawful UEFA historical-result and
+- [x] Use the live 33/6 reason split to create a fail-closed, lawful UEFA historical-result and
   chronological-training coverage plan or implementation checkpoint. Do not lower the minimum
   eight venue-specific matches, mix competition identities, fabricate timestamps, or register a
   paid/unapproved provider. Add deterministic tests for any code behavior, then commit and push.
+  `UEFA_HISTORICAL_COVERAGE_PLAN.md` records the resulting source, identity, chronology, and
+  promotion gates. The approved CC0 archive has no additional explicit qualification files before
+  2024/25, so no result import or model promotion was authorized in this checkpoint.
 - [ ] Keep the scheduler polling only at its configured interval until the old failure jobs,
   including sanitized failed job `62`, age out of the recent-job window. Require
   `monitor-collection --fail-on-alerts` to exit successfully, confirm target bookmaker coverage
