@@ -246,3 +246,16 @@ npm run test:e2e
 
 Do not scrape bookmaker websites, weaken atomic ingestion, fabricate historical timestamps,
 infer closing flags, or enable player props before their independent validation gates pass.
+
+## Site experience roadmap
+
+- [x] Make Matchday the default homepage and reorganize the navigation into Matches, Research,
+  Analytics, Admin, and About groups. Deterministic navigation tests, the full frontend unit suite,
+  lint, production build, and Playwright workflows pass.
+- [ ] Add stable, shareable event deep links that preserve the selected match across refreshes.
+- [ ] Unify kickoff, bookmaker prices, model evidence, availability gates, and builder research in
+  one coherent match-detail experience.
+- [ ] Build a mobile-first navigation and responsive match/price layouts.
+- [ ] Improve loading, empty, and recoverable error states with actionable language.
+- [ ] Add a concise first-visit guide for probabilities, fair odds, value gates, and blocked states.
+- [ ] Validate the completed site source and deploy it through the configured hosting workflow.

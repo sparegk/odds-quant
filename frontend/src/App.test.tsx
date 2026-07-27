@@ -4,10 +4,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DashboardData, ResearchValueCandidate, ValueSignal } from './types'
 import { ArbitrageResearch, BacktestResearch, InlineError, InlineLoading, ResourceErrors, SignalResearch, SuccessNotice } from './App'
 import { chooseDefaultEventId, preserveSelectedEventId } from './lib/events'
+import { navigationGroups, readView } from './navigation'
 import { UnderdogScanner } from './components/UnderdogScanner'
 import { ValueOpportunities } from './components/ValueOpportunities'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  window.location.hash = ''
+})
 
 const valueSignal: ValueSignal = {
   id: 1,
@@ -121,6 +125,34 @@ const dashboard: DashboardData = {
   backtests: [],
   resource_errors: {},
 }
+
+describe('site navigation', () => {
+  it('opens on Matchday and retains explicit destinations', () => {
+    window.location.hash = ''
+    expect(readView()).toBe('matchday')
+    window.location.hash = 'models'
+    expect(readView()).toBe('models')
+  })
+
+  it('groups the full site around matches and user intent', () => {
+    expect(navigationGroups.map((group) => group.label)).toEqual(['Matches', 'Research', 'Analytics', 'Admin', 'About'])
+    expect(navigationGroups.flatMap((group) => group.items.map((item) => item.key))).toEqual([
+      'matchday',
+      'event',
+      'comparison',
+      'opportunities',
+      'underdogs',
+      'builder',
+      'overview',
+      'models',
+      'backtests',
+      'bankroll',
+      'arbitrage',
+      'data',
+      'methodology',
+    ])
+  })
+})
 
 describe('SignalResearch', () => {
   it('shows distinct model, market, edge, EV, provenance, and risk evidence', () => {

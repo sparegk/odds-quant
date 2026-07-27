@@ -2,20 +2,8 @@ import {
   Activity,
   AlertTriangle,
   BarChart3,
-  Beaker,
-  BookOpen,
-  CalendarDays,
-  CircleDollarSign,
   CheckCircle2,
-  Database,
-  FlaskConical,
-  Gauge,
-  GitCompareArrows,
-  LineChart,
   RefreshCw,
-  ScanSearch,
-  ShieldCheck,
-  TrendingUp,
   X,
 } from 'lucide-react'
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
@@ -36,38 +24,9 @@ import { WorkflowReadiness } from './components/WorkflowReadiness'
 import { QuantPriceTable } from './components/QuantPriceTable'
 import { formatDateTime, humanizeCode } from './lib/format'
 import { chooseDefaultEventId, preserveSelectedEventId } from './lib/events'
+import { navigation, navigationGroups, readView } from './navigation'
+import type { ViewKey } from './navigation'
 import type { DashboardData, EvaluationRun, EventSummary, MarketComparison, ValueSignal } from './types'
-
-type ViewKey =
-  | 'overview'
-  | 'matchday'
-  | 'opportunities'
-  | 'underdogs'
-  | 'arbitrage'
-  | 'event'
-  | 'comparison'
-  | 'builder'
-  | 'models'
-  | 'backtests'
-  | 'bankroll'
-  | 'data'
-  | 'methodology'
-
-const navigation = [
-  { key: 'overview', label: 'Overview', icon: Gauge },
-  { key: 'matchday', label: 'Matchday', icon: CalendarDays },
-  { key: 'opportunities', label: 'Value opportunities', icon: TrendingUp },
-  { key: 'underdogs', label: 'Underdog scanner', icon: ScanSearch },
-  { key: 'arbitrage', label: 'Arbitrage', icon: ShieldCheck },
-  { key: 'event', label: 'Event markets', icon: CalendarDays },
-  { key: 'comparison', label: 'Odds comparison', icon: GitCompareArrows },
-  { key: 'builder', label: 'Bet Builder Lab', icon: Beaker },
-  { key: 'models', label: 'Model performance', icon: LineChart },
-  { key: 'backtests', label: 'Backtesting', icon: FlaskConical },
-  { key: 'bankroll', label: 'Bankroll research', icon: CircleDollarSign },
-  { key: 'data', label: 'Data operations', icon: Database },
-  { key: 'methodology', label: 'Methodology', icon: BookOpen },
-] as const
 
 const BestPriceChart = lazy(async () => {
   const module = await import('./components/BestPriceChart')
@@ -78,11 +37,6 @@ const DASHBOARD_OPENED_AT = Date.now()
 
 function navigateTo(view: ViewKey) {
   window.location.hash = view
-}
-
-function readView(): ViewKey {
-  const candidate = window.location.hash.slice(1)
-  return navigation.some((item) => item.key === candidate) ? (candidate as ViewKey) : 'overview'
 }
 
 function App() {
@@ -188,10 +142,13 @@ function App() {
           </div>
         </div>
         <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Primary navigation">
-          {navigation.map((item) => {
-            const Icon = item.icon
-            const active = view === item.key
-            return (
+          {navigationGroups.map((group) => (
+            <div className='mb-5 last:mb-0' key={group.label}>
+              <p className='mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-600'>{group.label}</p>
+              {group.items.map((item) => {
+                const Icon = item.icon
+                const active = view === item.key
+                return (
               <button
                 key={item.key}
                 className={`mb-1 flex h-10 w-full items-center gap-3 rounded-[5px] px-3 text-left text-sm transition-colors ${
@@ -203,8 +160,10 @@ function App() {
                 <Icon aria-hidden="true" size={17} />
                 {item.label}
               </button>
-            )
-          })}
+                )
+              })}
+            </div>
+          ))}
         </nav>
         <div className="border-t border-zinc-800 p-4 text-xs leading-5 text-zinc-500">
           Research only. No automated betting.
