@@ -39,7 +39,7 @@ def test_compose_orders_database_api_and_worker() -> None:
 def test_free_tunnel_starts_a_hardened_loopback_backend() -> None:
     script = (ROOT / "scripts" / "start-free-site-tunnel.ps1").read_text(encoding="utf-8")
     assert "python -m alembic upgrade head" not in script
-    assert 'py -m alembic upgrade head' in script
+    assert "py -m alembic upgrade head" in script
     assert '$env:ODDSQUANT_ENVIRONMENT = "production"' in script
     assert '$env:ODDSQUANT_SEED_DEMO = "false"' in script
     assert '"--host", "127.0.0.1"' in script
