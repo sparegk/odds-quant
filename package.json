@@ -4,6 +4,6 @@
   "type": "module",
   "version": "0.1.0",
   "scripts": {
-    "build": "npm --prefix frontend ci && npm --prefix frontend run build -- --outDir ../dist --emptyOutDir && node scripts/prepare-sites.mjs"
+    "build": "npm --prefix frontend ci && npm --prefix frontend run build -- --outDir ../dist/client --emptyOutDir && node scripts/prepare-sites.mjs"
   }
 }
