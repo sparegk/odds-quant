@@ -67,6 +67,18 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByText('OddsQuant')).toBeVisible()
 })
 
+test('opens and refreshes a shareable match URL', async ({ page }) => {
+  await page.goto('/matches/7')
+  await expect(page).toHaveURL(/\/matches\/7$/)
+  await expect(page.locator('header h1')).toHaveText('Event markets')
+  await expect(page.getByLabel('Event')).toHaveValue('7')
+
+  await page.reload()
+  await expect(page).toHaveURL(/\/matches\/7$/)
+  await expect(page.locator('header h1')).toHaveText('Event markets')
+  await expect(page.getByLabel('Event')).toHaveValue('7')
+})
+
 test('imports odds and completes the model-to-signal workflow', async ({ page }) => {
   await page.getByRole('button', { name: 'Data operations' }).click()
   await page.getByLabel('Odds snapshots CSV file').setInputFiles({ name: 'odds.csv', mimeType: 'text/csv', buffer: Buffer.from('event,price\n7,1.8') })

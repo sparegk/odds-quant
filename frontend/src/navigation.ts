@@ -83,9 +83,43 @@ export const navigation: readonly NavigationItem[] = navigationGroups.flatMap(
   (group) => group.items,
 )
 
-export function readView(): ViewKey {
+export interface SiteRoute {
+  view: ViewKey
+  eventId: number | null
+}
+
+export const navigationEventName = 'oddsquant:navigation'
+
+export function eventPath(eventId: number): string {
+  return `/matches/${eventId}`
+}
+
+export function readRoute(): SiteRoute {
   const candidate = window.location.hash.slice(1)
-  return navigation.some((item) => item.key === candidate)
-    ? (candidate as ViewKey)
-    : 'matchday'
+  if (navigation.some((item) => item.key === candidate)) {
+    return { view: candidate as ViewKey, eventId: null }
+  }
+
+  const match = window.location.pathname.match(/^\/matches\/(\d+)\/?$/)
+  const eventId = match ? Number(match[1]) : null
+  if (eventId !== null && Number.isSafeInteger(eventId) && eventId > 0) {
+    return { view: 'event', eventId }
+  }
+
+  return { view: 'matchday', eventId: null }
+}
+
+export function readView(): ViewKey {
+  return readRoute().view
+}
+
+export function navigateToView(view: ViewKey): void {
+  const target = view === 'matchday' ? '/' : `/#${view}`
+  window.history.pushState(null, '', target)
+  window.dispatchEvent(new Event(navigationEventName))
+}
+
+export function navigateToEvent(eventId: number): void {
+  window.history.pushState(null, '', eventPath(eventId))
+  window.dispatchEvent(new Event(navigationEventName))
 }

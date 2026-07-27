@@ -24,7 +24,14 @@ import { WorkflowReadiness } from './components/WorkflowReadiness'
 import { QuantPriceTable } from './components/QuantPriceTable'
 import { formatDateTime, humanizeCode } from './lib/format'
 import { chooseDefaultEventId, preserveSelectedEventId } from './lib/events'
-import { navigation, navigationGroups, readView } from './navigation'
+import {
+  navigateToEvent,
+  navigateToView,
+  navigation,
+  navigationEventName,
+  navigationGroups,
+  readRoute,
+} from './navigation'
 import type { ViewKey } from './navigation'
 import type { DashboardData, EvaluationRun, EventSummary, MarketComparison, ValueSignal } from './types'
 
@@ -36,13 +43,13 @@ const BestPriceChart = lazy(async () => {
 const DASHBOARD_OPENED_AT = Date.now()
 
 function navigateTo(view: ViewKey) {
-  window.location.hash = view
+  if (view !== 'event') navigateToView(view)
 }
 
 function App() {
-  const [view, setView] = useState<ViewKey>(readView)
+  const [view, setView] = useState<ViewKey>(() => readRoute().view)
   const [dashboard, setDashboard] = useState<DashboardData | null>(null)
-  const [selectedEventId, setSelectedEventId] = useState<number | null>(null)
+  const [selectedEventId, setSelectedEventId] = useState<number | null>(() => readRoute().eventId)
   const [markets, setMarkets] = useState<MarketComparison[]>([])
   const [comparisonLoading, setComparisonLoading] = useState(false)
   const [comparisonError, setComparisonError] = useState<string | null>(null)
@@ -75,7 +82,7 @@ function App() {
       .then((loaded) => {
         if (!active) return
         setDashboard(loaded)
-        setSelectedEventId(chooseDefaultEventId(loaded.events))
+        setSelectedEventId((current) => current ?? chooseDefaultEventId(loaded.events))
       })
       .catch((caught: unknown) => {
         if (active) setError(caught instanceof Error ? caught.message : 'Unable to reach the OddsQuant API')
@@ -89,9 +96,19 @@ function App() {
   }, [])
 
   useEffect(() => {
-    const onHashChange = () => setView(readView())
-    window.addEventListener('hashchange', onHashChange)
-    return () => window.removeEventListener('hashchange', onHashChange)
+    const synchronizeRoute = () => {
+      const route = readRoute()
+      setView(route.view)
+      if (route.eventId !== null) setSelectedEventId(route.eventId)
+    }
+    window.addEventListener('hashchange', synchronizeRoute)
+    window.addEventListener('popstate', synchronizeRoute)
+    window.addEventListener(navigationEventName, synchronizeRoute)
+    return () => {
+      window.removeEventListener('hashchange', synchronizeRoute)
+      window.removeEventListener('popstate', synchronizeRoute)
+      window.removeEventListener(navigationEventName, synchronizeRoute)
+    }
   }, [])
 
   useEffect(() => {
@@ -125,8 +142,19 @@ function App() {
   }, [selectedEventId])
 
   const selectView = (next: ViewKey) => {
-    navigateTo(next)
+    navigateToView(next)
     setView(next)
+  }
+
+  const openEvent = (eventId: number) => {
+    setSelectedEventId(eventId)
+    navigateToEvent(eventId)
+    setView('event')
+  }
+
+  const selectEvent = (eventId: number) => {
+    setSelectedEventId(eventId)
+    if (view === 'event') navigateToEvent(eventId)
   }
 
   return (
@@ -221,7 +249,8 @@ function App() {
                 comparisonLoading={comparisonLoading}
                 dashboard={dashboard}
                 markets={markets}
-                onSelectEvent={setSelectedEventId}
+                onOpenEvent={openEvent}
+                onSelectEvent={selectEvent}
                 onRefresh={synchronize}
                 selectedEventId={selectedEventId}
                 view={view}
@@ -246,6 +275,7 @@ interface ActiveViewProps {
   comparisonLoading: boolean
   comparisonError: string | null
   selectedEventId: number | null
+  onOpenEvent: (eventId: number) => void
   onSelectEvent: (eventId: number) => void
   onRefresh: () => Promise<void>
 }
@@ -253,11 +283,11 @@ interface ActiveViewProps {
 function ActiveView(props: ActiveViewProps) {
   switch (props.view) {
     case 'overview':
-      return <Overview dashboard={props.dashboard} onSelectEvent={props.onSelectEvent} />
+      return <Overview dashboard={props.dashboard} onSelectEvent={props.onOpenEvent} />
     case 'matchday':
       return <MatchdayResearch events={props.dashboard.events} onSelectEvent={props.onSelectEvent} />
     case 'event':
-      return <EventMarkets dashboard={props.dashboard} events={props.dashboard.events} selectedEventId={props.selectedEventId} markets={props.markets} loading={props.comparisonLoading} error={props.comparisonError} onSelectEvent={props.onSelectEvent} onOpenComparison={() => navigateTo('comparison')} />
+      return <EventMarkets dashboard={props.dashboard} events={props.dashboard.events} selectedEventId={props.selectedEventId} markets={props.markets} loading={props.comparisonLoading} error={props.comparisonError} onSelectEvent={props.onSelectEvent} onOpenComparison={() => navigateToView('comparison')} />
     case 'comparison':
       return <OddsComparison {...props} />
     case 'data':
@@ -265,9 +295,9 @@ function ActiveView(props: ActiveViewProps) {
     case 'methodology':
       return <Methodology />
     case 'opportunities':
-      return <ValueOpportunities dashboard={props.dashboard} onOpenEvent={(eventId) => { props.onSelectEvent(eventId); navigateTo('event') }} />
+      return <ValueOpportunities dashboard={props.dashboard} onOpenEvent={props.onOpenEvent} />
     case 'underdogs':
-      return <UnderdogScanner dashboard={props.dashboard} onOpenEvent={(eventId) => { props.onSelectEvent(eventId); navigateTo('event') }} />
+      return <UnderdogScanner dashboard={props.dashboard} onOpenEvent={props.onOpenEvent} />
     case 'arbitrage':
       return <ArbitrageResearch dashboard={props.dashboard} onChanged={props.onRefresh} />
     case 'builder':

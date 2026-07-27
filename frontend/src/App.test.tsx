@@ -4,13 +4,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DashboardData, ResearchValueCandidate, ValueSignal } from './types'
 import { ArbitrageResearch, BacktestResearch, InlineError, InlineLoading, ResourceErrors, SignalResearch, SuccessNotice } from './App'
 import { chooseDefaultEventId, preserveSelectedEventId } from './lib/events'
-import { navigationGroups, readView } from './navigation'
+import { eventPath, navigationGroups, readRoute, readView } from './navigation'
 import { UnderdogScanner } from './components/UnderdogScanner'
 import { ValueOpportunities } from './components/ValueOpportunities'
 
 afterEach(() => {
   cleanup()
-  window.location.hash = ''
+  window.history.replaceState(null, '', '/')
 })
 
 const valueSignal: ValueSignal = {
@@ -132,6 +132,18 @@ describe('site navigation', () => {
     expect(readView()).toBe('matchday')
     window.location.hash = 'models'
     expect(readView()).toBe('models')
+  })
+
+  it('restores a selected match from a stable direct URL', () => {
+    window.history.replaceState(null, '', '/matches/7')
+    expect(readRoute()).toEqual({ view: 'event', eventId: 7 })
+    expect(readView()).toBe('event')
+    expect(eventPath(7)).toBe('/matches/7')
+  })
+
+  it('rejects malformed match URLs', () => {
+    window.history.replaceState(null, '', '/matches/not-a-number')
+    expect(readRoute()).toEqual({ view: 'matchday', eventId: null })
   })
 
   it('groups the full site around matches and user intent', () => {
