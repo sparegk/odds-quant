@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   BarChart3,
   CheckCircle2,
+  HelpCircle,
   Menu,
   RefreshCw,
   X,
@@ -18,12 +19,14 @@ import { MatchdayResearch } from './components/MatchdayResearch'
 import { UnderdogScanner } from './components/UnderdogScanner'
 import { ValueOpportunities } from './components/ValueOpportunities'
 import { MatchDetailPage } from './components/MatchDetailPage'
+import { FirstVisitGuide } from './components/FirstVisitGuide'
 import { ModelPerformance } from './components/ModelPerformance'
 import { DataOperations } from './components/DataOperations'
 import { ArbitrageSettings } from './components/ArbitrageSettings'
 import { WorkflowReadiness } from './components/WorkflowReadiness'
 import { QuantPriceTable } from './components/QuantPriceTable'
 import { formatDateTime, humanizeCode } from './lib/format'
+import { rememberResearchGuideDismissal, shouldShowResearchGuide } from './lib/researchGuide'
 import { chooseDefaultEventId, preserveSelectedEventId } from './lib/events'
 import {
   navigateToEvent,
@@ -58,6 +61,7 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false)
+  const [researchGuideOpen, setResearchGuideOpen] = useState(shouldShowResearchGuide)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -223,6 +227,15 @@ function App() {
                 {dashboard?.status.data_mode === 'demo_or_user_supplied' ? 'Demo / user data' : dashboard?.status.data_mode ?? 'Connecting'}
               </span>
               <button
+                aria-label='Open research guide'
+                className='grid h-9 w-9 place-items-center rounded-[5px] border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50'
+                onClick={() => setResearchGuideOpen(true)}
+                title='Open research guide'
+                type='button'
+              >
+                <HelpCircle aria-hidden='true' size={16} />
+              </button>
+              <button
                 aria-label="Refresh dashboard data"
                 className="grid h-9 w-9 place-items-center rounded-[5px] border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
                 disabled={loading}
@@ -263,6 +276,8 @@ function App() {
             </nav>
           ) : null}
         </header>
+
+        {researchGuideOpen ? <FirstVisitGuide onDismiss={() => { rememberResearchGuideDismissal(); setResearchGuideOpen(false) }} /> : null}
 
         <main className="px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
           {error ? <ConnectionError message={error} onRetry={() => void refresh()} /> : null}

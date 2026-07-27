@@ -257,5 +257,5 @@ infer closing flags, or enable player props before their independent validation 
   one coherent match-detail experience.
 - [x] Build a mobile-first navigation and responsive match/price layouts.
 - [x] Improve loading, empty, and recoverable error states with actionable language.
-- [ ] Add a concise first-visit guide for probabilities, fair odds, value gates, and blocked states.
+- [x] Add a concise first-visit guide for probabilities, fair odds, value gates, and blocked states.
 - [ ] Validate the completed site source and deploy it through the configured hosting workflow.

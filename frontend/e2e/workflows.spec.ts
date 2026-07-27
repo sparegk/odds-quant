@@ -97,7 +97,7 @@ async function mockApi(page: Page) {
 test.beforeEach(async ({ page }) => {
   await mockApi(page)
   await page.goto('/')
-  await expect(page.getByText('OddsQuant')).toBeVisible()
+  await expect(page.getByText('OddsQuant', { exact: true })).toBeVisible()
 })
 
 test('opens and refreshes a shareable match URL', async ({ page }) => {
@@ -127,6 +127,22 @@ test('uses compact grouped navigation on a mobile viewport', async ({ page }) =>
   await expect(page.locator('header h1')).toHaveText('Model performance')
   await expect(page).toHaveURL(/#models$/)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+})
+
+test('explains research concepts on first visit and remembers dismissal', async ({ page }) => {
+  const guide = page.getByRole('region', { name: 'Research guide' })
+  await expect(guide).toBeVisible()
+  await expect(guide.getByText('Probability', { exact: true })).toBeVisible()
+  await expect(guide.getByText('Fair odds', { exact: true })).toBeVisible()
+  await expect(guide.getByText('Value gate', { exact: true })).toBeVisible()
+  await expect(guide.getByText('Blocked', { exact: true })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Dismiss research guide' }).click()
+  await expect(guide).toBeHidden()
+  await page.reload()
+  await expect(guide).toBeHidden()
+  await page.getByRole('button', { name: 'Open research guide' }).click()
+  await expect(guide).toBeVisible()
 })
 
 test('imports odds and completes the model-to-signal workflow', async ({ page }) => {
