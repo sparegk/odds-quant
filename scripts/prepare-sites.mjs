@@ -6,6 +6,23 @@ await copyFile('.openai/hosting.json', 'dist/.openai/hosting.json')
 
 const worker = `export default {
   async fetch(request, env) {
+    const requestUrl = new URL(request.url)
+    if (requestUrl.pathname.startsWith('/api/')) {
+      let upstream
+      try {
+        upstream = new URL(env.ODDSQUANT_API_BASE_URL)
+      } catch {
+        return Response.json({ detail: 'Production API route is not configured' }, { status: 503 })
+      }
+
+      if (upstream.protocol !== 'https:' || !upstream.hostname.endsWith('.trycloudflare.com')) {
+        return Response.json({ detail: 'Production API route is invalid' }, { status: 503 })
+      }
+
+      const upstreamUrl = new URL(requestUrl.pathname + requestUrl.search, upstream)
+      return fetch(new Request(upstreamUrl, request))
+    }
+
     const response = await env.ASSETS.fetch(request)
     if (response.status !== 404 || request.method !== 'GET') return response
 

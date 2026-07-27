@@ -31,7 +31,8 @@ import type {
   ValueSignal,
 } from '../types'
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ?? 'http://127.0.0.1:8000'
+const configuredApiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '')
+const API_BASE_URL = configuredApiBaseUrl ?? (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '')
 
 export class ApiError extends Error {
   constructor(
