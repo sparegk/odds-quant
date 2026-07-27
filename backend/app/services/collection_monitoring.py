@@ -1,13 +1,35 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import cast
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.models import Provider, ProviderJob
-from app.schemas.api import CollectionAlert, CollectionMonitoringView, ProviderCollectionHealth
+from app.schemas.api import (
+    CollectionAlert,
+    CollectionMonitoringView,
+    PredictionRefreshMonitoring,
+    ProviderCollectionHealth,
+)
 from app.services.data_coverage import data_coverage
+
+PREDICTION_SKIP_REASONS = frozenset(
+    {
+        "cutoff_not_before_kickoff",
+        "event_not_found",
+        "inputs_after_prediction",
+        "insufficient_away_team_away_history",
+        "insufficient_home_team_home_history",
+        "model_competition_mismatch",
+        "model_not_active",
+        "model_training_after_cutoff",
+        "model_version_not_found",
+        "modeling_validation_failed",
+        "no_cutoff_valid_trained_model",
+    }
+)
 
 
 def collection_monitoring(
@@ -58,7 +80,83 @@ def _monitoring_view(
         healthy=bool(health) and all(item.healthy for item in health) and not alerts,
         providers=health,
         alerts=alerts,
+        latest_prediction_refresh=_latest_prediction_refresh(session),
         coverage=data_coverage(session),
+    )
+
+
+def _latest_prediction_refresh(session: Session) -> PredictionRefreshMonitoring | None:
+    jobs = session.execute(
+        select(ProviderJob, Provider)
+        .join(Provider, Provider.id == ProviderJob.provider_id)
+        .where(
+            Provider.is_demo.is_(False),
+            ProviderJob.status == "completed",
+            ProviderJob.finished_at.is_not(None),
+        )
+        .order_by(ProviderJob.created_at.desc(), ProviderJob.id.desc())
+    ).all()
+    for job, provider in jobs:
+        summary = _prediction_refresh_view(job, provider)
+        if summary is not None:
+            return summary
+    return None
+
+
+def _prediction_refresh_view(
+    job: ProviderJob, provider: Provider
+) -> PredictionRefreshMonitoring | None:
+    if not isinstance(job.metrics, dict):
+        return None
+    value = job.metrics.get("prediction_refresh")
+    if not isinstance(value, dict) or job.finished_at is None:
+        return None
+    count_names = (
+        "eligible_events",
+        "predictions_created",
+        "predictions_reused",
+        "events_skipped",
+        "research_candidates_available",
+    )
+    counts = {name: value.get(name) for name in count_names}
+    if any(
+        not isinstance(count, int) or isinstance(count, bool) or count < 0
+        for count in counts.values()
+    ):
+        return None
+    validated_counts = cast(dict[str, int], counts)
+    reasons = value.get("skip_reasons")
+    if not isinstance(reasons, dict):
+        return None
+    if any(
+        not isinstance(reason, str)
+        or reason not in PREDICTION_SKIP_REASONS
+        or not isinstance(count, int)
+        or isinstance(count, bool)
+        or count <= 0
+        for reason, count in reasons.items()
+    ):
+        return None
+    if sum(reasons.values()) != validated_counts["events_skipped"]:
+        return None
+    if (
+        validated_counts["predictions_created"]
+        + validated_counts["predictions_reused"]
+        + validated_counts["events_skipped"]
+        != validated_counts["eligible_events"]
+    ):
+        return None
+    return PredictionRefreshMonitoring(
+        provider_job_id=job.id,
+        provider_slug=provider.slug,
+        job_created_at=_utc(job.created_at),
+        job_finished_at=_utc(job.finished_at),
+        eligible_events=validated_counts["eligible_events"],
+        predictions_created=validated_counts["predictions_created"],
+        predictions_reused=validated_counts["predictions_reused"],
+        events_skipped=validated_counts["events_skipped"],
+        research_candidates_available=validated_counts["research_candidates_available"],
+        skip_reasons=dict(sorted(reasons.items())),
     )
 
 

@@ -105,6 +105,19 @@ class CollectionAlert(BaseModel):
     detail: str
 
 
+class PredictionRefreshMonitoring(BaseModel):
+    provider_job_id: int = Field(ge=1)
+    provider_slug: str
+    job_created_at: datetime
+    job_finished_at: datetime
+    eligible_events: int = Field(ge=0)
+    predictions_created: int = Field(ge=0)
+    predictions_reused: int = Field(ge=0)
+    events_skipped: int = Field(ge=0)
+    research_candidates_available: int = Field(ge=0)
+    skip_reasons: dict[str, int]
+
+
 class CollectionMonitoringView(BaseModel):
     observed_at: datetime
     expected_poll_seconds: int
@@ -112,6 +125,7 @@ class CollectionMonitoringView(BaseModel):
     healthy: bool
     providers: list[ProviderCollectionHealth]
     alerts: list[CollectionAlert]
+    latest_prediction_refresh: PredictionRefreshMonitoring | None = None
     coverage: DataCoverageView
 
 

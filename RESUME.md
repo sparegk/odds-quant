@@ -149,10 +149,19 @@ repeating that work.
 
 ### Next-session continuation checklist (2026-07-27)
 
+The monitoring surface now exposes a typed `latest_prediction_refresh` summary from the newest
+completed non-demo provider job with valid persisted evidence. It includes provider-job
+provenance, all aggregate refresh counts, research-watchlist availability, and only the fixed
+bounded skip-reason vocabulary. Malformed, inconsistent, boolean, negative, or unrecognized
+metrics fail closed. Both `GET /api/v1/data/monitoring` and `python -m app.cli
+monitor-collection` return the same object. A live local CLI read selected job `64` and returned
+the exact 42 eligible, 3 created, 39 skipped, 5 watchlist, and 33/6 history split. Deterministic
+API, service-validation, and CLI JSON tests cover the behavior; the full backend suite passes.
+
 - [x] Verify a scheduler-owned live Odds batch persists bounded reasons for every skipped event.
   Job `64` is the proof: 33 home-history plus 6 away-history skips equal all 39 skips. Commit and
   push this evidence before starting the next box if it is not already the tip of `main`.
-- [ ] Expose the latest prediction-refresh summary and bounded `skip_reasons` directly in both
+- [x] Expose the latest prediction-refresh summary and bounded `skip_reasons` directly in both
   `python -m app.cli monitor-collection` and `GET /api/v1/data/monitoring`. Add deterministic API,
   service, and CLI/serialization tests. Run relevant backend checks, then make a focused commit
   and push `main`.

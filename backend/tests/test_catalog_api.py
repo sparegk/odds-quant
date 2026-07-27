@@ -147,6 +147,23 @@ def test_collection_monitoring_requires_two_fresh_completed_jobs(
                 message="Imported sanitized prices",
                 created_at=finished_at - timedelta(seconds=2),
                 finished_at=finished_at,
+                metrics=(
+                    {
+                        "prediction_refresh": {
+                            "eligible_events": 42,
+                            "predictions_created": 3,
+                            "predictions_reused": 0,
+                            "events_skipped": 39,
+                            "research_candidates_available": 5,
+                            "skip_reasons": {
+                                "insufficient_away_team_away_history": 6,
+                                "insufficient_home_team_home_history": 33,
+                            },
+                        }
+                    }
+                    if offset == 1
+                    else {}
+                ),
             )
         )
     session.commit()
@@ -155,6 +172,18 @@ def test_collection_monitoring_requires_two_fresh_completed_jobs(
 
     assert response.status_code == 200
     payload = response.json()
+    refresh = payload["latest_prediction_refresh"]
+    assert refresh["provider_job_id"] > 0
+    assert refresh["provider_slug"] == "licensed-monitor"
+    assert refresh["eligible_events"] == 42
+    assert refresh["predictions_created"] == 3
+    assert refresh["predictions_reused"] == 0
+    assert refresh["events_skipped"] == 39
+    assert refresh["research_candidates_available"] == 5
+    assert refresh["skip_reasons"] == {
+        "insufficient_away_team_away_history": 6,
+        "insufficient_home_team_home_history": 33,
+    }
     assert payload["healthy"] is True
     assert payload["alerts"] == []
     assert payload["expected_poll_seconds"] == 900
