@@ -267,7 +267,10 @@ infer closing flags, or enable player props before their independent validation 
   returned 14 timestamped Matchday events over HTTPS, while an unauthenticated admin import
   failed closed with HTTP 503. `scripts/start-free-site-tunnel.ps1` reproduces the startup;
   the computer and processes must remain running, and a restarted Quick Tunnel gets a new URL.
-- [ ] Configure the Sites production build with the live API base URL.
+- [x] Route production browser API requests through the same-origin Sites worker and store the
+  live Quick Tunnel origin in Sites runtime configuration. Sites version 8 deployed from
+  CI-passing commit `f32ab8a` with environment revision 1; the deterministic worker check proves
+  API paths proxy to the configured HTTPS tunnel and fail closed when configuration is absent.
 - [ ] Confirm the API allows the exact Sites production origin without using a wildcard.
 - [ ] Redeploy and verify Matchday, stable match details, prices, models, and builder data against
   the production API.
