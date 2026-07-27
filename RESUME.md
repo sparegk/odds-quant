@@ -178,6 +178,18 @@ API, service-validation, and CLI JSON tests cover the behavior; the full backend
   has not regressed, and confirm player props and inferred closing prices remain blocked. Record
   the clean live evidence in this file, then commit and push.
 
+### In-progress scheduler recovery (2026-07-27)
+
+PID `14120` had not survived and both providers were stale when this continuation began. The
+configured hidden scheduler was restored as PID `13804`; its normal startup cycle completed
+API-Football job `65` and Odds-API.io job `66`. Both providers became fresh and individually
+healthy, target-bookmaker coverage emitted no regression alert, and job `66` reproduced the
+bounded 42 eligible / 3 created / 39 skipped summary with the exact 33 home-history and 6
+away-history split. The only remaining monitoring alert is `repeated_provider_failures`: failed
+Odds jobs `62` and `52` are still inside the default last-10 window. Starting from job `66`, eight
+additional successful scheduler-owned Odds intervals are required for job `62` itself to age out.
+Do not restart the live process or trigger manual provider calls while it remains active.
+
 At handoff time the hidden scheduler process was active as PID `14120`. Always verify the process
 rather than assuming the PID survived. Start the next session with `git status -sb`, `git log -1
 --oneline`, a process check, and `python -m app.cli monitor-collection --fail-on-alerts`. Do not
