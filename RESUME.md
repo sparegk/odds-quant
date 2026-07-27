@@ -275,7 +275,9 @@ infer closing flags, or enable player props before their independent validation 
   returned HTTP 200 with that origin echoed in `Access-Control-Allow-Origin`; an unrelated origin
   returned HTTP 400 with no allow-origin header. The reproducible startup script contains no
   wildcard CORS setting.
-- [ ] Redeploy and verify Matchday, stable match details, prices, models, and builder data against
-  the production API.
+- [x] Deploy owner-only Sites version 9 from CI-passing commit `85c63cd` and verify the production
+  proxy end to end. Matchday returned 14 events; stable deep link `/matches/1256` returned HTTP
+  200 and its detail API retained two price markets, a latest model prediction, an explicit
+  blocked builder gate with zero stored quotes, and a non-empty evidence note.
 - [ ] Review whether the completed owner-only site should be made public; do not change access
   without explicit approval.
