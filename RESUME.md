@@ -259,3 +259,14 @@ infer closing flags, or enable player props before their independent validation 
 - [x] Improve loading, empty, and recoverable error states with actionable language.
 - [x] Add a concise first-visit guide for probabilities, fair odds, value gates, and blocked states.
 - [x] Validate the completed site source and deploy it through the configured hosting workflow.
+
+### Production data connection checklist
+
+- [ ] Provision the Render API, PostgreSQL database, migrations, and scheduler worker from the
+  production Blueprint; require successful deploys before recording the service URL.
+- [ ] Configure the Sites production build with the live API base URL.
+- [ ] Confirm the API allows the exact Sites production origin without using a wildcard.
+- [ ] Redeploy and verify Matchday, stable match details, prices, models, and builder data against
+  the production API.
+- [ ] Review whether the completed owner-only site should be made public; do not change access
+  without explicit approval.

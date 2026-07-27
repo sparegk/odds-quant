@@ -41,8 +41,8 @@ def test_render_is_production_safe_and_migrates_before_deploy() -> None:
     services = blueprint["services"]
     assert isinstance(services, list)
     web = next(service for service in services if service["name"] == "oddsquant-api")
-    frontend = next(service for service in services if service["name"] == "oddsquant-web")
     worker = next(service for service in services if service["type"] == "worker")
+    assert {service["name"] for service in services} == {"oddsquant-api", "oddsquant-worker"}
     assert web["preDeployCommand"] == "python -m alembic upgrade head"
     assert web["autoDeployTrigger"] == "checksPass"
     web_environment = {item["key"]: item for item in web["envVars"]}
@@ -50,11 +50,14 @@ def test_render_is_production_safe_and_migrates_before_deploy() -> None:
     assert web_environment["ODDSQUANT_ENVIRONMENT"]["value"] == "production"
     assert web_environment["ODDSQUANT_SEED_DEMO"]["value"] == "false"
     assert web_environment["ODDSQUANT_ADMIN_API_KEY"]["generateValue"] is True
+    assert web_environment["ODDSQUANT_CORS_ORIGINS"]["value"] == (
+        "https://oddsquant-research.kkakarantzas17.chatgpt.site"
+    )
     assert web_environment["ODDSQUANT_MATCHDAY_TIMEZONE"]["value"] == "Europe/Athens"
     assert web_environment["ODDSQUANT_MATCHDAY_FORM_MATCHES"]["value"] == "5"
     assert worker_environment["ODDSQUANT_SEED_DEMO"]["value"] == "false"
-    assert frontend["runtime"] == "static"
-    assert frontend["buildCommand"] == "npm ci && npm run build"
+    assert worker_environment["ODDSQUANT_ODDS_API_IO_KEY"]["sync"] is False
+    assert worker_environment["ODDSQUANT_API_FOOTBALL_KEY"]["sync"] is False
 
 
 def test_backend_image_runs_as_non_root_without_embedded_secrets() -> None:
