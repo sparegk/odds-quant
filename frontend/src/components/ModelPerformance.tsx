@@ -13,12 +13,12 @@ export function ModelPerformance({ dashboard, onChanged }: { dashboard: Dashboar
 
   if (!selected) return <div className="space-y-5"><ModelOperations dashboard={dashboard} onChanged={onChanged} /><ModelEmpty title="No trained model versions" detail="Import timestamped historical results and train the Poisson baseline to populate this registry." /><EvidenceWarning /></div>
 
-  return <div className="space-y-7">
+  return <div className="min-w-0 space-y-7">
     <ModelOperations dashboard={dashboard} onChanged={onChanged} />
     <div><p className="text-xs font-bold uppercase text-emerald-700">Versioned evidence registry</p><h2 className="mt-1 text-lg font-bold">Model performance and audit</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-zinc-500">Compare immutable training versions with their own chronological evaluation evidence. Training fit is never shown as validation.</p></div>
-    <div className="grid gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
+    <div className="grid min-w-0 gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
       <aside><h3 className="mb-3 text-xs font-bold uppercase text-zinc-500">Model versions</h3><div className="border-y border-zinc-200 bg-white">{dashboard.models.map((model) => <button key={model.id} className={`w-full border-b border-zinc-100 p-4 text-left last:border-0 ${selected.id === model.id ? 'bg-emerald-50' : 'hover:bg-zinc-50'}`} onClick={() => setSelectedId(model.id)} type="button"><div className="flex items-start justify-between gap-2"><div><p className="font-bold">{model.version}</p><p className="mt-1 text-xs text-zinc-500">{model.kind} · {model.sample_size} matches</p></div><Status status={model.evaluation_status} /></div></button>)}</div></aside>
-      <div className="space-y-7">
+      <div className="min-w-0 space-y-7">
         <section className="border border-zinc-200 bg-white"><div className="flex flex-wrap items-start justify-between gap-4 p-5"><div><p className="text-xs font-bold uppercase text-emerald-700">{selected.name}</p><h3 className="mt-1 text-xl font-bold">{selected.version}</h3><p className="mt-1 text-sm text-zinc-500">{selected.is_demo ? 'DEMO TRAINING DATA' : 'PERMITTED EXTERNAL HISTORY'}</p></div><Status status={selected.evaluation_status} /></div><div className="grid grid-cols-2 border-t border-zinc-200 md:grid-cols-4"><Metric label="Training matches" value={selected.sample_size.toString()} /><Metric label="Feature version" value={selected.feature_version} /><Metric label="Evaluations" value={evaluations.length.toString()} /><Metric label="Registry status" value={humanizeCode(selected.status)} /></div><div className="grid gap-2 border-t border-zinc-200 px-5 py-4 text-xs text-zinc-500 sm:grid-cols-2"><p>Training window: {formatDateTime(selected.training_start)} to {formatDateTime(selected.training_end)}</p><p>Created: {formatDateTime(selected.created_at)}</p><p className="font-mono">Data fingerprint: {selected.data_fingerprint}</p><p>Model ID #{selected.id}</p></div></section>
         <EvaluationSummary run={latest} />
         <Calibration run={latest} />

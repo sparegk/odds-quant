@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   BarChart3,
   CheckCircle2,
+  Menu,
   RefreshCw,
   X,
 } from 'lucide-react'
@@ -56,6 +57,7 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -144,6 +146,7 @@ function App() {
   const selectView = (next: ViewKey) => {
     navigateToView(next)
     setView(next)
+    setMobileNavigationOpen(false)
   }
 
   const openEvent = (eventId: number) => {
@@ -202,7 +205,16 @@ function App() {
         {notice ? <SuccessNotice message={notice} onDismiss={() => setNotice(null)} /> : null}
         <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/95 backdrop-blur">
           <div className="flex h-16 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-            <div className="min-w-0">
+            <button
+              aria-expanded={mobileNavigationOpen}
+              aria-label={mobileNavigationOpen ? 'Close navigation' : 'Open navigation'}
+              className='grid h-9 w-9 shrink-0 place-items-center border border-zinc-300 text-zinc-700 lg:hidden'
+              onClick={() => setMobileNavigationOpen((open) => !open)}
+              type='button'
+            >
+              {mobileNavigationOpen ? <X aria-hidden='true' size={18} /> : <Menu aria-hidden='true' size={18} />}
+            </button>
+            <div className="min-w-0 flex-1">
               <h1 className="truncate text-lg font-bold">{navigation.find((item) => item.key === view)?.label}</h1>
               <p className="truncate text-xs text-zinc-500">Point-in-time market and model research</p>
             </div>
@@ -222,20 +234,34 @@ function App() {
               </button>
             </div>
           </div>
-          <div className="overflow-x-auto border-t border-zinc-100 px-3 py-2 lg:hidden">
-            <div className="flex min-w-max gap-1">
-              {navigation.map((item) => (
-                <button
-                  key={item.key}
-                  className={`rounded-[4px] px-3 py-1.5 text-xs font-semibold ${view === item.key ? 'bg-zinc-900 text-white' : 'text-zinc-600'}`}
-                  onClick={() => selectView(item.key)}
-                  type="button"
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </div>
+          {mobileNavigationOpen ? (
+            <nav aria-label='Mobile navigation' className='max-h-[calc(100vh-4rem)] overflow-y-auto border-t border-zinc-200 bg-white px-4 py-4 lg:hidden'>
+              <div className='grid gap-5 sm:grid-cols-2'>
+                {navigationGroups.map((group) => (
+                  <div key={group.label}>
+                    <p className='mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-400'>{group.label}</p>
+                    <div className='grid grid-cols-2 gap-2'>
+                      {group.items.map((item) => {
+                        const Icon = item.icon
+                        return (
+                          <button
+                            aria-current={view === item.key ? 'page' : undefined}
+                            className={`flex min-h-11 items-center gap-2 border px-3 py-2 text-left text-xs font-semibold ${view === item.key ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 text-zinc-700'}`}
+                            key={item.key}
+                            onClick={() => selectView(item.key)}
+                            type='button'
+                          >
+                            <Icon aria-hidden='true' className='shrink-0' size={15} />
+                            {item.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </nav>
+          ) : null}
         </header>
 
         <main className="px-4 py-5 sm:px-6 lg:px-8 lg:py-7">

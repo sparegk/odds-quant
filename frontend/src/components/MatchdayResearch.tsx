@@ -466,12 +466,26 @@ export function MatchDetail({ detail }: { detail: MatchdayEventDetail }) {
             </div>
           ) : null}
           {bestPrices.length ? (
-            <div className="overflow-x-auto border-y border-zinc-200">
+            <>
+            <div className='grid gap-2 sm:hidden'>
+              {bestPrices.map(({ market, price }) => (
+                <div className='grid grid-cols-[1fr_auto] gap-3 border border-zinc-200 p-3' key={`${market.market_id}-${price.selection_code}-mobile`}>
+                  <div className='min-w-0'>
+                    <p className='truncate text-xs text-zinc-500'>{humanizeCode(market.market_type)}{market.line === null ? '' : ` ${market.line}`}</p>
+                    <p className='mt-1 font-semibold'>{price.selection_name}</p>
+                    <p className='mt-1 text-xs text-zinc-500'>{price.bookmaker}</p>
+                  </div>
+                  <p className='self-center font-mono text-lg font-bold'>{price.decimal_odds.toFixed(2)}</p>
+                </div>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto border-y border-zinc-200 sm:block">
               <table className="w-full min-w-[580px] text-left text-sm">
                 <thead className="bg-zinc-50 text-xs uppercase text-zinc-500"><tr><th className="px-3 py-2.5">Market</th><th className="px-3 py-2.5">Selection</th><th className="px-3 py-2.5">Bookmaker</th><th className="px-3 py-2.5 text-right">Odds</th></tr></thead>
                 <tbody>{bestPrices.map(({ market, price }) => <tr className="border-t border-zinc-100" key={`${market.market_id}-${price.selection_code}`}><td className="px-3 py-2.5">{humanizeCode(market.market_type)}{market.line === null ? '' : ` ${market.line}`}</td><td className="px-3 py-2.5 font-semibold">{price.selection_name}</td><td className="px-3 py-2.5">{price.bookmaker}</td><td className="px-3 py-2.5 text-right font-mono font-bold">{price.decimal_odds.toFixed(2)}</td></tr>)}</tbody>
               </table>
             </div>
+            </>
           ) : <ResearchEmpty text="No complete timestamp-valid bookmaker comparison is stored." />}
           {detail.markets.length ? (
             <div className="mt-4 space-y-3">{detail.markets.map((market) => <MarketSnapshotStats key={market.market_id} market={market} />)}</div>
@@ -751,7 +765,19 @@ function SnapshotStats({ snapshot }: { snapshot: SnapshotComparison }) {
           <StatValue label="Margin" value={percentage(snapshot.bookmaker_margin)} />
         </div>
       </div>
-      <div className="mt-3 overflow-x-auto">
+      <div className='mt-3 grid gap-2 sm:hidden'>
+        {snapshot.prices.map((price) => (
+          <div className='border border-zinc-200 p-3 text-xs' key={`${price.selection_code}-mobile`}>
+            <div className='flex items-center justify-between gap-3'><p className='font-semibold'>{price.selection_name}</p><p className='font-mono text-base font-bold'>{price.decimal_odds.toFixed(2)}</p></div>
+            <div className='mt-2 grid grid-cols-3 gap-2 text-center text-[11px] text-zinc-500'>
+              <StatValue label='Raw implied' value={percentage(price.raw_implied_probability)} />
+              <StatValue label='Fair chance' value={percentage(price.proportional_fair_probability)} />
+              <StatValue label='Fair odds' value={price.proportional_fair_odds.toFixed(2)} />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 hidden overflow-x-auto sm:block">
         <table className="w-full min-w-[610px] text-left text-xs">
           <thead className="text-[10px] uppercase text-zinc-500"><tr><th className="pb-2">Selection</th><th className="pb-2 text-right">Odds</th><th className="pb-2 text-right">Raw implied</th><th className="pb-2 text-right">Fair probability</th><th className="pb-2 text-right">Fair odds</th></tr></thead>
           <tbody>{snapshot.prices.map((price) => <tr className="border-t border-zinc-100" key={price.selection_code}><td className="py-2 font-semibold">{price.selection_name}</td><td className="py-2 text-right font-mono font-bold">{price.decimal_odds.toFixed(2)}</td><td className="py-2 text-right font-mono">{percentage(price.raw_implied_probability)}</td><td className="py-2 text-right font-mono">{percentage(price.proportional_fair_probability)}</td><td className="py-2 text-right font-mono">{price.proportional_fair_odds.toFixed(2)}</td></tr>)}</tbody>

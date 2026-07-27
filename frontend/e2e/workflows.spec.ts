@@ -115,6 +115,20 @@ test('opens and refreshes a shareable match URL', async ({ page }) => {
   await expect(page.getByLabel('Match')).toHaveValue('7')
 })
 
+test('uses compact grouped navigation on a mobile viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.getByRole('button', { name: 'Open navigation' }).click()
+  const menu = page.getByRole('navigation', { name: 'Mobile navigation' })
+  await expect(menu).toBeVisible()
+  await expect(menu.getByText('Matches', { exact: true })).toBeVisible()
+  await expect(menu.getByText('Research', { exact: true })).toBeVisible()
+  await menu.getByRole('button', { name: 'Model performance' }).click()
+  await expect(menu).toBeHidden()
+  await expect(page.locator('header h1')).toHaveText('Model performance')
+  await expect(page).toHaveURL(/#models$/)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+})
+
 test('imports odds and completes the model-to-signal workflow', async ({ page }) => {
   await page.getByRole('button', { name: 'Data operations' }).click()
   await page.getByLabel('Odds snapshots CSV file').setInputFiles({ name: 'odds.csv', mimeType: 'text/csv', buffer: Buffer.from('event,price\n7,1.8') })
