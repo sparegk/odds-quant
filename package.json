@@ -1,0 +1,8 @@
+{
+  "name": "oddsquant-site",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "build": "npm --prefix frontend ci && npm --prefix frontend run build"
+  }
+}
