@@ -271,7 +271,10 @@ infer closing flags, or enable player props before their independent validation 
   live Quick Tunnel origin in Sites runtime configuration. Sites version 8 deployed from
   CI-passing commit `f32ab8a` with environment revision 1; the deterministic worker check proves
   API paths proxy to the configured HTTPS tunnel and fail closed when configuration is absent.
-- [ ] Confirm the API allows the exact Sites production origin without using a wildcard.
+- [x] Allow only the exact Sites production origin in the tunneled API process. A live preflight
+  returned HTTP 200 with that origin echoed in `Access-Control-Allow-Origin`; an unrelated origin
+  returned HTTP 400 with no allow-origin header. The reproducible startup script contains no
+  wildcard CORS setting.
 - [ ] Redeploy and verify Matchday, stable match details, prices, models, and builder data against
   the production API.
 - [ ] Review whether the completed owner-only site should be made public; do not change access

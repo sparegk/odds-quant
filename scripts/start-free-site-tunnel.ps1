@@ -53,6 +53,7 @@ catch {
 if (-not $apiReady) {
     $env:ODDSQUANT_ENVIRONMENT = "production"
     $env:ODDSQUANT_SEED_DEMO = "false"
+    $env:ODDSQUANT_CORS_ORIGINS = "https://oddsquant-research.kkakarantzas17.chatgpt.site"
     Start-Process -FilePath "py" `
         -ArgumentList "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "$Port" `
         -WorkingDirectory $backendDir `

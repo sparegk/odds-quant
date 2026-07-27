@@ -42,6 +42,10 @@ def test_free_tunnel_starts_a_hardened_loopback_backend() -> None:
     assert "py -m alembic upgrade head" in script
     assert '$env:ODDSQUANT_ENVIRONMENT = "production"' in script
     assert '$env:ODDSQUANT_SEED_DEMO = "false"' in script
+    assert (
+        '$env:ODDSQUANT_CORS_ORIGINS = "https://oddsquant-research.kkakarantzas17.chatgpt.site"'
+    ) in script
+    assert '$env:ODDSQUANT_CORS_ORIGINS = "*"' not in script
     assert '"--host", "127.0.0.1"' in script
     assert '"-m", "app.jobs.scheduler"' in script
     assert '"tunnel", "--url", $apiUrl' in script
