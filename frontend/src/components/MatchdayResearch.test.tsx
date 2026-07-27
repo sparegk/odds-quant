@@ -415,5 +415,21 @@ describe('MatchdayResearch', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Champions League' }))
     expect(screen.getByText('No timestamped fixtures for this view')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Try next day' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Show all tracked' }))
+    expect(screen.queryByText('No timestamped fixtures for this view')).not.toBeInTheDocument()
+  })
+
+  it('retries a failed matchday without losing the selected date', async () => {
+    apiMocks.loadMatchday.mockRejectedValueOnce(new Error('Temporary upstream failure')).mockResolvedValueOnce(schedule)
+    apiMocks.loadMatchdayEvent.mockResolvedValue(detail)
+
+    render(<MatchdayResearch onSelectEvent={() => undefined} />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Temporary upstream failure')
+    expect(screen.getByText('Your selected date and filters are preserved.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry this matchday' }))
+    expect(await screen.findByRole('heading', { name: /Northbridge FC vs Riverside Athletic/ })).toBeInTheDocument()
+    expect(apiMocks.loadMatchday).toHaveBeenCalledTimes(2)
   })
 })

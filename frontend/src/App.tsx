@@ -894,7 +894,7 @@ function EmptyRow({ text }: { text: string }) {
 }
 
 function LoadingState() {
-  return <div className="grid min-h-[420px] place-items-center"><div className="text-center"><RefreshCw aria-hidden="true" className="mx-auto animate-spin text-emerald-700" size={24} /><p className="mt-3 text-sm text-zinc-500">Loading market data</p></div></div>
+  return <div className="grid min-h-[420px] place-items-center" role="status"><div className="text-center"><RefreshCw aria-hidden="true" className="mx-auto animate-spin text-emerald-700" size={24} /><p className="mt-3 font-semibold">Loading your research workspace</p><p className="mt-1 text-sm text-zinc-500">Fetching fixtures, timestamped prices, and model evidence.</p></div></div>
 }
 
 function ConnectionError({ message, onRetry }: { message: string; onRetry: () => void }) {
@@ -922,7 +922,7 @@ export function InlineLoading({ text }: { text: string }) {
 }
 
 export function InlineError({ message }: { message: string }) {
-  return <div className="m-4 border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900"><strong>Unable to load prices.</strong> {message}</div>
+  return <div className="m-4 border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900" role="alert"><strong>Unable to load prices.</strong> {message}<p className="mt-2 text-rose-800">The selected match is preserved. Use the refresh button in the page header to try again.</p></div>
 }
 
 export default App

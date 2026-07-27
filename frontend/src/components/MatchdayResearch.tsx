@@ -108,6 +108,8 @@ export function MatchdayResearch({
   const [detailLoading, setDetailLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [detailError, setDetailError] = useState<string | null>(null)
+  const [scheduleReload, setScheduleReload] = useState(0)
+  const [detailReload, setDetailReload] = useState(0)
   const [bookmakerMode, setBookmakerMode] = useState<BookmakerMode>('both')
   const selectedBookmakers = useMemo<MatchdayBookmakerCode[]>(
     () => (bookmakerMode === 'both' ? ['allwyn', 'novibet'] : [bookmakerMode]),
@@ -138,7 +140,7 @@ export function MatchdayResearch({
     return () => {
       active = false
     }
-  }, [date, onSelectEvent, timezone])
+  }, [date, onSelectEvent, scheduleReload, timezone])
 
   useEffect(() => {
     if (selectedEventId === null) {
@@ -160,7 +162,7 @@ export function MatchdayResearch({
     return () => {
       active = false
     }
-  }, [selectedBookmakers, selectedEventId])
+  }, [detailReload, selectedBookmakers, selectedEventId])
 
   const filteredCompetitions = useMemo(
     () => schedule?.competitions.filter((competition) => filter === 'all' || competition.group_key === filter) ?? [],
@@ -271,7 +273,7 @@ export function MatchdayResearch({
         </div>
       </section>
 
-      {error ? <MatchdayError message={error} /> : null}
+      {error ? <MatchdayError actionLabel='Retry this matchday' message={error} onRetry={() => { setLoading(true); setScheduleReload((version) => version + 1) }} /> : null}
       {loading ? <MatchdayLoading label="Loading fixtures" /> : null}
       {!loading && schedule ? (
         <>
@@ -293,12 +295,12 @@ export function MatchdayResearch({
               </div>
               <div className="min-w-0 xl:sticky xl:top-24">
                 {detailLoading ? <MatchdayLoading label="Loading match research" /> : null}
-                {detailError ? <MatchdayError message={detailError} /> : null}
+                {detailError ? <MatchdayError actionLabel='Retry match research' message={detailError} onRetry={() => { setDetailLoading(true); setDetailReload((version) => version + 1) }} /> : null}
                 {!detailLoading && detail ? <MatchDetail detail={detail} /> : null}
               </div>
             </div>
           ) : (
-            <EmptyMatchday filter={filter} />
+            <EmptyMatchday filter={filter} onNextDay={() => chooseDate(shiftDate(date, 1))} onShowAll={() => setFilter('all')} />
           )}
           <p className="border-l-4 border-sky-500 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950">
             {schedule.data_note}
@@ -945,14 +947,14 @@ function ResearchEmpty({ text }: { text: string }) {
   return <div className="border border-zinc-200 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500">{text}</div>
 }
 
-function EmptyMatchday({ filter }: { filter: string }) {
-  return <div className="border-y border-zinc-200 bg-white px-6 py-14 text-center"><CalendarDays aria-hidden="true" className="mx-auto text-zinc-400" size={28} /><h2 className="mt-3 font-bold">No timestamped fixtures for this view</h2><p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-zinc-500">{filter === 'all' ? 'Import a permitted fixture and odds feed, or choose another date.' : 'This competition group has no imported matches on the selected day. Try All tracked or another date.'}</p></div>
+function EmptyMatchday({ filter, onNextDay, onShowAll }: { filter: string; onNextDay: () => void; onShowAll: () => void }) {
+  return <div className="border-y border-zinc-200 bg-white px-6 py-14 text-center"><CalendarDays aria-hidden="true" className="mx-auto text-zinc-400" size={28} /><h2 className="mt-3 font-bold">No timestamped fixtures for this view</h2><p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-zinc-500">{filter === 'all' ? 'No permitted fixtures are stored for this date. Try the next day, or import a fixture and odds feed in Data operations.' : 'This competition group has no imported matches on the selected day. Show all tracked competitions or try the next day.'}</p><div className="mt-4 flex flex-wrap justify-center gap-2">{filter !== 'all' ? <button className="border border-zinc-300 px-3 py-2 text-sm font-semibold" onClick={onShowAll} type="button">Show all tracked</button> : null}<button className="bg-zinc-900 px-3 py-2 text-sm font-semibold text-white" onClick={onNextDay} type="button">Try next day</button></div></div>
 }
 
 function MatchdayLoading({ label }: { label: string }) {
   return <div className="flex min-h-48 items-center justify-center gap-2 border border-zinc-200 bg-white text-sm text-zinc-500"><RefreshCw aria-hidden="true" className="animate-spin" size={17} />{label}</div>
 }
 
-function MatchdayError({ message }: { message: string }) {
-  return <div className="flex items-start gap-3 border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900"><AlertTriangle aria-hidden="true" className="mt-0.5 shrink-0" size={18} /><div><p className="font-bold">Matchday data unavailable</p><p className="mt-1">{message}</p></div></div>
+function MatchdayError({ message, actionLabel, onRetry }: { message: string; actionLabel: string; onRetry: () => void }) {
+  return <div className="flex items-start gap-3 border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900" role="alert"><AlertTriangle aria-hidden="true" className="mt-0.5 shrink-0" size={18} /><div><p className="font-bold">Matchday data unavailable</p><p className="mt-1">{message}</p><p className="mt-2 text-rose-800">Your selected date and filters are preserved.</p><button className="mt-3 bg-rose-800 px-3 py-2 font-semibold text-white" onClick={onRetry} type="button">{actionLabel}</button></div></div>
 }

@@ -256,6 +256,6 @@ infer closing flags, or enable player props before their independent validation 
 - [x] Unify kickoff, bookmaker prices, model evidence, availability gates, and builder research in
   one coherent match-detail experience.
 - [x] Build a mobile-first navigation and responsive match/price layouts.
-- [ ] Improve loading, empty, and recoverable error states with actionable language.
+- [x] Improve loading, empty, and recoverable error states with actionable language.
 - [ ] Add a concise first-visit guide for probabilities, fair odds, value gates, and blocked states.
 - [ ] Validate the completed site source and deploy it through the configured hosting workflow.

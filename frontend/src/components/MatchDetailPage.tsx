@@ -26,6 +26,7 @@ export function MatchDetailPage({
   const [detail, setDetail] = useState<MatchdayEventDetail | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [reloadVersion, setReloadVersion] = useState(0)
   const bookmakers = useMemo<MatchdayBookmakerCode[]>(
     () => bookmakerMode === 'both' ? ['allwyn', 'novibet'] : [bookmakerMode],
     [bookmakerMode],
@@ -56,7 +57,7 @@ export function MatchDetailPage({
     return () => {
       active = false
     }
-  }, [bookmakers, selectedEventId])
+  }, [bookmakers, reloadVersion, selectedEventId])
 
   return (
     <div className='space-y-6'>
@@ -108,9 +109,16 @@ export function MatchDetailPage({
       </section>
 
       {loading ? <div className='flex items-center justify-center gap-2 border-y border-zinc-200 bg-white px-5 py-12 text-sm text-zinc-500'><RefreshCw aria-hidden='true' className='animate-spin' size={17} />Loading the complete match record</div> : null}
-      {error ? <div className='border border-rose-200 bg-rose-50 p-4 text-sm text-rose-950' role='alert'>{error}</div> : null}
+      {error ? (
+        <div className='border border-rose-200 bg-rose-50 p-5 text-sm text-rose-950' role='alert'>
+          <h2 className='font-bold'>Match research could not be loaded</h2>
+          <p className='mt-1'>{error}</p>
+          <p className='mt-2 text-rose-800'>Your selected match and bookmaker filter are preserved.</p>
+          <button className='mt-3 bg-rose-800 px-3 py-2 font-semibold text-white' onClick={() => setReloadVersion((version) => version + 1)} type='button'>Retry match research</button>
+        </div>
+      ) : null}
       {!loading && !error && selectedEventId !== null && detail ? <MatchDetail detail={detail} /> : null}
-      {!loading && !error && !detail ? <div className='border-y border-zinc-200 bg-white px-5 py-12 text-center'><h2 className='font-bold'>No match selected</h2><p className='mt-2 text-sm text-zinc-500'>Choose a tracked match to inspect its complete research record.</p></div> : null}
+      {!loading && !error && !detail ? <div className='border-y border-zinc-200 bg-white px-5 py-12 text-center'><h2 className='font-bold'>No match selected</h2><p className='mt-2 text-sm text-zinc-500'>{events.length ? 'Choose a tracked match above to inspect its complete research record.' : 'No tracked matches are available yet. Import a permitted fixture feed in Data operations first.'}</p></div> : null}
     </div>
   )
 }
