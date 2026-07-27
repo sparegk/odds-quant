@@ -262,8 +262,11 @@ infer closing flags, or enable player props before their independent validation 
 
 ### Production data connection checklist
 
-- [ ] Provision the Render API, PostgreSQL database, migrations, and scheduler worker from the
-  production Blueprint; require successful deploys before recording the service URL.
+- [x] Replace the card-gated Render plan with a local, production-mode API, migrated SQLite
+  database, scheduler worker, and free Cloudflare Quick Tunnel. The 2026-07-27 tunnel proof
+  returned 14 timestamped Matchday events over HTTPS, while an unauthenticated admin import
+  failed closed with HTTP 503. `scripts/start-free-site-tunnel.ps1` reproduces the startup;
+  the computer and processes must remain running, and a restarted Quick Tunnel gets a new URL.
 - [ ] Configure the Sites production build with the live API base URL.
 - [ ] Confirm the API allows the exact Sites production origin without using a wildcard.
 - [ ] Redeploy and verify Matchday, stable match details, prices, models, and builder data against

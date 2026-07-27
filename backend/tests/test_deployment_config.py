@@ -36,28 +36,17 @@ def test_compose_orders_database_api_and_worker() -> None:
     assert frontend["ports"] == ["${ODDSQUANT_FRONTEND_PORT:-5173}:8080"]
 
 
-def test_render_is_production_safe_and_migrates_before_deploy() -> None:
-    blueprint = _yaml("render.yaml")
-    services = blueprint["services"]
-    assert isinstance(services, list)
-    web = next(service for service in services if service["name"] == "oddsquant-api")
-    worker = next(service for service in services if service["type"] == "worker")
-    assert {service["name"] for service in services} == {"oddsquant-api", "oddsquant-worker"}
-    assert web["preDeployCommand"] == "python -m alembic upgrade head"
-    assert web["autoDeployTrigger"] == "checksPass"
-    web_environment = {item["key"]: item for item in web["envVars"]}
-    worker_environment = {item["key"]: item for item in worker["envVars"]}
-    assert web_environment["ODDSQUANT_ENVIRONMENT"]["value"] == "production"
-    assert web_environment["ODDSQUANT_SEED_DEMO"]["value"] == "false"
-    assert web_environment["ODDSQUANT_ADMIN_API_KEY"]["generateValue"] is True
-    assert web_environment["ODDSQUANT_CORS_ORIGINS"]["value"] == (
-        "https://oddsquant-research.kkakarantzas17.chatgpt.site"
-    )
-    assert web_environment["ODDSQUANT_MATCHDAY_TIMEZONE"]["value"] == "Europe/Athens"
-    assert web_environment["ODDSQUANT_MATCHDAY_FORM_MATCHES"]["value"] == "5"
-    assert worker_environment["ODDSQUANT_SEED_DEMO"]["value"] == "false"
-    assert worker_environment["ODDSQUANT_ODDS_API_IO_KEY"]["sync"] is False
-    assert worker_environment["ODDSQUANT_API_FOOTBALL_KEY"]["sync"] is False
+def test_free_tunnel_starts_a_hardened_loopback_backend() -> None:
+    script = (ROOT / "scripts" / "start-free-site-tunnel.ps1").read_text(encoding="utf-8")
+    assert "python -m alembic upgrade head" not in script
+    assert 'py -m alembic upgrade head' in script
+    assert '$env:ODDSQUANT_ENVIRONMENT = "production"' in script
+    assert '$env:ODDSQUANT_SEED_DEMO = "false"' in script
+    assert '"--host", "127.0.0.1"' in script
+    assert '"-m", "app.jobs.scheduler"' in script
+    assert '"tunnel", "--url", $apiUrl' in script
+    assert "ODDSQUANT_ODDS_API_IO_KEY=" not in script
+    assert "ODDSQUANT_API_FOOTBALL_KEY=" not in script
 
 
 def test_backend_image_runs_as_non_root_without_embedded_secrets() -> None:
