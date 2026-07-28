@@ -220,6 +220,14 @@ after `134` are required for newest failure `132` to age out before ticking the 
 checkbox. The active worker records the provider adapter's own validated `OddsApiIoError` reason
 while retaining generic, secret-safe messages for unexpected exceptions.
 
+The cadence-safe worker then completed Odds jobs `135` and `136`, but its skipped API-Football
+startup left the next intelligence wake anchored 30 minutes after restart and monitoring marked
+the feed stale. API-Football now runs on the five-minute scheduler heartbeat while its persisted
+30-minute guard remains authoritative. The replacement worker is active as Python PID `11952`;
+startup skipped the not-yet-due Odds collector and completed overdue API-Football job `137`.
+Both providers returned healthy and only the recent Odds failure warning remains. Six further
+successful Odds jobs after `136` are required for job `132` to age out.
+
 The scheduled odds workflow now refreshes cutoff-safe baseline predictions for upcoming priced
 fixtures, reports research-watchlist availability, and reuses an output when the exact cutoff is
 polled again. API-Football intelligence polling creates a separate

@@ -498,7 +498,10 @@ def build_scheduler(settings: Settings | None = None) -> BlockingScheduler:
         scheduler.add_job(
             poll_api_football_intelligence,
             "interval",
-            seconds=runtime_settings.api_football_poll_seconds,
+            seconds=min(
+                runtime_settings.api_football_poll_seconds,
+                runtime_settings.provider_near_kickoff_poll_seconds,
+            ),
             id="poll-api-football-intelligence",
             coalesce=True,
             max_instances=1,

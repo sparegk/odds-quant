@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+from apscheduler.triggers.interval import IntervalTrigger  # type: ignore[import-untyped]
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -337,7 +338,10 @@ def test_scheduler_registers_api_football_poll_only_when_configured() -> None:
     with_key = build_scheduler(Settings(api_football_key="configured-secret"))
 
     assert without_key.get_job("poll-api-football-intelligence") is None
-    assert with_key.get_job("poll-api-football-intelligence") is not None
+    api_job = with_key.get_job("poll-api-football-intelligence")
+    assert api_job is not None
+    assert isinstance(api_job.trigger, IntervalTrigger)
+    assert api_job.trigger.interval.total_seconds() == 300
 
 
 def test_near_kickoff_polling_cannot_be_slower_than_base_polling() -> None:
