@@ -208,6 +208,11 @@ API, service-validation, and CLI JSON tests cover the behavior; the full backend
   This authorizes probability evaluation only—not market comparison, CLV, ROI, or profitability
   claims. Closing prices must remain unavailable until an explicit, timestamped source stores them;
   they must never be inferred. Backtesting and evaluation tests passed (21 tests).
+- [x] Deploy the completed frontend-tab source from pushed commit `194d463` as owner-only Sites
+  version 10. Frontend lint, all 64 unit tests, the production build, and the repository's Sites
+  worker verification passed. The deployment completed successfully at
+  `https://oddsquant-research.kkakarantzas17.chatgpt.site`; Sites reports the project active with
+  custom access limited to exactly one allowed user and zero groups.
 
 ### In-progress scheduler recovery (2026-07-27)
 
