@@ -177,6 +177,12 @@ API, service-validation, and CLI JSON tests cover the behavior; the full backend
   `monitor-collection --fail-on-alerts` to exit successfully, confirm target bookmaker coverage
   has not regressed, and confirm player props and inferred closing prices remain blocked. Record
   the clean live evidence in this file, then commit and push.
+- [x] Verify adequate permitted historical-result coverage before any new training. Premier League
+  seasons 2022/23 through 2025/26 each retain 380 unique non-demo finals from
+  `openfootball-cc0` (1,520 total). All four seasons have source-update timestamps, zero
+  settled-after-observed violations, accepted non-demo raw provenance, and distinct pinned content
+  fingerprints. No duplicate import was required. OpenFootball, result-import, and modeling tests
+  passed (23 tests).
 
 ### In-progress scheduler recovery (2026-07-27)
 
