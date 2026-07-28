@@ -183,6 +183,15 @@ API, service-validation, and CLI JSON tests cover the behavior; the full backend
   settled-after-observed violations, accepted non-demo raw provenance, and distinct pinned content
   fingerprints. No duplicate import was required. OpenFootball, result-import, and modeling tests
   passed (23 tests).
+- [x] Verify immutable model training, chronological evaluation, and promotion gates. The
+  2025/26 held-out Premier League replay remains the only calibrated non-demo model: 342
+  observations at 90% coverage, with Poisson Brier `0.6191`, log loss `1.0306`, and ECE `0.0707`.
+  It beats the uniform baseline but trails the stored Elo and Dixon-Coles comparators marginally.
+  The separate current Premier League, Champions League qualification, and Conference League
+  qualification models remain explicitly `unvalidated`; none was promoted or retrained
+  redundantly. All persisted non-demo outputs have zero input-cutoff and kickoff chronology
+  violations. No bookmaker/closing benchmark or profitability conclusion is authorized. Model
+  and evaluation tests passed (24 tests).
 
 ### In-progress scheduler recovery (2026-07-27)
 
