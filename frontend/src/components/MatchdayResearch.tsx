@@ -396,12 +396,18 @@ function FixtureButton({ item, active, onSelect }: { item: MatchdayEvent; active
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold">{item.event.home_team}</p>
         <p className="mt-1 truncate text-sm font-semibold">{item.event.away_team}</p>
-        <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-semibold uppercase text-zinc-500">
-          <span>{item.market_count} markets</span>
-          <span>·</span>
-          <span>{item.bookmaker_count} books</span>
-          {item.latest_prediction_at ? <><span>·</span><span>model</span></> : null}
-          {item.qualified_signal_count ? <span className="text-emerald-700">· {item.qualified_signal_count} value</span> : null}
+        <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-semibold uppercase">
+          <span className={item.market_count ? 'text-zinc-600' : 'text-amber-700'}>{item.market_count ? `${item.market_count} markets` : 'Prices blocked'}</span>
+          <span className="text-zinc-300">·</span>
+          <span className={item.bookmaker_count ? 'text-zinc-600' : 'text-amber-700'}>{item.bookmaker_count ? `${item.bookmaker_count} books` : 'No books'}</span>
+          <span className="text-zinc-300">·</span>
+          {item.latest_prediction_at
+            ? <span className="text-sky-700" title={`Latest cutoff-safe prediction ${formatDateTime(item.latest_prediction_at)}`}>Model ready</span>
+            : <span className="text-amber-700" title="No cutoff-safe prediction is stored. Open the match to inspect team-history and model evidence.">Model blocked</span>}
+          <span className="text-zinc-300">·</span>
+          {item.qualified_signal_count
+            ? <span className="text-emerald-700">{item.qualified_signal_count} value</span>
+            : <span className="text-zinc-400">No qualified value</span>}
         </div>
       </div>
     </button>

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Matchday, MatchdayCompetition, MatchdayEventDetail } from '../types'
@@ -366,6 +366,12 @@ describe('MatchdayResearch', () => {
     })
     expect(selectEvent).toHaveBeenCalledWith(42)
     expect(apiMocks.loadMatchdayEvent).not.toHaveBeenCalledWith(41, expect.anything())
+    const blockedFixture = screen.getByRole('button', { name: /Unpriced FC/ })
+    expect(within(blockedFixture).getByText('Prices blocked')).toBeInTheDocument()
+    expect(within(blockedFixture).getByText('Model blocked')).toHaveAttribute('title', expect.stringContaining('team-history'))
+    const readyFixture = screen.getByRole('button', { name: /Northbridge FC/ })
+    expect(within(readyFixture).getByText('Model ready')).toHaveAttribute('title', expect.stringContaining('Latest cutoff-safe prediction'))
+    expect(within(readyFixture).getByText('No qualified value')).toBeInTheDocument()
   })
 
   it('shows filtered ranked suggestions, app coverage, and fail-closed markets', async () => {
