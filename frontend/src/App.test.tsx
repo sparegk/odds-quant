@@ -256,6 +256,17 @@ describe('UnderdogScanner', () => {
     expect(screen.getByText('No underdogs match these filters')).toBeInTheDocument()
     expect(screen.getByText('0 of 1 shown')).toBeInTheDocument()
   })
+
+  it('filters by market depth, freshness, and calibration evidence', () => {
+    render(<UnderdogScanner dashboard={dashboard} onOpenEvent={() => undefined} />)
+
+    expect(screen.getByLabelText('Minimum compatible books')).toBeInTheDocument()
+    expect(screen.getByLabelText('Maximum odds age (minutes)')).toBeInTheDocument()
+    expect(screen.getByLabelText('Maximum calibration error (%)')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Minimum compatible books'), { target: { value: '5' } })
+    expect(screen.getByText('No underdogs match these filters')).toBeInTheDocument()
+    expect(screen.getByText(/not proof of executable liquidity/)).toBeInTheDocument()
+  })
 })
 
 describe('ValueOpportunities', () => {

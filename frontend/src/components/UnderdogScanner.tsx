@@ -18,6 +18,9 @@ export function UnderdogScanner({ dashboard, onOpenEvent }: UnderdogScannerProps
   const [minimumOdds, setMinimumOdds] = useState('2')
   const [minimumLowerEv, setMinimumLowerEv] = useState('0')
   const [minimumConfidence, setMinimumConfidence] = useState('0')
+  const [minimumBookmakers, setMinimumBookmakers] = useState('1')
+  const [maximumOddsAge, setMaximumOddsAge] = useState('60')
+  const [maximumCalibrationError, setMaximumCalibrationError] = useState('100')
   const [sort, setSort] = useState<SortKey>('LOWER_EV')
 
   const eventById = useMemo(() => new Map(dashboard.events.map((event) => [event.id, event])), [dashboard.events])
@@ -29,6 +32,9 @@ export function UnderdogScanner({ dashboard, onOpenEvent }: UnderdogScannerProps
     const oddsFloor = finiteOr(minimumOdds, 0)
     const lowerEvFloor = finiteOr(minimumLowerEv, 0) / 100
     const confidenceFloor = finiteOr(minimumConfidence, 0) / 100
+    const bookmakerFloor = finiteOr(minimumBookmakers, 1)
+    const oddsAgeCeiling = finiteOr(maximumOddsAge, Number.POSITIVE_INFINITY)
+    const calibrationErrorCeiling = finiteOr(maximumCalibrationError, 100) / 100
     return dashboard.underdogs
       .filter((signal) => {
         const event = eventById.get(signal.event_id)
@@ -37,9 +43,12 @@ export function UnderdogScanner({ dashboard, onOpenEvent }: UnderdogScannerProps
           && signal.offered_odds >= oddsFloor
           && signal.lower_expected_value >= lowerEvFloor
           && signal.confidence >= confidenceFloor
+          && signal.bookmaker_count >= bookmakerFloor
+          && signal.odds_age_minutes <= oddsAgeCeiling
+          && signal.calibration_error <= calibrationErrorCeiling
       })
       .sort((left, right) => rankValue(right, sort) - rankValue(left, sort) || right.expected_value - left.expected_value)
-  }, [competition, dashboard.underdogs, eventById, minimumConfidence, minimumLowerEv, minimumOdds, side, sort])
+  }, [competition, dashboard.underdogs, eventById, maximumCalibrationError, maximumOddsAge, minimumBookmakers, minimumConfidence, minimumLowerEv, minimumOdds, side, sort])
 
   if (!dashboard.underdogs.length) return <UnderdogEvidenceGate />
 
@@ -66,12 +75,15 @@ export function UnderdogScanner({ dashboard, onOpenEvent }: UnderdogScannerProps
 
       <section className="border-y border-zinc-200 bg-white p-4">
         <div className="mb-4 flex items-center gap-2 text-sm font-bold"><Filter aria-hidden="true" size={16} />Scanner controls</div>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-9">
           <FilterSelect label="Competition" value={competition} onChange={setCompetition} options={[['ALL', 'All competitions'], ...competitions.map((item) => [item, item])]}/>
           <FilterSelect label="Side" value={side} onChange={(value) => setSide(value as SideFilter)} options={[["ALL", "Home or away"], ["HOME", "Home underdog"], ["AWAY", "Away underdog"]]}/>
           <FilterNumber label="Minimum odds" value={minimumOdds} onChange={setMinimumOdds} min="2" step="0.1" />
           <FilterNumber label="Minimum lower EV (%)" value={minimumLowerEv} onChange={setMinimumLowerEv} step="0.5" />
           <FilterNumber label="Minimum confidence (%)" value={minimumConfidence} onChange={setMinimumConfidence} min="0" max="100" step="5" />
+          <FilterNumber label="Minimum compatible books" value={minimumBookmakers} onChange={setMinimumBookmakers} min="1" step="1" />
+          <FilterNumber label="Maximum odds age (minutes)" value={maximumOddsAge} onChange={setMaximumOddsAge} min="0" step="1" />
+          <FilterNumber label="Maximum calibration error (%)" value={maximumCalibrationError} onChange={setMaximumCalibrationError} min="0" max="100" step="0.5" />
           <FilterSelect label="Rank by" value={sort} onChange={(value) => setSort(value as SortKey)} options={[["LOWER_EV", "Conservative EV"], ["EDGE", "Probability edge"], ["CONFIDENCE", "Confidence"], ["ODDS", "Offered odds"]]}/>
         </div>
       </section>
@@ -84,11 +96,11 @@ export function UnderdogScanner({ dashboard, onOpenEvent }: UnderdogScannerProps
         <div className="border-y border-zinc-200 bg-white px-6 py-12 text-center">
           <ScanSearch aria-hidden="true" className="mx-auto text-zinc-400" size={28} />
           <h3 className="mt-3 font-bold">No underdogs match these filters</h3>
-          <p className="mt-2 text-sm text-zinc-500">Reduce the odds, conservative EV, or confidence threshold to inspect the stored qualified set.</p>
+          <p className="mt-2 text-sm text-zinc-500">Reduce the odds, EV, confidence, bookmaker-depth, freshness, or calibration filter to inspect the stored qualified set.</p>
         </div>
       )}
 
-      <div className="border-l-4 border-sky-500 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950">Rankings keep model probability, market consensus, price improvement, and uncertainty separate. They are research classifications at a stored cutoff, not betting instructions.</div>
+      <div className="border-l-4 border-sky-500 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950">Compatible-bookmaker count is a market-depth check, not proof of executable liquidity. Rankings keep model probability, market consensus, price improvement, and uncertainty separate. They are research classifications at a stored cutoff, not betting instructions.</div>
     </div>
   )
 }
