@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Matchday, MatchdayCompetition, MatchdayEventDetail } from '../types'
-import { MatchdayResearch } from './MatchdayResearch'
+import { MatchdayResearch, MatchDetail } from './MatchdayResearch'
 
 const apiMocks = vi.hoisted(() => ({
   loadMatchday: vi.fn(),
@@ -400,6 +400,10 @@ describe('MatchdayResearch', () => {
     expect(screen.getByText('32.0% uncertainty')).toBeInTheDocument()
     expect(screen.getByText('Player markets remain research-only')).toBeInTheDocument()
     expect(screen.getByText('No verified builder value')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Prediction evidence layer' })).toBeInTheDocument()
+    expect(screen.getByText('Team Baseline')).toBeInTheDocument()
+    expect(screen.getByText(/No expected or confirmed lineup adjustment/)).toBeInTheDocument()
+    expect(screen.getByText('None applied')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Availability evidence explorer' })).toBeInTheDocument()
     expect(screen.getAllByTestId('availability-audit-item')).toHaveLength(5)
     expect(screen.getByText('Unavailable does not mean invisible.', { exact: false })).toBeInTheDocument()
@@ -424,6 +428,22 @@ describe('MatchdayResearch', () => {
     expect(screen.getByRole('button', { name: 'Try next day' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Show all tracked' }))
     expect(screen.queryByText('No timestamped fixtures for this view')).not.toBeInTheDocument()
+  })
+
+  it('labels confirmed-lineup context without claiming a player-adjusted forecast', () => {
+    render(<MatchDetail detail={{
+      ...detail,
+      latest_prediction: {
+        ...detail.latest_prediction!,
+        evidence_class: 'confirmed_lineup_context_unadjusted',
+        lineup_snapshot_ids: [71, 72],
+      },
+    }} />)
+
+    expect(screen.getByText('Confirmed lineup context / unadjusted baseline')).toBeInTheDocument()
+    expect(screen.getByText(/Probabilities remain team-baseline values/)).toBeInTheDocument()
+    expect(screen.getByText('CONTEXT ONLY')).toBeInTheDocument()
+    expect(screen.getByText('#71, #72')).toBeInTheDocument()
   })
 
   it('retries a failed matchday without losing the selected date', async () => {

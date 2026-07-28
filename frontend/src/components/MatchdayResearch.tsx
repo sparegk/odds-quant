@@ -435,6 +435,7 @@ export function MatchDetail({ detail }: { detail: MatchdayEventDetail }) {
       <div className="space-y-7 p-5">
         <BookmakerAvailability detail={detail} />
         <AvailabilityExplorer detail={detail} />
+        <PredictionEvidence detail={detail} />
         <section>
           <DetailHeading eyebrow="Probability versus exact price" title="Ranked match suggestions" />
           {detail.suggestions.length ? (
@@ -526,6 +527,36 @@ export function MatchDetail({ detail }: { detail: MatchdayEventDetail }) {
       </div>
     </article>
   )
+}
+
+function PredictionEvidence({ detail }: { detail: MatchdayEventDetail }) {
+  const prediction = detail.latest_prediction
+  if (!prediction) {
+    return <section><DetailHeading eyebrow="Model boundary" title="Prediction evidence layer" /><ResearchEmpty text="No timestamp-valid pre-kickoff model output is stored. Team history, model availability, and cutoff evidence must be inspected before a probability can be shown." /></section>
+  }
+  const confirmedContext = prediction.evidence_class === 'confirmed_lineup_context_unadjusted'
+  return <section>
+    <DetailHeading eyebrow="Model boundary" title="Prediction evidence layer" />
+    <div className={`border-l-4 p-4 ${confirmedContext ? 'border-sky-500 bg-sky-50' : 'border-zinc-400 bg-zinc-50'}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="font-bold">{confirmedContext ? 'Confirmed lineup context / unadjusted baseline' : humanizeCode(prediction.evidence_class)}</p>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-zinc-700">{confirmedContext ? 'Complete confirmed lineup snapshots were available at the cutoff, but player-strength adjustments are not independently validated. Probabilities remain team-baseline values.' : 'This output uses team-level baseline evidence. No expected or confirmed lineup adjustment is included in its probabilities.'}</p>
+        </div>
+        <span className="border border-zinc-300 bg-white px-2 py-1 text-xs font-bold">{confirmedContext ? 'CONTEXT ONLY' : 'TEAM BASELINE'}</span>
+      </div>
+      <dl className="mt-4 grid gap-3 text-xs sm:grid-cols-2 xl:grid-cols-4">
+        <PredictionMetric label="Model version" value={prediction.model_version} />
+        <PredictionMetric label="Inputs as of" value={formatDateTime(prediction.inputs_as_of)} />
+        <PredictionMetric label="Prediction time" value={formatDateTime(prediction.predicted_at)} />
+        <PredictionMetric label="Lineup snapshots" value={prediction.lineup_snapshot_ids.length ? prediction.lineup_snapshot_ids.map((id) => `#${id}`).join(', ') : 'None applied'} />
+      </dl>
+    </div>
+  </section>
+}
+
+function PredictionMetric({ label, value }: { label: string; value: string }) {
+  return <div><dt className="font-semibold uppercase text-zinc-500">{label}</dt><dd className="mt-1 font-mono text-zinc-800">{value}</dd></div>
 }
 
 function AvailabilityExplorer({ detail }: { detail: MatchdayEventDetail }) {
