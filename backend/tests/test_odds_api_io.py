@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from email.utils import format_datetime
 
 import httpx
 import pytest
@@ -345,6 +346,114 @@ def test_provider_reports_source_clock_delta_after_response_receipt() -> None:
     )
 
     with pytest.raises(OddsApiIoError, match="exceeds response receipt by 1.250 seconds"):
+        list(provider.collect_odds())
+
+
+def test_provider_accepts_bounded_authoritative_http_response_date() -> None:
+    collection_started_at = OBSERVED_AT
+    local_received_at = collection_started_at + timedelta(seconds=2)
+    source_updated_at = collection_started_at + timedelta(seconds=55)
+    response_date = collection_started_at + timedelta(seconds=60)
+    clock_values = iter((collection_started_at, local_received_at))
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/bookmakers/selected"):
+            return httpx.Response(
+                200,
+                json={"bookmakers": ["Pamestoixima", "Novibet"], "count": 2},
+            )
+        if request.url.path.endswith("/events"):
+            return httpx.Response(
+                200,
+                json=[_event()] if request.url.params["league"] == "england-premier-league" else [],
+            )
+        return httpx.Response(
+            200,
+            headers={"Date": format_datetime(response_date, usegmt=True)},
+            json=[_event_odds(updated_at=source_updated_at.isoformat())],
+        )
+
+    provider = OddsApiIoProvider(
+        SECRET,
+        transport=httpx.MockTransport(handler),
+        clock=lambda: next(clock_values),
+    )
+
+    rows = list(provider.collect_odds())
+
+    assert len(rows) == 6
+    assert {row.observed_at for row in rows} == {response_date}
+    assert {row.source_updated_at for row in rows} == {source_updated_at}
+
+
+@pytest.mark.parametrize("response_date", (None, "not-an-http-date"))
+def test_provider_rejects_future_source_when_response_date_is_unusable(
+    response_date: str | None,
+) -> None:
+    collection_started_at = OBSERVED_AT
+    local_received_at = collection_started_at + timedelta(seconds=2)
+    source_updated_at = local_received_at + timedelta(seconds=1)
+    clock_values = iter((collection_started_at, local_received_at))
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/bookmakers/selected"):
+            return httpx.Response(
+                200,
+                json={"bookmakers": ["Pamestoixima", "Novibet"], "count": 2},
+            )
+        if request.url.path.endswith("/events"):
+            return httpx.Response(
+                200,
+                json=[_event()] if request.url.params["league"] == "england-premier-league" else [],
+            )
+        headers = {"Date": response_date} if response_date is not None else {}
+        return httpx.Response(
+            200,
+            headers=headers,
+            json=[_event_odds(updated_at=source_updated_at.isoformat())],
+        )
+
+    provider = OddsApiIoProvider(
+        SECRET,
+        transport=httpx.MockTransport(handler),
+        clock=lambda: next(clock_values),
+    )
+
+    with pytest.raises(OddsApiIoError, match="exceeds response receipt by 1.000 seconds"):
+        list(provider.collect_odds())
+
+
+def test_provider_rejects_future_source_when_response_clock_skew_is_excessive() -> None:
+    collection_started_at = OBSERVED_AT
+    local_received_at = collection_started_at + timedelta(seconds=2)
+    source_updated_at = collection_started_at + timedelta(seconds=60)
+    response_date = collection_started_at + timedelta(minutes=10)
+    clock_values = iter((collection_started_at, local_received_at))
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/bookmakers/selected"):
+            return httpx.Response(
+                200,
+                json={"bookmakers": ["Pamestoixima", "Novibet"], "count": 2},
+            )
+        if request.url.path.endswith("/events"):
+            return httpx.Response(
+                200,
+                json=[_event()] if request.url.params["league"] == "england-premier-league" else [],
+            )
+        return httpx.Response(
+            200,
+            headers={"Date": format_datetime(response_date, usegmt=True)},
+            json=[_event_odds(updated_at=source_updated_at.isoformat())],
+        )
+
+    provider = OddsApiIoProvider(
+        SECRET,
+        transport=httpx.MockTransport(handler),
+        clock=lambda: next(clock_values),
+    )
+
+    with pytest.raises(OddsApiIoError, match="exceeds response receipt by 58.000 seconds"):
         list(provider.collect_odds())
 
 

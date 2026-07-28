@@ -123,7 +123,13 @@ def run_provider_collection(
     try:
         fixtures = _collect_fixtures(provider_adapter)
         rows = list(provider_adapter.collect_odds())
-        collected_at = datetime.now(UTC)
+        collected_at = max(
+            [
+                datetime.now(UTC),
+                *(_utc(row.observed_at) for row in rows),
+                *(_utc(fixture.observed_at) for fixture in fixtures),
+            ]
+        )
         prediction_cutoff = max([started_at, *(_utc(row.observed_at) for row in rows)])
         fixture_result = None
         prediction_summary = None

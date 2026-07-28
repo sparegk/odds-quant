@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from email.utils import parsedate_to_datetime
 from typing import Any
 
 import httpx
@@ -20,6 +21,7 @@ COLLECTION_HORIZON = timedelta(days=35)
 MAX_EVENTS_PER_LEAGUE = 30
 MAX_RATE_LIMIT_RETRIES = 3
 MAX_RETRY_DELAY_SECONDS = 30.0
+MAX_HTTP_RESPONSE_CLOCK_SKEW = timedelta(minutes=5)
 LEAGUE_COUNTRIES: Mapping[str, str] = {
     "england-premier-league": "England",
     "international-clubs-uefa-champions-league": "International",
@@ -158,6 +160,7 @@ class OddsApiIoClient:
         self._sleep = sleep
         self._jitter = jitter
         self._clock = clock
+        self._last_response_date: datetime | None = None
         self._client = httpx.Client(
             base_url=base_url.rstrip("/"),
             timeout=20,
@@ -255,6 +258,10 @@ class OddsApiIoClient:
                 received_at = self._clock()
                 _require_aware(received_at, "odds response receipt timestamp")
                 batch_observed_at = max(observed_at, received_at)
+            batch_observed_at = _trusted_response_observed_at(
+                batch_observed_at,
+                self._last_response_date,
+            )
             odds_events = _validate_list(payload, _EventOdds, "event odds")
             rows.extend(_normalize_batch(batch, odds_events, batch_observed_at))
         return rows
@@ -383,6 +390,7 @@ class OddsApiIoClient:
             self._sleep(_rate_limit_delay(response, attempt, self._jitter()))
         if response is None:
             raise OddsApiIoError("odds provider request failed")
+        self._last_response_date = _parse_http_response_date(response.headers.get("date"))
         if response.status_code != 200:
             raise OddsApiIoError(f"odds provider returned HTTP {response.status_code}")
         try:
@@ -443,6 +451,29 @@ def _rate_limit_delay(response: httpx.Response, attempt: int, jitter: float) -> 
         provider_delay = 0.0
     exponential_delay = float(2**attempt)
     return min(MAX_RETRY_DELAY_SECONDS, max(exponential_delay, provider_delay) + max(0.0, jitter))
+
+
+def _parse_http_response_date(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = parsedate_to_datetime(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+    return parsed.astimezone(UTC)
+
+
+def _trusted_response_observed_at(
+    local_received_at: datetime,
+    response_date: datetime | None,
+) -> datetime:
+    if response_date is None:
+        return local_received_at
+    if abs(response_date - local_received_at) > MAX_HTTP_RESPONSE_CLOCK_SKEW:
+        return local_received_at
+    return max(local_received_at, response_date)
 
 
 def _validate_list[ModelT: BaseModel](

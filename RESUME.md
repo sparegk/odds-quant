@@ -247,6 +247,15 @@ receipt. No arbitrary clock-skew tolerance was added. The monitoring checkbox re
 until an authoritative response timestamp can prove the source update existed when received, the
 provider corrects its clock, or a separately tested fail-closed handling policy is approved.
 
+The provider's standard HTTP `Date` response header is now accepted as authoritative receipt
+evidence only when it parses as an aware timestamp and differs from the local response clock by no
+more than five minutes. Missing, malformed, and excessive-skew headers fall back to local receipt
+and continue to reject future source updates; every accepted source update must still be strictly
+before kickoff. Ingestion time is advanced to the trusted observation time when needed, preserving
+`source_updated_at <= observed_at <= ingested_at`. The bounded-clock worker is active as Python
+PID `17720`; its first due Odds job `157` completed successfully after failed old-build job `156`.
+Require consecutive post-fix successes and a clean monitoring report before ticking the checkbox.
+
 The scheduled odds workflow now refreshes cutoff-safe baseline predictions for upcoming priced
 fixtures, reports research-watchlist availability, and reuses an output when the exact cutoff is
 polled again. API-Football intelligence polling creates a separate
