@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { DashboardData, ResearchValueCandidate, ValueSignal } from './types'
-import { ArbitrageResearch, BacktestResearch, InlineError, InlineLoading, Overview, ResourceErrors, SignalResearch, SuccessNotice } from './App'
+import { ArbitrageResearch, BacktestResearch, InlineError, InlineLoading, Methodology, Overview, ResourceErrors, SignalResearch, SuccessNotice } from './App'
 import { chooseDefaultEventId, preserveSelectedEventId } from './lib/events'
 import { eventPath, navigationGroups, readRoute, readView } from './navigation'
 import { UnderdogScanner } from './components/UnderdogScanner'
@@ -182,6 +182,20 @@ describe('Research overview', () => {
     expect(navigate).toHaveBeenCalledWith('data')
     fireEvent.click(screen.getAllByRole('button', { name: 'Open Model performance' })[0]!)
     expect(navigate).toHaveBeenCalledWith('models')
+  })
+})
+
+describe('Methodology', () => {
+  it('documents the operational evidence lifecycle and fail-closed gates', () => {
+    render(<Methodology />)
+
+    expect(screen.getByText('Prediction skips')).toBeInTheDocument()
+    expect(screen.getByText('Lineup evidence')).toBeInTheDocument()
+    expect(screen.getByText('Model promotion')).toBeInTheDocument()
+    expect(screen.getByText('Closing prices')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Operational evidence lifecycle' })).toBeInTheDocument()
+    expect(screen.getByText(/Skip when model or venue-specific history is insufficient/)).toBeInTheDocument()
+    expect(screen.getByText(/latest observed price is never inferred to be closing/)).toBeInTheDocument()
   })
 })
 
