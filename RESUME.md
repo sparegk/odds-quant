@@ -172,7 +172,7 @@ API, service-validation, and CLI JSON tests cover the behavior; the full backend
   `UEFA_HISTORICAL_COVERAGE_PLAN.md` records the resulting source, identity, chronology, and
   promotion gates. The approved CC0 archive has no additional explicit qualification files before
   2024/25, so no result import or model promotion was authorized in this checkpoint.
-- [ ] Keep the scheduler polling only at its configured interval until the old failure jobs,
+- [x] Keep the scheduler polling only at its configured interval until the old failure jobs,
   including sanitized failed job `62`, age out of the recent-job window. Require
   `monitor-collection --fail-on-alerts` to exit successfully, confirm target bookmaker coverage
   has not regressed, and confirm player props and inferred closing prices remain blocked. Record
@@ -263,6 +263,16 @@ otherwise be five minutes. The backoff worker is active as Python PID `18048`; s
 intervening heartbeat skipped Odds, and the first eligible post-backoff job `167` completed
 successfully. One older failure warning remains in monitoring; require another successful Odds job
 and a zero-alert report before ticking the checkbox.
+
+Final monitoring completed on 2026-07-28 after Odds job `173` and API-Football job `174`. Odds had
+six consecutive completed jobs, API-Football had ten, both providers were healthy, and
+`monitor-collection --fail-on-alerts` exited `0` with zero alerts. Job `173` retained both required
+bookmakers for the active Champions League and Conference League qualification feeds; the known
+Premier League Novibet gap remained explicit without a regression alert. The permitted store
+contained only `MATCH_RESULT` and `TOTAL_CORNERS`, player props remained unimplemented, closing
+snapshots remained `0`, and deterministic database checks found no source-after-observation or
+observation-after-ingestion violations. The full backend gate passed: 231 tests, Ruff, formatting,
+and mypy.
 
 The scheduled odds workflow now refreshes cutoff-safe baseline predictions for upcoming priced
 fixtures, reports research-watchlist availability, and reuses an output when the exact cutoff is
