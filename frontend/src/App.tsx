@@ -324,7 +324,7 @@ interface ActiveViewProps {
 function ActiveView(props: ActiveViewProps) {
   switch (props.view) {
     case 'overview':
-      return <Overview dashboard={props.dashboard} onSelectEvent={props.onOpenEvent} />
+      return <Overview dashboard={props.dashboard} onNavigate={navigateToView} onSelectEvent={props.onOpenEvent} />
     case 'matchday':
       return <MatchdayResearch events={props.dashboard.events} onSelectEvent={props.onSelectEvent} />
     case 'event':
@@ -352,7 +352,7 @@ function ActiveView(props: ActiveViewProps) {
   }
 }
 
-function Overview({ dashboard, onSelectEvent }: { dashboard: DashboardData; onSelectEvent: (eventId: number) => void }) {
+export function Overview({ dashboard, onSelectEvent, onNavigate }: { dashboard: DashboardData; onSelectEvent: (eventId: number) => void; onNavigate: (view: ViewKey) => void }) {
   const snapshotCount = dashboard.providers.reduce((sum, provider) => sum + provider.snapshot_count, 0)
   const latestOdds = dashboard.events
     .map((event) => event.latest_odds_at)
@@ -360,6 +360,20 @@ function Overview({ dashboard, onSelectEvent }: { dashboard: DashboardData; onSe
     .sort()
     .at(-1)
   const latestEvaluation = dashboard.evaluations[0]
+  const readiness = dashboard.readiness
+  const monitoring = dashboard.monitoring
+  const coverage = monitoring?.coverage
+  const resourceErrorCount = Object.keys(dashboard.resource_errors).length
+  const actions: Array<{ title: string; detail: string; target: ViewKey; targetLabel: string }> = []
+
+  if (resourceErrorCount) actions.push({ title: 'Restore unavailable resources', detail: `${resourceErrorCount} dashboard resource${resourceErrorCount === 1 ? '' : 's'} failed to load.`, target: 'data', targetLabel: 'Data operations' })
+  if (!monitoring || !monitoring.healthy || monitoring.alerts.length) actions.push({ title: 'Resolve collection monitoring', detail: monitoring ? `${monitoring.alerts.length} active alert${monitoring.alerts.length === 1 ? '' : 's'} across scheduled providers.` : 'No collection monitoring evidence is available.', target: 'data', targetLabel: 'Data operations' })
+  if (coverage && coverage.permitted_final_results < coverage.minimum_evaluation_results) actions.push({ title: 'Complete historical coverage', detail: `${coverage.permitted_final_results} of at least ${coverage.minimum_evaluation_results} permitted final results are stored.`, target: 'data', targetLabel: 'Data operations' })
+  if ((readiness?.model_versions ?? dashboard.models.length) === 0) actions.push({ title: 'Train a leakage-safe baseline', detail: 'No immutable model version is available.', target: 'models', targetLabel: 'Model performance' })
+  if ((readiness?.predictions ?? 0) === 0) actions.push({ title: 'Persist pre-kickoff predictions', detail: 'Upcoming events have no stored cutoff-safe prediction evidence.', target: 'models', targetLabel: 'Model performance' })
+  if ((readiness?.non_demo_calibrated_evaluations ?? dashboard.evaluations.filter((run) => !run.is_demo && run.evaluation_status === 'calibrated').length) === 0) actions.push({ title: 'Establish non-demo calibration', detail: 'Value and underdog outputs remain blocked without a qualifying chronological evaluation.', target: 'models', targetLabel: 'Model performance' })
+  if ((readiness?.signals ?? dashboard.signals.length) === 0) actions.push({ title: 'Generate gated signals', detail: 'No immutable calibrated signals are stored.', target: 'models', targetLabel: 'Model performance' })
+  if ((readiness?.signal_backtests ?? dashboard.backtests.length) === 0) actions.push({ title: 'Run a settled signal replay', detail: 'Bankroll research has no timestamp-valid backtest input.', target: 'backtests', targetLabel: 'Backtesting' })
 
   return (
     <div className="space-y-6">
@@ -372,6 +386,20 @@ function Overview({ dashboard, onSelectEvent }: { dashboard: DashboardData; onSe
           value={dashboard.models.length ? "Baseline available" : "Untrained"}
           tone={dashboard.models.length ? "default" : "amber"}
         />
+      </section>
+
+      <section aria-labelledby="priority-actions-title">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+          <div><p className="text-xs font-bold uppercase text-emerald-700">Control surface</p><h2 className="mt-1 text-lg font-bold" id="priority-actions-title">Priority actions</h2></div>
+          <span className={`rounded-[4px] border px-2 py-1 text-xs font-bold ${actions.length ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>{actions.length ? `${actions.length} OPEN` : 'ALL CLEAR'}</span>
+        </div>
+        {actions.length ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {actions.map((action) => <article className="flex min-h-36 flex-col border border-zinc-200 bg-white p-4" key={action.title}>
+            <h3 className="font-bold">{action.title}</h3>
+            <p className="mt-2 flex-1 text-sm leading-6 text-zinc-600">{action.detail}</p>
+            <button className="mt-4 self-start border border-zinc-300 px-3 py-2 text-xs font-bold hover:border-zinc-600" onClick={() => onNavigate(action.target)} type="button">Open {action.targetLabel}</button>
+          </article>)}
+        </div> : <div className="flex items-start gap-3 border-l-4 border-emerald-500 bg-emerald-50 px-4 py-3 text-sm text-emerald-950"><CheckCircle2 aria-hidden="true" className="mt-0.5 shrink-0" size={18} /><p>Collection, historical coverage, model, calibration, signal, and backtest prerequisites are available. Inspect their individual evidence before interpreting any output.</p></div>}
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.7fr)]">

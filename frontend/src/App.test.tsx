@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { DashboardData, ResearchValueCandidate, ValueSignal } from './types'
-import { ArbitrageResearch, BacktestResearch, InlineError, InlineLoading, ResourceErrors, SignalResearch, SuccessNotice } from './App'
+import { ArbitrageResearch, BacktestResearch, InlineError, InlineLoading, Overview, ResourceErrors, SignalResearch, SuccessNotice } from './App'
 import { chooseDefaultEventId, preserveSelectedEventId } from './lib/events'
 import { eventPath, navigationGroups, readRoute, readView } from './navigation'
 import { UnderdogScanner } from './components/UnderdogScanner'
@@ -163,6 +163,25 @@ describe('site navigation', () => {
       'data',
       'methodology',
     ])
+  })
+})
+
+describe('Research overview', () => {
+  it('prioritizes evidence blockers and routes to the responsible tabs', () => {
+    const navigate = vi.fn()
+    render(<Overview dashboard={dashboard} onNavigate={navigate} onSelectEvent={() => undefined} />)
+
+    expect(screen.getByRole('heading', { name: 'Priority actions' })).toBeInTheDocument()
+    expect(screen.getByText('5 OPEN')).toBeInTheDocument()
+    expect(screen.getByText('Resolve collection monitoring')).toBeInTheDocument()
+    expect(screen.getByText('Train a leakage-safe baseline')).toBeInTheDocument()
+    expect(screen.getByText('Establish non-demo calibration')).toBeInTheDocument()
+    expect(screen.getByText('Run a settled signal replay')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Data operations' }))
+    expect(navigate).toHaveBeenCalledWith('data')
+    fireEvent.click(screen.getAllByRole('button', { name: 'Open Model performance' })[0]!)
+    expect(navigate).toHaveBeenCalledWith('models')
   })
 })
 
