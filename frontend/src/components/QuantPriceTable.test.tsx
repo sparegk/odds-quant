@@ -1,5 +1,5 @@
-import { render, screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { cleanup, render, screen, within } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
 
 import type { MarketComparison } from '../types'
 import { QuantPriceTable } from './QuantPriceTable'
@@ -52,6 +52,8 @@ const market: MarketComparison = {
   ],
 }
 
+afterEach(cleanup)
+
 describe('QuantPriceTable', () => {
   it('renders distinct raw, vig-free, fair, margin, and best-price fields', () => {
     render(<QuantPriceTable market={market} />)
@@ -64,5 +66,18 @@ describe('QuantPriceTable', () => {
     expect(cells.getByText('2.33')).toBeInTheDocument()
     expect(cells.getByText('5.0%')).toBeInTheDocument()
     expect(cells.getByLabelText('Best available price')).toBeInTheDocument()
+    expect(screen.getByLabelText('Market evidence summary')).toHaveTextContent('Bookmakers1')
+    expect(screen.getByLabelText('Market evidence summary')).toHaveTextContent('Explicit closing0')
+    expect(cells.getByText('Demo provider')).toBeInTheDocument()
+    expect(cells.getByText('DEMO DATA')).toBeInTheDocument()
+    expect(cells.getByText('NON-CLOSING')).toBeInTheDocument()
+    expect(screen.getByText(/Do not infer closing price or CLV/)).toBeInTheDocument()
+  })
+
+  it('labels explicit closing evidence without showing the inference warning', () => {
+    render(<QuantPriceTable market={{ ...market, snapshots: [{ ...market.snapshots[0]!, is_closing: true, is_demo: false, source_label: 'Provider closing flag' }] }} />)
+
+    expect(screen.getByText('EXPLICIT CLOSING')).toBeInTheDocument()
+    expect(screen.queryByText(/Do not infer closing price or CLV/)).not.toBeInTheDocument()
   })
 })

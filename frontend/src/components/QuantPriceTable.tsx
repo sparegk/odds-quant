@@ -1,6 +1,6 @@
 import { Check } from 'lucide-react'
 
-import { formatOdds, formatPercent } from '../lib/format'
+import { formatDateTime, formatOdds, formatPercent } from '../lib/format'
 import type { MarketComparison } from '../types'
 import { FreshnessBadge } from './FreshnessBadge'
 
@@ -10,10 +10,20 @@ interface QuantPriceTableProps {
 
 export function QuantPriceTable({ market }: QuantPriceTableProps) {
   const best = new Map(market.best_prices.map((price) => [price.selection_code, price]))
+  const bookmakerCount = new Set(market.snapshots.map((snapshot) => snapshot.bookmaker_id)).size
+  const staleCount = market.snapshots.filter((snapshot) => snapshot.is_stale).length
+  const closingCount = market.snapshots.filter((snapshot) => snapshot.is_closing).length
 
   return (
-    <div className="w-full max-w-full overflow-x-auto border-y border-zinc-200 bg-white">
-      <table className="w-full min-w-[940px] border-collapse text-left text-sm">
+    <div className="w-full max-w-full border-y border-zinc-200 bg-white">
+      <dl aria-label="Market evidence summary" className="grid grid-cols-2 border-b border-zinc-200 bg-zinc-50 text-xs sm:grid-cols-4">
+        <EvidenceSummary label="Bookmakers" value={String(bookmakerCount)} />
+        <EvidenceSummary label="Snapshots" value={String(market.snapshots.length)} />
+        <EvidenceSummary label="Stale" value={String(staleCount)} warning={staleCount > 0} />
+        <EvidenceSummary label="Explicit closing" value={String(closingCount)} warning={closingCount === 0} />
+      </dl>
+      <div className="overflow-x-auto">
+      <table className="w-full min-w-[1180px] border-collapse text-left text-sm">
         <thead className="bg-zinc-50 text-xs font-semibold uppercase text-zinc-500">
           <tr>
             <th className="px-4 py-3">Bookmaker</th>
@@ -24,6 +34,8 @@ export function QuantPriceTable({ market }: QuantPriceTableProps) {
             <th className="px-4 py-3 text-right">Fair odds</th>
             <th className="px-4 py-3 text-right">Margin</th>
             <th className="px-4 py-3">Freshness</th>
+            <th className="px-4 py-3">Observed / source</th>
+            <th className="px-4 py-3">Evidence</th>
           </tr>
         </thead>
         <tbody>
@@ -55,12 +67,20 @@ export function QuantPriceTable({ market }: QuantPriceTableProps) {
                   <td className="px-4 py-3">
                     <FreshnessBadge seconds={snapshot.freshness_seconds} stale={snapshot.is_stale} />
                   </td>
+                  <td className="px-4 py-3 text-xs text-zinc-600"><p>{formatDateTime(snapshot.observed_at)}</p><p className="mt-1 text-zinc-400">Source {snapshot.source_updated_at ? formatDateTime(snapshot.source_updated_at) : 'timestamp unavailable'}</p></td>
+                  <td className="px-4 py-3 text-xs"><p className="font-semibold">{snapshot.provider}</p><p className="mt-1 text-zinc-500">{snapshot.source_label}</p><span className={`mt-1 inline-block border px-1.5 py-0.5 font-bold ${snapshot.is_closing ? 'border-sky-200 bg-sky-50 text-sky-800' : 'border-zinc-200 bg-zinc-50 text-zinc-600'}`}>{snapshot.is_closing ? 'EXPLICIT CLOSING' : 'NON-CLOSING'}</span></td>
                 </tr>
               )
             }),
           )}
         </tbody>
       </table>
+      </div>
+      {!closingCount ? <p className="border-t border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900">No snapshot carries explicit closing provenance. Do not infer closing price or CLV from the latest observed row.</p> : null}
     </div>
   )
+}
+
+function EvidenceSummary({ label, value, warning = false }: { label: string; value: string; warning?: boolean }) {
+  return <div className="border-r border-zinc-200 px-3 py-2"><dt className="font-semibold uppercase text-zinc-500">{label}</dt><dd className={`mt-1 font-mono font-bold ${warning ? 'text-amber-700' : 'text-zinc-800'}`}>{value}</dd></div>
 }
