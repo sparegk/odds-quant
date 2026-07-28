@@ -208,13 +208,17 @@ successfully with no alerts; both required bookmakers remain covered for the act
 qualification competitions, no closing snapshots were inferred, and Premier League Novibet
 coverage remains explicitly blocked rather than fabricated.
 
-Job `127` is still inside the per-provider last-10 window and job `128` provides only one
-consecutive Odds success. Leave PID `10472` running at its configured adaptive cadence. Require at
-least one further consecutive success for provider health and nine further successful Odds jobs
-after `128` for job `127` to age out before ticking the monitoring checkbox. A narrowly scoped
-diagnostic now records the provider adapter's own validated `OddsApiIoError` reason while retaining
-generic, secret-safe messages for unexpected exceptions; it takes effect on a future normal worker
-restart and must not be used as a reason to restart this healthy process.
+The original recovery continued with successful job `129`, transient fail-closed Odds jobs `131`
+and `132`, then consecutive successful jobs `133` and `134`. Both providers returned to healthy,
+but the recent-window repeated-failure warning remains. The worker was replaced after job `134`
+with the cadence-safe build as Python PID `9108`; its startup correctly skipped both providers
+because neither configured interval was due. API-Football now applies the same persisted-job
+restart guard as Odds, preventing restarts from accelerating its licensed request cadence.
+
+Leave PID `9108` running at its configured adaptive cadence. Eight further successful Odds jobs
+after `134` are required for newest failure `132` to age out before ticking the monitoring
+checkbox. The active worker records the provider adapter's own validated `OddsApiIoError` reason
+while retaining generic, secret-safe messages for unexpected exceptions.
 
 The scheduled odds workflow now refreshes cutoff-safe baseline predictions for upcoming priced
 fixtures, reports research-watchlist availability, and reuses an output when the exact cutoff is

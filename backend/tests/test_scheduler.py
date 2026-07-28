@@ -15,12 +15,13 @@ from app.collectors.registry import (
     registered_odds_providers,
 )
 from app.core.config import Settings
-from app.db.models import Event, FixtureObservation, OddsSnapshot, ProviderJob
+from app.db.models import Event, FixtureObservation, OddsSnapshot, Provider, ProviderJob
 from app.db.session import Base
 from app.jobs.scheduler import (
     SensitiveQueryFilter,
     adaptive_poll_seconds,
     build_scheduler,
+    poll_api_football_intelligence,
     poll_registered_providers_adaptively,
     register_configured_providers,
     run_provider_collection,
@@ -286,6 +287,49 @@ def test_provider_polling_defaults_to_fifteen_minutes() -> None:
     assert Settings().provider_near_kickoff_poll_seconds == 300
     assert Settings().provider_near_kickoff_window_seconds == 21600
     assert Settings().api_football_poll_seconds == 1800
+
+
+def test_api_football_restart_skips_before_configured_interval(
+    sessions: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with sessions() as session:
+        provider = Provider(
+            slug="api-football",
+            name="API-Football",
+            kind="licensed_api",
+            is_demo=False,
+            terms_url="https://www.api-football.com/terms",
+            capabilities={},
+        )
+        session.add(provider)
+        session.flush()
+        session.add(
+            ProviderJob(
+                provider_id=provider.id,
+                job_type="collect_football_intelligence",
+                status="completed",
+                finished_at=AS_OF,
+                message="completed",
+                metrics={},
+                created_at=AS_OF,
+            )
+        )
+        session.commit()
+
+    def unexpected_client(*args: object, **kwargs: object) -> None:
+        raise AssertionError("API-Football must not be called before its interval")
+
+    monkeypatch.setattr("app.jobs.scheduler.ApiFootballClient", unexpected_client)
+
+    job_id = poll_api_football_intelligence(
+        settings=Settings(api_football_key="configured-secret"),
+        session_factory=sessions,
+        now=AS_OF + timedelta(minutes=29),
+    )
+
+    assert job_id is None
+    with sessions() as session:
+        assert session.scalar(select(func.count()).select_from(ProviderJob)) == 1
 
 
 def test_scheduler_registers_api_football_poll_only_when_configured() -> None:

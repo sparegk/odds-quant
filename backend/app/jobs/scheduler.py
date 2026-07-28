@@ -359,6 +359,17 @@ def poll_api_football_intelligence(
     current = _utc(now or datetime.now(UTC))
     with session_factory() as session:
         provider = session.scalar(select(Provider).where(Provider.slug == "api-football"))
+        if provider is not None:
+            latest_started = session.scalar(
+                select(ProviderJob.created_at)
+                .where(ProviderJob.provider_id == provider.id)
+                .order_by(ProviderJob.created_at.desc(), ProviderJob.id.desc())
+                .limit(1)
+            )
+            if latest_started is not None:
+                elapsed = (current - _utc(latest_started)).total_seconds()
+                if elapsed < runtime_settings.api_football_poll_seconds:
+                    return None
         if provider is None:
             provider = Provider(
                 slug="api-football",
