@@ -79,6 +79,19 @@ export interface CollectionAlert {
   detail: string
 }
 
+export interface PredictionRefreshMonitoring {
+  provider_job_id: number
+  provider_slug: string
+  job_created_at: string
+  job_finished_at: string
+  eligible_events: number
+  predictions_created: number
+  predictions_reused: number
+  events_skipped: number
+  research_candidates_available: number
+  skip_reasons: Record<string, number>
+}
+
 export interface CollectionMonitoring {
   observed_at: string
   expected_poll_seconds: number
@@ -86,6 +99,7 @@ export interface CollectionMonitoring {
   healthy: boolean
   providers: ProviderCollectionHealth[]
   alerts: CollectionAlert[]
+  latest_prediction_refresh: PredictionRefreshMonitoring | null
   coverage: DataCoverage
 }
 

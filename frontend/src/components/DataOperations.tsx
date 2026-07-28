@@ -34,6 +34,10 @@ function CollectionMonitoringPanel({ monitoring }: { monitoring: CollectionMonit
     return <section><Heading eyebrow="Scheduler" title="Collection monitoring" /><Empty text="Collection monitoring is unavailable." /></section>
   }
   const healthy = monitoring.healthy && monitoring.alerts.length === 0
+  const refresh = monitoring.latest_prediction_refresh
+  const skipReasons = refresh
+    ? Object.entries(refresh.skip_reasons).sort(([leftCode, leftCount], [rightCode, rightCount]) => rightCount - leftCount || leftCode.localeCompare(rightCode))
+    : []
   return <section>
     <Heading eyebrow="Scheduler" title="Collection monitoring" />
     <div className={`border-l-4 px-5 py-4 ${healthy ? 'border-emerald-500 bg-emerald-50' : 'border-rose-500 bg-rose-50'}`} role={healthy ? 'status' : 'alert'}>
@@ -60,12 +64,56 @@ function CollectionMonitoringPanel({ monitoring }: { monitoring: CollectionMonit
         {provider.blockers.length ? <div className="mt-3 text-xs text-rose-800">{provider.blockers.map((blocker) => <p key={blocker}>{humanizeCode(blocker)}</p>)}</div> : null}
       </article>)}
     </div>
+    <PredictionRefreshPanel refresh={refresh} skipReasons={skipReasons} />
     {monitoring.alerts.length ? <div className="mt-3 space-y-2" role="list" aria-label="Collection alerts">{monitoring.alerts.map((alert, index) => <article className="border border-rose-200 bg-white p-4 text-sm" key={`${alert.code}-${alert.provider_slug}-${alert.competition ?? 'all'}-${alert.bookmaker ?? 'all'}-${index}`} role="listitem">
       <div className="flex flex-wrap items-center justify-between gap-2"><p className="font-bold text-rose-900">{humanizeCode(alert.code)}</p><Badge status={alert.severity} /></div>
       <p className="mt-2 text-zinc-700">{alert.detail}</p>
       <p className="mt-1 text-xs text-zinc-500">{[alert.provider_slug, alert.competition, alert.bookmaker].filter(Boolean).join(' / ')}</p>
     </article>)}</div> : <p className="mt-3 text-xs text-zinc-500">No collection alerts detected.</p>}
   </section>
+}
+
+function PredictionRefreshPanel({ refresh, skipReasons }: { refresh: CollectionMonitoring['latest_prediction_refresh']; skipReasons: [string, number][] }) {
+  if (!refresh) {
+    return <div className="mt-3 border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">No valid non-demo prediction-refresh summary is available from a completed provider job.</div>
+  }
+  const accountedReasons = skipReasons.reduce((total, [, count]) => total + count, 0)
+  return <article className="mt-3 border border-zinc-200 bg-white" aria-labelledby="prediction-refresh-title">
+    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-200 p-4">
+      <div>
+        <p className="text-xs font-bold uppercase text-emerald-700">Latest scheduler output</p>
+        <h3 className="mt-1 font-bold" id="prediction-refresh-title">Prediction refresh</h3>
+        <p className="mt-1 text-xs text-zinc-500">{refresh.provider_slug} job #{refresh.provider_job_id} / finished {formatDateTime(refresh.job_finished_at)}</p>
+      </div>
+      <span className="rounded-[4px] border border-sky-200 bg-sky-50 px-2 py-1 text-xs font-bold text-sky-800">POINT-IN-TIME</span>
+    </div>
+    <dl className="grid grid-cols-2 border-b border-zinc-200 sm:grid-cols-3 xl:grid-cols-6">
+      <RefreshMetric label="Eligible events" value={refresh.eligible_events} />
+      <RefreshMetric label="Created" value={refresh.predictions_created} />
+      <RefreshMetric label="Reused" value={refresh.predictions_reused} />
+      <RefreshMetric label="Skipped" value={refresh.events_skipped} />
+      <RefreshMetric label="Watchlist" value={refresh.research_candidates_available} />
+      <RefreshMetric label="Reasons accounted" value={accountedReasons} />
+    </dl>
+    <div className="p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h4 className="text-sm font-bold">Fail-closed skip reasons</h4>
+        <p className="text-xs text-zinc-500">Created {formatDateTime(refresh.job_created_at)}</p>
+      </div>
+      {skipReasons.length ? <div className="mt-3 grid gap-2 md:grid-cols-2">
+        {skipReasons.map(([code, count]) => <div className="flex items-center justify-between gap-3 border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm" key={code}>
+          <span>{humanizeCode(code)}</span>
+          <span className="font-mono font-bold">{count}</span>
+        </div>)}
+      </div> : <p className="mt-3 text-sm text-zinc-500">No events were skipped by the latest refresh.</p>}
+      {accountedReasons !== refresh.events_skipped ? <p className="mt-3 border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900" role="alert">Skip-reason counts do not reconcile with the stored skipped-event total. Treat this refresh as invalid monitoring evidence.</p> : null}
+      <p className="mt-3 text-xs leading-5 text-zinc-500">Watchlist candidates are research-only. This summary reports scheduler decisions and does not establish calibration, value, or profitability.</p>
+    </div>
+  </article>
+}
+
+function RefreshMetric({ label, value }: { label: string; value: number }) {
+  return <div className="border-r border-b border-zinc-200 p-3 last:border-r-0"><dt className="text-xs font-semibold uppercase text-zinc-500">{label}</dt><dd className="mt-1 font-mono text-lg font-bold">{value}</dd></div>
 }
 
 function ImportPanel({ adminKey, kind, title, detail, onChanged }: { adminKey: string; kind: UploadKind; title: string; detail: string; onChanged?: () => Promise<void> | void }) {

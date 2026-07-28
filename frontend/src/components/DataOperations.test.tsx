@@ -33,6 +33,21 @@ const healthyMonitoring: CollectionMonitoring = {
     blockers: [],
   }],
   alerts: [],
+  latest_prediction_refresh: {
+    provider_job_id: 64,
+    provider_slug: 'odds-api-io',
+    job_created_at: '2026-07-24T12:46:21Z',
+    job_finished_at: '2026-07-24T12:46:23Z',
+    eligible_events: 42,
+    predictions_created: 3,
+    predictions_reused: 0,
+    events_skipped: 39,
+    research_candidates_available: 5,
+    skip_reasons: {
+      insufficient_home_team_home_history: 33,
+      insufficient_away_team_away_history: 6,
+    },
+  },
   coverage: {
     minimum_evaluation_results: 200,
     required_bookmakers: ['Allwyn / Pamestoixima', 'Novibet'],
@@ -67,6 +82,31 @@ describe('DataOperations', () => {
     expect(screen.getByText('Odds-API.io')).toBeInTheDocument()
     expect(screen.getByText('#31 / Completed')).toBeInTheDocument()
     expect(screen.getByText('No collection alerts detected.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Prediction refresh' })).toBeInTheDocument()
+    expect(screen.getByText('odds-api-io job #64', { exact: false })).toBeInTheDocument()
+    expect(screen.getByText('Insufficient Home Team Home History')).toBeInTheDocument()
+    expect(screen.getByText('Insufficient Away Team Away History')).toBeInTheDocument()
+    expect(screen.getByText('Watchlist').parentElement).toHaveTextContent('5')
+    expect(screen.getByText('Reasons accounted').parentElement).toHaveTextContent('39')
+  })
+
+  it('fails closed when prediction-refresh reasons do not reconcile', () => {
+    const monitoring: CollectionMonitoring = {
+      ...healthyMonitoring,
+      latest_prediction_refresh: {
+        ...healthyMonitoring.latest_prediction_refresh!,
+        events_skipped: 40,
+      },
+    }
+    render(<DataOperations dashboard={{ ...baseDashboard, monitoring }} />)
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Skip-reason counts do not reconcile')
+  })
+
+  it('explains when no valid prediction-refresh summary is available', () => {
+    render(<DataOperations dashboard={{ ...baseDashboard, monitoring: { ...healthyMonitoring, latest_prediction_refresh: null } }} />)
+
+    expect(screen.getByText(/No valid non-demo prediction-refresh summary/)).toBeInTheDocument()
   })
 
   it('shows a critical provider failure', () => {
