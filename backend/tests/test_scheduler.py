@@ -456,6 +456,60 @@ def test_adaptive_polling_skips_restart_duplicate_until_interval_is_due(
         assert session.scalar(select(func.count()).select_from(FixtureObservation)) == 1
 
 
+def test_adaptive_polling_backs_off_to_base_interval_after_http_429(
+    sessions: sessionmaker[Session],
+) -> None:
+    provider = FixtureOnlyProvider(
+        [
+            FixtureImportRow(
+                provider_event_key="rate-limited-fixture",
+                competition="UEFA Conference League Qualification",
+                country="International",
+                season="2026/27",
+                kickoff_at=AS_OF + timedelta(hours=2),
+                home_team="Rate Limited Home",
+                away_team="Rate Limited Away",
+                observed_at=AS_OF - timedelta(minutes=1),
+            )
+        ]
+    )
+    register_odds_provider(provider)
+    settings = Settings(
+        seed_demo=False,
+        provider_poll_seconds=900,
+        provider_near_kickoff_poll_seconds=300,
+        provider_near_kickoff_window_seconds=21600,
+    )
+
+    assert (
+        poll_registered_providers_adaptively(settings=settings, session_factory=sessions, now=AS_OF)
+        == 1
+    )
+    with sessions() as session:
+        job = session.scalar(select(ProviderJob))
+        assert job is not None
+        job.status = "failed"
+        job.message = "Collection failed (OddsApiIoError): odds provider returned HTTP 429"
+        session.commit()
+
+    assert (
+        poll_registered_providers_adaptively(
+            settings=settings,
+            session_factory=sessions,
+            now=AS_OF + timedelta(seconds=899),
+        )
+        == 0
+    )
+    assert (
+        poll_registered_providers_adaptively(
+            settings=settings,
+            session_factory=sessions,
+            now=AS_OF + timedelta(seconds=900),
+        )
+        == 1
+    )
+
+
 def test_scheduler_wakes_at_near_kickoff_cadence() -> None:
     scheduler = build_scheduler(
         Settings(

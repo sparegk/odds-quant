@@ -256,6 +256,14 @@ before kickoff. Ingestion time is advanced to the trusted observation time when 
 PID `17720`; its first due Odds job `157` completed successfully after failed old-build job `156`.
 Require consecutive post-fix successes and a clean monitoring report before ticking the checkbox.
 
+The bounded HTTP-clock worker completed consecutive jobs `157` through `165`, then scheduled job
+`166` exhausted its bounded internal retries on HTTP 429. A persisted 429 now forces the next Odds
+collection to wait at least the normal 15-minute interval even when near-kickoff cadence would
+otherwise be five minutes. The backoff worker is active as Python PID `18048`; startup and the
+intervening heartbeat skipped Odds, and the first eligible post-backoff job `167` completed
+successfully. One older failure warning remains in monitoring; require another successful Odds job
+and a zero-alert report before ticking the checkbox.
+
 The scheduled odds workflow now refreshes cutoff-safe baseline predictions for upcoming priced
 fixtures, reports research-watchlist availability, and reuses an output when the exact cutoff is
 polled again. API-Football intelligence polling creates a separate

@@ -326,17 +326,20 @@ def poll_registered_providers_adaptively(
             provider = session.scalar(
                 select(Provider).where(Provider.slug == provider_adapter.slug)
             )
-            latest_started = None
+            latest_job = None
             if provider is not None:
-                latest_started = session.scalar(
-                    select(ProviderJob.created_at)
+                latest_job = session.scalar(
+                    select(ProviderJob)
                     .where(ProviderJob.provider_id == provider.id)
                     .order_by(ProviderJob.created_at.desc(), ProviderJob.id.desc())
                     .limit(1)
                 )
-        if latest_started is not None:
-            elapsed = (current - _utc(latest_started)).total_seconds()
-            if elapsed < interval:
+        if latest_job is not None:
+            provider_interval = interval
+            if latest_job.status == "failed" and "HTTP 429" in latest_job.message:
+                provider_interval = max(provider_interval, runtime_settings.provider_poll_seconds)
+            elapsed = (current - _utc(latest_job.created_at)).total_seconds()
+            if elapsed < provider_interval:
                 continue
         run_provider_collection(provider_adapter, session_factory=session_factory, now=current)
         jobs_started += 1
