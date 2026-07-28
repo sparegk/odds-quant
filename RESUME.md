@@ -192,6 +192,14 @@ API, service-validation, and CLI JSON tests cover the behavior; the full backend
   redundantly. All persisted non-demo outputs have zero input-cutoff and kickoff chronology
   violations. No bookmaker/closing benchmark or profitability conclusion is authorized. Model
   and evaluation tests passed (24 tests).
+- [x] Verify cutoff-safe prediction persistence and fail-closed signal generation. The active
+  scheduler persisted current non-demo team-baseline outputs with three market probabilities per
+  event, exact `inputs_as_of == predicted_at` cutoffs, and prediction times strictly before
+  kickoff. The live watchlist exposed three `research_only` candidates; every candidate was
+  blocked by an unvalidated model and fewer than eight venue-specific matches per team. Running
+  the executable generator against current output `212` was rejected with `model is not
+  calibrated`, and a post-attempt audit confirmed zero non-demo `ValueSignal` rows. Modeling,
+  signal-policy, signal-service, and scheduler tests passed (46 tests).
 
 ### In-progress scheduler recovery (2026-07-27)
 
