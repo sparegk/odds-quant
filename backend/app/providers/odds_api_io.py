@@ -687,8 +687,17 @@ def _require_prematch_market_timestamp(
 ) -> None:
     if market.updated_at is None:
         raise OddsApiIoError(f"odds provider {label} market lacks an update timestamp")
-    if market.updated_at > observed_at or market.updated_at >= event.date:
-        raise OddsApiIoError(f"odds provider returned an invalid pre-match {label} timestamp")
+    if market.updated_at >= event.date:
+        raise OddsApiIoError(
+            f"odds provider returned an invalid pre-match {label} timestamp: "
+            "source update is at or after kickoff"
+        )
+    if market.updated_at > observed_at:
+        ahead_seconds = (market.updated_at - observed_at).total_seconds()
+        raise OddsApiIoError(
+            f"odds provider returned an invalid pre-match {label} timestamp: "
+            f"source update exceeds response receipt by {ahead_seconds:.3f} seconds"
+        )
 
 
 def _target_bookmaker_markets(

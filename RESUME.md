@@ -238,6 +238,15 @@ were cadence-skipped, and its first due Odds job `144` completed successfully. T
 repeated-failure alert cleared, but job `143` remains in the last-10 Odds window. Nine further
 successful Odds jobs after `144` are required before the monitoring checkbox can be ticked.
 
+Subsequent scheduled jobs showed that response receipt timing alone does not resolve the provider
+clock inconsistency. Jobs `145`, `149`, and `151` failed the same timestamp gate, job `146` failed
+closed on HTTP 429, and jobs `147`, `150`, `152`, and `153` completed without weakening atomic
+validation. The replacement diagnostic worker is active as Python PID `18664`. Its first due Odds
+job `155` measured the unsafe match-result source update at `55.682` seconds after local response
+receipt. No arbitrary clock-skew tolerance was added. The monitoring checkbox remains blocked
+until an authoritative response timestamp can prove the source update existed when received, the
+provider corrects its clock, or a separately tested fail-closed handling policy is approved.
+
 The scheduled odds workflow now refreshes cutoff-safe baseline predictions for upcoming priced
 fixtures, reports research-watchlist availability, and reuses an output when the exact cutoff is
 polled again. API-Football intelligence polling creates a separate
