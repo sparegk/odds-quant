@@ -21,6 +21,7 @@ export function ModelPerformance({ dashboard, onChanged }: { dashboard: Dashboar
       <div className="min-w-0 space-y-7">
         <section className="border border-zinc-200 bg-white"><div className="flex flex-wrap items-start justify-between gap-4 p-5"><div><p className="text-xs font-bold uppercase text-emerald-700">{selected.name}</p><h3 className="mt-1 text-xl font-bold">{selected.version}</h3><p className="mt-1 text-sm text-zinc-500">{selected.is_demo ? 'DEMO TRAINING DATA' : 'PERMITTED EXTERNAL HISTORY'}</p></div><Status status={selected.evaluation_status} /></div><div className="grid grid-cols-2 border-t border-zinc-200 md:grid-cols-4"><Metric label="Training matches" value={selected.sample_size.toString()} /><Metric label="Feature version" value={selected.feature_version} /><Metric label="Evaluations" value={evaluations.length.toString()} /><Metric label="Registry status" value={humanizeCode(selected.status)} /></div><div className="grid gap-2 border-t border-zinc-200 px-5 py-4 text-xs text-zinc-500 sm:grid-cols-2"><p>Training window: {formatDateTime(selected.training_start)} to {formatDateTime(selected.training_end)}</p><p>Created: {formatDateTime(selected.created_at)}</p><p className="font-mono">Data fingerprint: {selected.data_fingerprint}</p><p>Model ID #{selected.id}</p></div></section>
         <EvaluationSummary run={latest} />
+        <PromotionReadiness run={latest} />
         <Calibration run={latest} />
         <section><Heading eyebrow="Immutable history" title="Evaluation runs" />{evaluations.length ? <div className="overflow-x-auto border-y border-zinc-200 bg-white"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-zinc-50 text-xs uppercase text-zinc-500"><tr><th className="px-4 py-3">Window end</th><th className="px-4 py-3">Evidence</th><th className="px-4 py-3 text-right">Matches</th><th className="px-4 py-3 text-right">Brier</th><th className="px-4 py-3 text-right">Log loss</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Fingerprint</th></tr></thead><tbody>{evaluations.map((run) => <tr key={run.id} className="border-t border-zinc-100"><td className="px-4 py-3">{formatDateTime(run.evaluation_end)}</td><td className="px-4 py-3">{run.is_demo ? 'DEMO ONLY' : 'EXTERNAL HISTORY'}</td><td className="px-4 py-3 text-right font-mono">{numberMetric(run, 'evaluated_events', 0)}</td><td className="px-4 py-3 text-right font-mono">{score(run, 'brier_score')}</td><td className="px-4 py-3 text-right font-mono">{score(run, 'log_loss')}</td><td className="px-4 py-3"><Status status={run.evaluation_status} /></td><td className="px-4 py-3 font-mono text-xs">{run.fingerprint.slice(0, 12)}</td></tr>)}</tbody></table></div> : <ModelEmpty title="No linked chronological evaluations" detail="Evaluate this exact model version with expanding-window cutoffs before interpreting its forecasts." />}</section>
       </div>
@@ -32,6 +33,21 @@ export function ModelPerformance({ dashboard, onChanged }: { dashboard: Dashboar
 function EvaluationSummary({ run }: { run: EvaluationRun | undefined }) {
   if (!run) return <ModelEmpty title="Performance is not established" detail="This trained version has no chronological held-out evaluation. It cannot unlock calibrated value signals." />
   return <section><Heading eyebrow="Latest chronological replay" title="Proper-score performance" /><div className="grid grid-cols-2 border border-zinc-200 bg-white md:grid-cols-4"><Metric label="1X2 Brier" value={formatScoreInterval(run.metrics, 'brier_score')} /><Metric label="Log loss" value={formatScoreInterval(run.metrics, 'log_loss')} /><Metric label="Calibration error" value={percent(value(run, 'expected_calibration_error'))} /><Metric label="Coverage" value={`${numberMetric(run, 'evaluated_events', 0)} / ${numberMetric(run, 'candidate_events', 0)}`} /></div><BenchmarkComparison run={run} /></section>
+}
+
+function PromotionReadiness({ run }: { run: EvaluationRun | undefined }) {
+  if (!run) return null
+  const evaluated = numberMetric(run, 'evaluated_events', 0)
+  const candidates = numberMetric(run, 'candidate_events', 0)
+  const uniformEvidence = comparisonEvidence('Uniform', run.benchmarks.uniform)
+  const gates = [
+    ['Permitted external history', !run.is_demo, run.is_demo ? 'Demo evidence cannot promote a model.' : 'Non-demo evaluation provenance retained.'],
+    ['Complete replay coverage', evaluated > 0 && evaluated === candidates, `${evaluated} of ${candidates} candidate events evaluated.`],
+    ['Calibration policy', run.evaluation_status === 'calibrated', `Stored status: ${humanizeCode(run.evaluation_status)}.`],
+    ['Uniform benchmark', uniformEvidence === 'POISSON BETTER', `Paired interval verdict: ${uniformEvidence}.`],
+  ] as const
+  const ready = gates.every(([, passed]) => passed)
+  return <section><Heading eyebrow="Promotion control" title="Model promotion readiness" /><div className={`border-l-4 p-4 ${ready ? 'border-emerald-500 bg-emerald-50' : 'border-amber-400 bg-amber-50'}`}><div className="flex items-center justify-between gap-3"><p className="font-bold">{ready ? 'Promotion evidence gates passed' : 'Promotion remains blocked'}</p><span className="border border-black/10 bg-white px-2 py-1 text-xs font-bold">{ready ? 'READY' : 'BLOCKED'}</span></div><div className="mt-3 grid gap-2 md:grid-cols-2">{gates.map(([label, passed, detail]) => <div className="border border-black/10 bg-white/70 p-3 text-xs" key={label}><div className="flex items-center justify-between gap-2"><p className="font-bold">{label}</p><span className={passed ? 'text-emerald-700' : 'text-amber-800'}>{passed ? 'PASS' : 'BLOCKED'}</span></div><p className="mt-1 text-zinc-600">{detail}</p></div>)}</div><p className="mt-3 text-xs leading-5">This is a research promotion gate, not permission to claim profitability or automate staking.</p></div></section>
 }
 
 function BenchmarkComparison({ run }: { run: EvaluationRun }) {
