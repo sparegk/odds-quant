@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import type { BankrollSimulation } from '../types'
-import { BankrollResult } from './BankrollResearch'
+import { BankrollResult, BankrollStressComparison } from './BankrollResearch'
 
 const simulation: BankrollSimulation = {
   backtest_run_id: 4,
@@ -35,5 +35,16 @@ describe('BankrollResult', () => {
     expect(screen.getByText('25.00')).toBeInTheDocument()
     expect(screen.getByText('RESEARCH ONLY')).toBeInTheDocument()
     expect(screen.getByText(/not a forecast of future returns/)).toBeInTheDocument()
+  })
+
+  it('compares stored strategy paths without presenting forecast uncertainty', () => {
+    render(<BankrollStressComparison simulations={[simulation, { ...simulation, simulation_fingerprint: 'flat-simulation', strategy: 'flat', final_bankroll: 1010, maximum_drawdown_fraction: 0.05, bets_placed: 10, bets_skipped: 5 }]} />)
+
+    expect(screen.getByRole('heading', { name: 'Stored parameter comparisons' })).toBeInTheDocument()
+    expect(screen.getByText('fractional kelly')).toBeInTheDocument()
+    expect(screen.getByText('flat')).toBeInTheDocument()
+    expect(screen.getByText('Final-bankroll spread').parentElement).toHaveTextContent('32.50')
+    expect(screen.getByText('Worst drawdown').parentElement).toHaveTextContent('5.0%')
+    expect(screen.getByText(/not forecast uncertainty/)).toBeInTheDocument()
   })
 })

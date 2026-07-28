@@ -8,7 +8,7 @@ export function BankrollResearch({ backtests }: { backtests: SignalBacktest[] })
   const [runId, setRunId] = useState(backtests[0]?.id.toString() ?? '')
   const [strategy, setStrategy] = useState<'flat' | 'percentage' | 'fractional_kelly'>('flat')
   const [initialBankroll, setInitialBankroll] = useState('1000')
-  const [simulation, setSimulation] = useState<BankrollSimulation | null>(null)
+  const [simulations, setSimulations] = useState<BankrollSimulation[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -27,11 +27,12 @@ export function BankrollResearch({ backtests }: { backtests: SignalBacktest[] })
     setLoading(true)
     setError(null)
     try {
-      setSimulation(await simulateBankroll({
+      const result = await simulateBankroll({
         backtest_run_id: Number(runId),
         strategy,
         initial_bankroll: Number(initialBankroll),
-      }))
+      })
+      setSimulations((current) => [result, ...current.filter((item) => item.simulation_fingerprint !== result.simulation_fingerprint)])
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to simulate bankroll')
     } finally {
@@ -49,10 +50,17 @@ export function BankrollResearch({ backtests }: { backtests: SignalBacktest[] })
         <button className="rounded-[5px] bg-zinc-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 md:col-span-3 md:justify-self-start" disabled={loading} type="submit">{loading ? 'Simulating…' : 'Simulate stored sequence'}</button>
       </form>
       {error ? <div className="flex gap-3 border border-rose-200 bg-rose-50 p-4 text-sm text-rose-950"><AlertTriangle size={19} /><p>{error}</p></div> : null}
-      {simulation ? <BankrollResult simulation={simulation} /> : null}
+      {simulations[0] ? <BankrollResult simulation={simulations[0]} /> : null}
+      {simulations.length > 1 ? <BankrollStressComparison simulations={simulations} /> : null}
       <div className="border-l-4 border-amber-400 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">Kelly is disabled implicitly when the stored lower probability bound has no positive edge. Every strategy is capped by per-bet and daily exposure limits.</div>
     </div>
   )
+}
+
+export function BankrollStressComparison({ simulations }: { simulations: BankrollSimulation[] }) {
+  const finalValues = simulations.map((item) => item.final_bankroll)
+  const drawdowns = simulations.map((item) => item.maximum_drawdown_fraction)
+  return <section className="border border-zinc-200 bg-white" aria-labelledby="bankroll-stress-title"><div className="border-b border-zinc-200 p-5"><p className="text-xs font-bold uppercase text-sky-700">Replay sensitivity</p><h3 className="mt-1 font-bold" id="bankroll-stress-title">Stored parameter comparisons</h3><p className="mt-1 text-sm text-zinc-500">Compare strategies run against the same settled sequence. Differences are deterministic path sensitivity, not forecast uncertainty.</p></div><div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-sm"><thead className="bg-zinc-50 text-xs uppercase text-zinc-500"><tr><th className="px-4 py-3">Strategy</th><th className="px-4 py-3 text-right">Initial</th><th className="px-4 py-3 text-right">Final</th><th className="px-4 py-3 text-right">Max drawdown</th><th className="px-4 py-3 text-right">Placed / skipped</th><th className="px-4 py-3">Evidence</th></tr></thead><tbody>{simulations.map((item) => <tr className="border-t border-zinc-100" key={item.simulation_fingerprint}><td className="px-4 py-3 font-semibold">{item.strategy.replaceAll('_', ' ')}</td><td className="px-4 py-3 text-right font-mono">{item.initial_bankroll.toFixed(2)}</td><td className="px-4 py-3 text-right font-mono">{item.final_bankroll.toFixed(2)}</td><td className="px-4 py-3 text-right font-mono">{(item.maximum_drawdown_fraction * 100).toFixed(1)}%</td><td className="px-4 py-3 text-right font-mono">{item.bets_placed} / {item.bets_skipped}</td><td className="px-4 py-3">{item.is_demo ? 'DEMO ONLY' : 'NON-DEMO REPLAY'}</td></tr>)}</tbody></table></div><div className="grid grid-cols-2 border-t border-zinc-200 bg-zinc-50"><ResultMetric label="Final-bankroll spread" value={(Math.max(...finalValues) - Math.min(...finalValues)).toFixed(2)} /><ResultMetric label="Worst drawdown" value={`${(Math.max(...drawdowns) * 100).toFixed(1)}%`} /></div></section>
 }
 
 export function BankrollResult({ simulation }: { simulation: BankrollSimulation }) {
