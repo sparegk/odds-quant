@@ -264,6 +264,10 @@ describe('ValueOpportunities', () => {
 
     expect(screen.getByText('Value opportunity research')).toBeInTheDocument()
     expect(screen.getAllByText('+5.4%')).toHaveLength(2)
+    expect(screen.getByRole('heading', { name: 'Calibration and threshold sensitivity' })).toBeInTheDocument()
+    expect(screen.getByText('0 of 1 signals link to a loaded non-demo calibrated evaluation')).toBeInTheDocument()
+    expect(screen.getByText('Lower EV at least 5%').parentElement).toHaveTextContent('1')
+    expect(screen.getByText(/not optimized policies/)).toBeInTheDocument()
     fireEvent.click(screen.getByText('Full evidence'))
     expect(screen.getByText(/Prediction #13 · snapshot #29/)).toBeInTheDocument()
   })

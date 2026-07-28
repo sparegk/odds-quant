@@ -31,10 +31,16 @@ export function ValueOpportunities({ dashboard, onOpenEvent }: { dashboard: Dash
   const averageLowerEv = filtered.length ? filtered.reduce((sum, signal) => sum + signal.lower_expected_value, 0) / filtered.length : null
   const freshest = filtered.length ? Math.min(...filtered.map((signal) => signal.odds_age_minutes)) : null
   const positiveRawEv = researchCandidates.filter((candidate) => candidate.expected_value > 0).length
+  const evaluations = new Map(dashboard.evaluations.map((run) => [run.id, run]))
+  const linkedSignals = dashboard.signals.filter((signal) => {
+    const run = evaluations.get(signal.evaluation_run_id)
+    return Boolean(run && !run.is_demo && run.evaluation_status === 'calibrated')
+  }).length
 
   return <div className="space-y-7">
     <div><p className="text-xs font-bold uppercase text-emerald-700">Upcoming evidence versus market</p><h2 className="mt-1 text-lg font-bold">Value opportunity research</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-zinc-500">Qualified recommendations and exploratory model/price disagreements are kept separate. Research-only gaps show what looks interesting and exactly why it is not yet a VALUE signal.</p></div>
     <section className="grid grid-cols-2 border border-zinc-200 bg-white md:grid-cols-4"><ValueMetric label="Qualified VALUE" value={dashboard.signals.length.toString()} /><ValueMetric label="Research gaps" value={researchCandidates.length.toString()} /><ValueMetric label="Positive raw EV" value={positiveRawEv.toString()} /><ValueMetric label="Policy" value="Fail closed" /></section>
+    {dashboard.signals.length ? <SignalEvidenceAudit signals={dashboard.signals} linkedSignals={linkedSignals} /> : null}
     {researchCandidates.length ? <section className="space-y-4"><div><p className="text-xs font-bold uppercase text-amber-700">Upcoming watchlist</p><h3 className="mt-1 font-bold">Research-only candidates</h3><p className="mt-1 text-sm leading-6 text-zinc-500">Ranked by raw model EV before calibration. Never treat these as recommendations while any listed gate remains blocked.</p></div>{researchCandidates.map((candidate, index) => <ResearchCandidateCard candidate={candidate} key={`${candidate.output_id}-${candidate.selection_id}`} rank={index + 1} onOpenEvent={onOpenEvent} />)}</section> : null}
     {dashboard.signals.length ? <>
       <div><p className="text-xs font-bold uppercase text-emerald-700">Qualified set</p><h3 className="mt-1 font-bold">Calibrated VALUE recommendations</h3></div>
@@ -50,6 +56,17 @@ export function ValueOpportunities({ dashboard, onOpenEvent }: { dashboard: Dash
     </> : <EmptyValue title="No qualified VALUE recommendations yet" detail="The watchlist above remains visible while calibration, sample, uncertainty, freshness, and market-coverage gates are unresolved." />}
     <div className="border-l-4 border-sky-500 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950">Model edge, raw expected value, conservative qualified value, line-shopping improvement, and bookmaker margin remain separate quantities.</div>
   </div>
+}
+
+function SignalEvidenceAudit({ signals, linkedSignals }: { signals: ValueSignal[]; linkedSignals: number }) {
+  const scenarios = [
+    ['Stored qualified set', signals.length],
+    ['Lower EV at least 2%', signals.filter((signal) => signal.lower_expected_value >= 0.02).length],
+    ['Lower EV at least 5%', signals.filter((signal) => signal.lower_expected_value >= 0.05).length],
+    ['Confidence at least 80%', signals.filter((signal) => signal.confidence >= 0.8).length],
+  ] as const
+  const complete = linkedSignals === signals.length
+  return <section aria-labelledby="value-sensitivity-title"><div className="mb-3"><p className="text-xs font-bold uppercase text-sky-700">Evidence audit</p><h3 className="mt-1 font-bold" id="value-sensitivity-title">Calibration and threshold sensitivity</h3></div><div className={`border-l-4 p-4 ${complete ? 'border-emerald-500 bg-emerald-50' : 'border-amber-400 bg-amber-50'}`}><p className="font-bold">{linkedSignals} of {signals.length} signals link to a loaded non-demo calibrated evaluation</p><p className="mt-1 text-xs leading-5 text-zinc-700">Missing dashboard linkage blocks independent verification in this view; it does not rewrite immutable stored signal status.</p><dl className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">{scenarios.map(([label, count]) => <div className="border border-black/10 bg-white/80 p-3" key={label}><dt className="text-xs font-semibold text-zinc-600">{label}</dt><dd className="mt-1 font-mono text-lg font-bold">{count}</dd></div>)}</dl><p className="mt-3 text-xs leading-5 text-zinc-600">These scenarios only show how the current stored set changes under stricter display thresholds. They are not optimized policies or retrospective profitability evidence.</p></div></section>
 }
 
 function ResearchCandidateCard({ candidate, rank, onOpenEvent }: { candidate: ResearchValueCandidate; rank: number; onOpenEvent: (eventId: number) => void }) {
