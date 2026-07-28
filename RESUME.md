@@ -200,6 +200,14 @@ API, service-validation, and CLI JSON tests cover the behavior; the full backend
   the executable generator against current output `212` was rejected with `model is not
   calibrated`, and a post-attempt audit confirmed zero non-demo `ValueSignal` rows. Modeling,
   signal-policy, signal-service, and scheduler tests passed (46 tests).
+- [x] Verify retrospective outcome evidence and keep bookmaker-performance promotion fail-closed.
+  All 342 observations in non-demo held-out run `2` retain final result provenance, actual
+  outcomes, and post-kickoff settlement timestamps, with zero training-cutoff or kickoff chronology
+  violations. All 342 intentionally retain empty bookmaker snapshot evidence, no profit units, and
+  no closing-line values; the database contains zero snapshots explicitly marked `is_closing`.
+  This authorizes probability evaluation only—not market comparison, CLV, ROI, or profitability
+  claims. Closing prices must remain unavailable until an explicit, timestamped source stores them;
+  they must never be inferred. Backtesting and evaluation tests passed (21 tests).
 
 ### In-progress scheduler recovery (2026-07-27)
 
