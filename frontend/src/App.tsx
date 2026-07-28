@@ -743,6 +743,7 @@ export function ArbitrageResearch({ dashboard, onChanged }: { dashboard: Dashboa
                 <ArbitrageMetric label="Net ROI" value={formatSignedPercent(opportunity.net_roi)} />
                 <ArbitrageMetric label="Inverse sum" value={opportunity.inverse_sum.toFixed(4)} />
               </div>
+              <ArbitrageExecutionChecklist opportunity={opportunity} />
 
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[850px] text-left text-sm">
@@ -784,6 +785,19 @@ export function ArbitrageResearch({ dashboard, onChanged }: { dashboard: Dashboa
       </div>
     </div>
   )
+}
+
+function ArbitrageExecutionChecklist({ opportunity }: { opportunity: DashboardData['arbitrage'][number] }) {
+  const expectedLegs = opportunity.market_type === 'MATCH_RESULT' ? 3 : ['TOTAL_GOALS', 'BOTH_TEAMS_TO_SCORE'].includes(opportunity.market_type) ? 2 : null
+  const checks = [
+    ['Complete outcome set', expectedLegs !== null && opportunity.legs.length === expectedLegs, expectedLegs === null ? 'Market outcome count is not independently recognized.' : `${opportunity.legs.length} of ${expectedLegs} required outcomes stored.`],
+    ['Settlement identity', Boolean(opportunity.settlement_rule_key), opportunity.settlement_rule_key || 'Missing settlement rule.'],
+    ['Tax evidence', opportunity.tax_status === 'verified', humanizeCode(opportunity.tax_status)],
+    ['Stake constraints', opportunity.constraint_status === 'verified', humanizeCode(opportunity.constraint_status)],
+    ['Stored price freshness', opportunity.freshness_status === 'fresh', humanizeCode(opportunity.freshness_status)],
+    ['Worst-case net profit', opportunity.net_profit > 0, opportunity.net_profit > 0 ? 'Positive after stored taxes, fees, limits, and rounding.' : 'Not positive after stored costs.'],
+  ] as const
+  return <section className="border-b border-zinc-200 bg-zinc-50 p-4" aria-label="Arbitrage execution checklist"><div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">{checks.map(([label, passed, detail]) => <div className="border border-zinc-200 bg-white p-3 text-xs" key={label}><div className="flex justify-between gap-2"><span className="font-bold">{label}</span><span className={passed ? 'font-bold text-emerald-700' : 'font-bold text-amber-800'}>{passed ? 'PASS' : 'BLOCKED'}</span></div><p className="mt-1 text-zinc-600">{detail}</p></div>)}<div className="border border-rose-200 bg-rose-50 p-3 text-xs"><div className="flex justify-between gap-2"><span className="font-bold">Live price recheck</span><span className="font-bold text-rose-800">REQUIRED</span></div><p className="mt-1 text-rose-800">Reconfirm every price, limit, and accepted leg immediately before submission.</p></div></div></section>
 }
 
 function ArbitrageMetric({ label, value }: { label: string; value: string }) {

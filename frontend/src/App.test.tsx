@@ -361,6 +361,9 @@ describe('ArbitrageResearch', () => {
     expect(screen.getByText('+2.5%')).toBeInTheDocument()
     expect(screen.getByText('Snapshot #29 / tax #41 / limit #43')).toBeInTheDocument()
     expect(screen.getByText('Recheck every price immediately before submitting any leg.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Arbitrage execution checklist')).toHaveTextContent('Complete outcome setBLOCKED')
+    expect(screen.getByLabelText('Arbitrage execution checklist')).toHaveTextContent('Live price recheckREQUIRED')
+    expect(screen.getByText(/Reconfirm every price, limit, and accepted leg/)).toBeInTheDocument()
     expect(screen.getByText(/never a guarantee that every bookmaker leg/)).toBeInTheDocument()
   })
 
