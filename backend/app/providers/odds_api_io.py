@@ -150,12 +150,14 @@ class OddsApiIoClient:
         transport: httpx.BaseTransport | None = None,
         sleep: Callable[[float], None] = time.sleep,
         jitter: Callable[[], float] = random.random,
+        clock: Callable[[], datetime] | None = None,
     ) -> None:
         if not api_key.strip():
             raise OddsApiIoError("ODDSQUANT_ODDS_API_IO_KEY is not configured")
         self._api_key = api_key
         self._sleep = sleep
         self._jitter = jitter
+        self._clock = clock
         self._client = httpx.Client(
             base_url=base_url.rstrip("/"),
             timeout=20,
@@ -248,8 +250,13 @@ class OddsApiIoClient:
                 eventIds=event_ids,
                 bookmakers=",".join(TARGET_BOOKMAKERS.values()),
             )
+            batch_observed_at = observed_at
+            if self._clock is not None:
+                received_at = self._clock()
+                _require_aware(received_at, "odds response receipt timestamp")
+                batch_observed_at = max(observed_at, received_at)
             odds_events = _validate_list(payload, _EventOdds, "event odds")
-            rows.extend(_normalize_batch(batch, odds_events, observed_at))
+            rows.extend(_normalize_batch(batch, odds_events, batch_observed_at))
         return rows
 
     def collect_fixtures(
@@ -423,6 +430,7 @@ class OddsApiIoProvider:
             self._api_key,
             base_url=self._base_url,
             transport=self._transport,
+            clock=self._clock,
         ) as client:
             return client.collect_prematch_batch(observed_at=observed_at)
 

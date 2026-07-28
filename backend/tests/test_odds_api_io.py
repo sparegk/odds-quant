@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import httpx
@@ -279,6 +279,41 @@ def test_provider_reuses_one_event_catalog_for_fixture_and_odds_collection() -> 
     assert requested_paths.count("/v3/bookmakers/selected") == 1
     assert requested_paths.count("/v3/events") == len(LEAGUE_COUNTRIES)
     assert requested_paths.count("/v3/odds/multi") == 1
+
+
+def test_provider_uses_odds_response_receipt_time_for_source_timestamp() -> None:
+    collection_started_at = OBSERVED_AT
+    source_updated_at = collection_started_at + timedelta(seconds=1)
+    response_received_at = collection_started_at + timedelta(seconds=2)
+    clock_values = iter((collection_started_at, response_received_at))
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/bookmakers/selected"):
+            return httpx.Response(
+                200,
+                json={"bookmakers": ["Pamestoixima", "Novibet"], "count": 2},
+            )
+        if request.url.path.endswith("/events"):
+            return httpx.Response(
+                200,
+                json=[_event()] if request.url.params["league"] == "england-premier-league" else [],
+            )
+        return httpx.Response(
+            200,
+            json=[_event_odds(updated_at=source_updated_at.isoformat())],
+        )
+
+    provider = OddsApiIoProvider(
+        SECRET,
+        transport=httpx.MockTransport(handler),
+        clock=lambda: next(clock_values),
+    )
+
+    rows = list(provider.collect_odds())
+
+    assert len(rows) == 6
+    assert {row.observed_at for row in rows} == {response_received_at}
+    assert {row.source_updated_at for row in rows} == {source_updated_at}
 
 
 def test_collects_uefa_conference_league_corner_totals_from_novibet() -> None:

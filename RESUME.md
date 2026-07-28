@@ -228,6 +228,16 @@ startup skipped the not-yet-due Odds collector and completed overdue API-Footbal
 Both providers returned healthy and only the recent Odds failure warning remains. Six further
 successful Odds jobs after `136` are required for job `132` to age out.
 
+The active diagnostics identified later failed Odds job `143` as
+`invalid pre-match match-result timestamp`. The adapter had captured one observation timestamp
+before the multi-request collection began, so a legitimate source update created while an HTTP
+request was in flight could appear later than local observation. Odds sub-batches now use their
+actual response receipt time while still requiring source update at or before receipt and strictly
+before kickoff. The replacement worker is active as Python PID `18504`; both startup collectors
+were cadence-skipped, and its first due Odds job `144` completed successfully. The
+repeated-failure alert cleared, but job `143` remains in the last-10 Odds window. Nine further
+successful Odds jobs after `144` are required before the monitoring checkbox can be ticked.
+
 The scheduled odds workflow now refreshes cutoff-safe baseline predictions for upcoming priced
 fixtures, reports research-watchlist availability, and reuses an output when the exact cutoff is
 polled again. API-Football intelligence polling creates a separate
