@@ -195,6 +195,27 @@ rather than assuming the PID survived. Start the next session with `git status -
 --oneline`, a process check, and `python -m app.cli monitor-collection --fail-on-alerts`. Do not
 manually accelerate provider retries.
 
+### Scheduler continuation (2026-07-28)
+
+The prior worker had stopped and both providers were stale. The production-mode hidden scheduler
+was restored as Python PID `10472`. Its startup cycle completed API-Football job `126`, while Odds
+job `127` failed closed after a successful, credential-redacted HTTP response. The next
+scheduler-owned adaptive interval completed Odds job `128`, imported 372 prices across 138 new
+timestamped snapshots, and reproduced the bounded 42 eligible / 3 created / 39 skipped prediction
+summary with the exact 33 home-history and 6 away-history reasons. `monitor-collection
+--fail-on-alerts` then exited
+successfully with no alerts; both required bookmakers remain covered for the active UEFA
+qualification competitions, no closing snapshots were inferred, and Premier League Novibet
+coverage remains explicitly blocked rather than fabricated.
+
+Job `127` is still inside the per-provider last-10 window and job `128` provides only one
+consecutive Odds success. Leave PID `10472` running at its configured adaptive cadence. Require at
+least one further consecutive success for provider health and nine further successful Odds jobs
+after `128` for job `127` to age out before ticking the monitoring checkbox. A narrowly scoped
+diagnostic now records the provider adapter's own validated `OddsApiIoError` reason while retaining
+generic, secret-safe messages for unexpected exceptions; it takes effect on a future normal worker
+restart and must not be used as a reason to restart this healthy process.
+
 The scheduled odds workflow now refreshes cutoff-safe baseline predictions for upcoming priced
 fixtures, reports research-watchlist availability, and reuses an output when the exact cutoff is
 polled again. API-Football intelligence polling creates a separate

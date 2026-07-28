@@ -21,7 +21,7 @@ from app.providers.api_football import (
     ApiFootballLeagueCoverage,
 )
 from app.providers.base import OddsProvider
-from app.providers.odds_api_io import OddsApiIoProvider
+from app.providers.odds_api_io import OddsApiIoError, OddsApiIoProvider
 from app.schemas.fixtures import FixtureImportRow
 from app.schemas.odds import OddsImportRow
 from app.services.api_football_collection import collect_api_football_intelligence
@@ -185,16 +185,18 @@ def run_provider_collection(
         )
     except Exception as exc:
         error_type = type(exc).__name__
+        failure_detail = f": {exc}" if isinstance(exc, OddsApiIoError) and str(exc).strip() else ""
         logger.error(
-            "Provider collection failed: provider=%s error_type=%s",
+            "Provider collection failed: provider=%s error_type=%s%s",
             provider_adapter.slug,
             error_type,
+            failure_detail,
         )
         _finish_job(
             session_factory,
             job_id,
             "failed",
-            f"Collection failed ({error_type})",
+            f"Collection failed ({error_type}){failure_detail}",
             started_at,
         )
     return job_id

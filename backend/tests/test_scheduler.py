@@ -26,6 +26,7 @@ from app.jobs.scheduler import (
     run_provider_collection,
     seed_development_demo,
 )
+from app.providers.odds_api_io import OddsApiIoError
 from app.schemas.fixtures import FixtureImportRow
 from app.schemas.odds import OddsImportRow
 from app.services.demo_seed import build_demo_odds_csv
@@ -225,6 +226,32 @@ def test_provider_failure_is_recorded_without_exception_secrets(
         assert job.status == "failed"
         assert job.message == "Collection failed (RuntimeError)"
         assert "secret-token" not in job.message
+
+
+def test_odds_api_failure_records_validated_provider_reason(
+    sessions: sessionmaker[Session],
+) -> None:
+    class FailingOddsProvider(FakeLicensedProvider):
+        slug = "odds-api-io"
+        name = "Odds-API.io"
+
+        def collect_odds(self) -> list[OddsImportRow]:
+            raise OddsApiIoError("odds provider returned incomplete match-result prices")
+
+    job_id = run_provider_collection(
+        FailingOddsProvider([]),
+        session_factory=sessions,
+        now=AS_OF,
+    )
+
+    with sessions() as session:
+        job = session.get(ProviderJob, job_id)
+        assert job is not None
+        assert job.status == "failed"
+        assert job.message == (
+            "Collection failed (OddsApiIoError): "
+            "odds provider returned incomplete match-result prices"
+        )
 
 
 def test_registry_rejects_unverified_scheduled_provider() -> None:
