@@ -164,18 +164,26 @@ export function BetBuilderLab({ events, selectedEventId, onSelectEvent }: BetBui
 }
 
 export function BuilderQuoteCard({ quote }: { quote: BetBuilderQuote }) {
+  const dependenceDelta = quote.joint_probability - quote.independent_product
   return (
     <article className="border border-zinc-200 bg-white">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-200 p-5">
         <div><h3 className="font-bold">{quote.legs.map((leg) => `${humanizeCode(leg.selection)} ${humanizeCode(leg.market_type)}`).join(' + ')}</h3><p className="mt-1 text-xs text-zinc-500">Quote #{quote.id} / fingerprint {quote.fingerprint.slice(0, 12)} / {quote.is_demo ? 'DEMO MODEL' : 'NON-DEMO MODEL'}</p></div>
         <span className="rounded-[4px] border border-sky-200 bg-sky-50 px-2 py-1 text-xs font-bold text-sky-800">SCORELINE SUM</span>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-5">
+      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7">
         <QuoteMetric label="Joint probability" value={`${(quote.joint_probability * 100).toFixed(1)}%`} />
         <QuoteMetric label="95% lower bound" value={`${(quote.lower_joint_probability * 100).toFixed(1)}%`} />
         <QuoteMetric label="Independent product" value={`${(quote.independent_product * 100).toFixed(1)}%`} />
+        <QuoteMetric label="Correlation delta" value={`${dependenceDelta >= 0 ? '+' : ''}${(dependenceDelta * 100).toFixed(1)} pp`} />
+        <QuoteMetric label="Dependence ratio" value={`${quote.dependence_ratio.toFixed(3)}x`} />
         <QuoteMetric label="Fair odds" value={quote.fair_odds.toFixed(2)} />
         <QuoteMetric label="Lower-bound EV" value={quote.lower_expected_value === null ? '—' : `${quote.lower_expected_value >= 0 ? '+' : ''}${(quote.lower_expected_value * 100).toFixed(1)}%`} />
+      </div>
+      <div className="grid gap-2 border-t border-zinc-200 bg-zinc-50 p-4 text-xs md:grid-cols-3" aria-label="Builder settlement checklist">
+        <SettlementCheck label="Scoreline-derived legs" status="VALIDATED" detail="Joint probability uses the stored full-time score matrix." />
+        <SettlementCheck label="Bookmaker terms" status="MANUAL CHECK" detail="Verify every period, line, void rule, and offered-price term is identical." />
+        <SettlementCheck label="Player props" status="BLOCKED" detail="Unsupported until player targets and settlement are independently validated." />
       </div>
       <div className="border-t border-zinc-200 px-5 py-4 text-xs leading-5 text-zinc-600">
         <p>Model {quote.model_version} / feature {quote.feature_version} / inputs {formatDateTime(quote.inputs_as_of)}</p>
@@ -183,6 +191,11 @@ export function BuilderQuoteCard({ quote }: { quote: BetBuilderQuote }) {
       </div>
     </article>
   )
+}
+
+function SettlementCheck({ label, status, detail }: { label: string; status: string; detail: string }) {
+  const ready = status === 'VALIDATED'
+  return <div className="border border-zinc-200 bg-white p-3"><div className="flex items-center justify-between gap-2"><p className="font-bold">{label}</p><span className={ready ? 'font-bold text-emerald-700' : 'font-bold text-amber-800'}>{status}</span></div><p className="mt-1 leading-5 text-zinc-600">{detail}</p></div>
 }
 
 function QuoteMetric({ label, value }: { label: string; value: string }) {
