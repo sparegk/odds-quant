@@ -426,8 +426,13 @@ infer closing flags, or enable player props before their independent validation 
   API-Football's latest two jobs are completed, with fresh job `204` retaining 97 requests after
   its bounded collection. `monitor-collection --recent-job-limit 2 --fail-on-alerts` exited `0`:
   both providers were healthy, each had a two-job completed streak, and alerts were empty.
-- [ ] Verify the resumed UEFA feed retains cutoff-safe timestamps, required-bookmaker coverage,
-  supported team markets only, and no inferred closing snapshots or player props.
+- [x] Verify the resumed UEFA feed retains cutoff-safe timestamps, required-bookmaker coverage,
+  supported team markets only, and no inferred closing snapshots or player props. The latest
+  completed Odds job `211` retained Allwyn / Pamestoixima and Novibet across both active UEFA
+  qualification competitions. A deterministic database audit found zero fixture or odds timestamp
+  ordering violations, zero canonical-versus-latest fixture identity mismatches, zero prediction
+  chronology violations, and zero closing snapshots. The only stored market types remain
+  `MATCH_RESULT` and `TOTAL_CORNERS`; player props remain absent and disabled.
 - [ ] Establish the permitted historical-odds and explicit closing-price acquisition checkpoint;
   do not authorize market, CLV, ROI, or profitability validation without that evidence.
 - [ ] Revisit signal thresholds, staking, CLV, and market benchmarks only if the acquired evidence
