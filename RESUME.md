@@ -472,3 +472,9 @@ infer closing flags, or enable player props before their independent validation 
   calibrator cutoff and fingerprint, and signal generation fails closed unless the output applies
   the accepted pre-cutoff calibrator from the qualifying evaluation. These controls are software
   and provenance evidence only; no historical-odds, CLV, ROI, or profitability claim is added.
+- [x] Smoke-test calibration-provenance migration `c9d0e1f2a3b4`. The configured local SQLite
+  database reports the new revision as its Alembic head and exposes non-null JSON column
+  `model_event_outputs.probability_calibration`. A separate temporary database upgraded through
+  predecessor `b8c9d0e1f2a3` and then applied the exact predecessor-to-head transition successfully;
+  inspection confirmed the same column contract. The isolated database was removed after the
+  check. No production database, credential, or raw data was exposed by this receipt.
