@@ -447,6 +447,10 @@ infer closing flags, or enable player props before their independent validation 
   also retains zero non-demo signals and zero closing snapshots. This supports probability scoring
   only; no threshold, staking, market-benchmark, CLV, ROI, or profitability validation is
   authorized, and all existing policies remain unchanged.
-- [ ] Keep player-strength adjustments and player props blocked until timestamped licensed player
+- [x] Keep player-strength adjustments and player props blocked until timestamped licensed player
   targets, stable identities, minimum-minute and recency rules, settlement contracts, and
-  chronological ablation evidence are independently validated.
+  chronological ablation evidence are independently validated. The 2026-07-30 local audit found
+  zero non-demo players, registrations, appearances, player statistics, availability reports,
+  expected lineups, confirmed lineups, or confirmed-context outputs. Stored markets remain only
+  `MATCH_RESULT` and `TOTAL_CORNERS`. `DATA_SOURCES.md` records the separate player-strength and
+  prop activation contracts; no player adjustment or prop behavior was enabled.

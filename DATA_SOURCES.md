@@ -64,6 +64,31 @@ all of the following are independently validated:
 Do not infer player identity from display names, treat a bookmaker label as a validated
 target, or reuse team-market settlement for a player prop.
 
+## Player-Strength And Player-Prop Activation Audit
+
+### Local evidence review: 2026-07-30
+
+The configured non-demo store contains zero players, registrations, appearances, player
+statistics, availability reports, expected lineups, or confirmed lineups. It also contains zero
+`confirmed_lineup_context_unadjusted` outputs. The only stored market types are `MATCH_RESULT` and
+`TOTAL_CORNERS`. Therefore neither player-strength adjustment nor player-prop ingestion, pricing,
+settlement, evaluation, or signaling is authorized.
+
+Player-strength work remains blocked until a permitted source supplies stable player IDs and
+timestamped historical registrations, positions, appearances, starts, minutes, and
+position-appropriate metrics across a chronologically usable sample. Before activation, the
+implementation must add and test minimum-minute rules, recency and opponent adjustment, shrinkage
+to position/competition priors, expected-versus-confirmed lineup scenarios, unresolved-availability
+uncertainty, feature provenance, and walk-forward ablations. The ablations must demonstrate that
+player, team-form, coach, and tactical effects are not double counted.
+
+Player props have an independent gate. A future adapter must prove stable provider player identity,
+complete market outcomes, the bookmaker's exact period and line semantics, and explicit void,
+substitution, starting-status, extra-time, abandonment, and correction rules. It must also ingest a
+separately licensed timestamped player-result target and pass deterministic settlement plus
+chronological calibration tests. Discovery of a provider market name is not authorization to
+store prices or expose a prop.
+
 ## Closing Evidence Audit
 
 ### Historical-odds acquisition review: 2026-07-30
