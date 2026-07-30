@@ -552,3 +552,13 @@ infer closing flags, or enable player props before their independent validation 
   predictions, and zero value signals. Its legacy market-status label does not satisfy the v5
   evaluation-policy and exact-calibrator requirements used by signal generation. The project
   therefore remains fail-closed while model research continues.
+- [x] Compare the current Poisson model with Elo and Dixon-Coles on the same 342-event holdout.
+  Elo produced the best point estimates (Brier `0.615412`, log loss `1.024991`, ECE `0.046775`);
+  Dixon-Coles followed (Brier `0.618151`, log loss `1.028645`, ECE `0.060217`), then Poisson
+  (Brier `0.619119`, log loss `1.030631`, ECE `0.070717`). Poisson-minus-Elo paired 95%
+  intervals were `[-0.009654, 0.017196]` for Brier and `[-0.013799, 0.026058]` for log loss;
+  Poisson-minus-Dixon-Coles intervals were `[-0.010826, 0.012781]` and
+  `[-0.015359, 0.018516]`. Both comparisons cross zero, so no challenger is selected from this
+  evidence alone. Elo is the next implementation candidate because it has the strongest proper-
+  scoring and calibration point estimates and avoids the repeated numerical optimization cost;
+  it must still pass an identical chronological evaluation before selection.
