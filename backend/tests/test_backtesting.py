@@ -108,7 +108,17 @@ def _prepared_backtest(session: Session) -> tuple[ModelVersion, Event, RunSignal
         test_end=AS_OF - timedelta(days=1),
         fingerprint=f"backtest-calibration-{model.id:043d}",
         config={"evaluation_kind": "expanding_window_match_result"},
-        policy={"decision": "calibrated"},
+        policy={
+            "version": "market-relative-calibration-v3",
+            "decision": "calibrated",
+            "checks": {
+                "market_benchmark_available": True,
+                "minimum_market_observations": True,
+                "minimum_market_coverage": True,
+                "market_brier_upper_difference_below_zero": True,
+                "market_log_loss_upper_difference_below_zero": True,
+            },
+        },
         evaluation_status="calibrated",
         is_demo=False,
     )

@@ -12,6 +12,7 @@ from app.db.models import (
     BacktestObservation,
     BacktestResult,
     BacktestRun,
+    Bookmaker,
     Competition,
     Event,
     Market,
@@ -19,6 +20,7 @@ from app.db.models import (
     ModelVersion,
     OddsPrice,
     OddsSnapshot,
+    Provider,
     Selection,
 )
 from app.quant.dixon_coles import DixonColesMatch, fit_dixon_coles
@@ -39,20 +41,31 @@ from app.services.modeling import MODEL_KIND, competition_family_ids
 
 MINIMUM_PROMOTION_OBSERVATIONS = 200
 MINIMUM_PROMOTION_COVERAGE = 0.90
+MINIMUM_MARKET_PROMOTION_OBSERVATIONS = 160
+MINIMUM_MARKET_PROMOTION_COVERAGE = 0.80
+MINIMUM_MARKET_BOOKMAKERS = 2
+MARKET_BENCHMARK_MAX_AGE = timedelta(hours=24)
 MAXIMUM_PROMOTION_ECE = 0.08
 BOOTSTRAP_CONFIDENCE_LEVEL = 0.95
 BOOTSTRAP_RESAMPLES = 2000
 EVALUATION_METHOD_VERSION = "expanding-window-block-bootstrap-v2"
+PROMOTION_POLICY_VERSION = "market-relative-calibration-v3"
 
 
 PROMOTION_POLICY: dict[str, object] = {
-    "version": "probability-calibration-v2",
+    "version": PROMOTION_POLICY_VERSION,
     "minimum_observations": MINIMUM_PROMOTION_OBSERVATIONS,
     "minimum_coverage": MINIMUM_PROMOTION_COVERAGE,
     "maximum_expected_calibration_error": MAXIMUM_PROMOTION_ECE,
+    "minimum_market_observations": MINIMUM_MARKET_PROMOTION_OBSERVATIONS,
+    "minimum_market_coverage": MINIMUM_MARKET_PROMOTION_COVERAGE,
+    "minimum_market_bookmakers_per_event": MINIMUM_MARKET_BOOKMAKERS,
+    "market_benchmark_max_age_seconds": int(MARKET_BENCHMARK_MAX_AGE.total_seconds()),
     "bootstrap_confidence_level": BOOTSTRAP_CONFIDENCE_LEVEL,
     "require_uniform_brier_upper_difference_below_zero": True,
     "require_uniform_log_loss_upper_difference_below_zero": True,
+    "require_market_brier_upper_difference_below_zero": True,
+    "require_market_log_loss_upper_difference_below_zero": True,
     "demo_data_eligible": False,
 }
 
@@ -310,7 +323,12 @@ def evaluate_model(
         )
 
     is_demo = bool(model.is_demo or any(row.event.is_demo for row in replayed))
-    evaluation_status, policy = _policy_decision(metrics, uniform_metrics, is_demo=is_demo)
+    evaluation_status, policy = _policy_decision(
+        metrics,
+        uniform_metrics,
+        market_metrics,
+        is_demo=is_demo,
+    )
     fingerprint = _evaluation_fingerprint(
         model=model,
         request=request,
@@ -531,6 +549,8 @@ def _market_consensus(
         .join(OddsSnapshot, OddsSnapshot.market_id == Market.id)
         .join(OddsPrice, OddsPrice.snapshot_id == OddsSnapshot.id)
         .join(Selection, Selection.id == OddsPrice.selection_id)
+        .join(Bookmaker, Bookmaker.id == OddsSnapshot.bookmaker_id)
+        .join(Provider, Provider.id == OddsSnapshot.provider_id)
         .where(
             Market.event_id == event_id,
             Market.market_type == "MATCH_RESULT",
@@ -538,6 +558,9 @@ def _market_consensus(
             Market.period == "FULL_TIME",
             OddsSnapshot.is_complete.is_(True),
             OddsSnapshot.observed_at <= predicted_at,
+            OddsSnapshot.observed_at >= predicted_at - MARKET_BENCHMARK_MAX_AGE,
+            Bookmaker.is_demo.is_(False),
+            Provider.is_demo.is_(False),
         )
         .order_by(OddsSnapshot.observed_at, OddsSnapshot.id, Selection.id)
     ).all()
@@ -569,6 +592,8 @@ def _market_consensus(
             -group[0][0].id,
         ),
     )
+    if len(chosen) < MINIMUM_MARKET_BOOKMAKERS:
+        return ([], None)
     devigged: list[dict[str, float]] = []
     for _, _, prices in chosen:
         ordered_odds = [prices[outcome] for outcome in OUTCOMES]
@@ -683,6 +708,7 @@ def _paired_interval_upper(metrics: dict[str, object], metric: str) -> float:
 def _policy_decision(
     metrics: dict[str, object],
     uniform_metrics: dict[str, object],
+    market_metrics: dict[str, object] | None,
     *,
     is_demo: bool,
 ) -> tuple[str, dict[str, object]]:
@@ -691,6 +717,22 @@ def _policy_decision(
     ece = _metric_number(metrics, "expected_calibration_error")
     uniform_brier_upper = _paired_interval_upper(uniform_metrics, "brier_score")
     uniform_log_loss_upper = _paired_interval_upper(uniform_metrics, "log_loss")
+    market_observations = (
+        _metric_number(market_metrics, "observations") if market_metrics is not None else 0.0
+    )
+    market_coverage = (
+        _metric_number(market_metrics, "coverage") if market_metrics is not None else 0.0
+    )
+    market_brier_upper = (
+        _paired_interval_upper(market_metrics, "brier_score")
+        if market_metrics is not None
+        else float("inf")
+    )
+    market_log_loss_upper = (
+        _paired_interval_upper(market_metrics, "log_loss")
+        if market_metrics is not None
+        else float("inf")
+    )
     checks = {
         "non_demo_data": not is_demo,
         "minimum_observations": observations >= MINIMUM_PROMOTION_OBSERVATIONS,
@@ -698,11 +740,24 @@ def _policy_decision(
         "maximum_expected_calibration_error": ece <= MAXIMUM_PROMOTION_ECE,
         "uniform_brier_upper_difference_below_zero": uniform_brier_upper < 0,
         "uniform_log_loss_upper_difference_below_zero": uniform_log_loss_upper < 0,
+        "market_benchmark_available": market_metrics is not None,
+        "minimum_market_observations": (
+            market_observations >= MINIMUM_MARKET_PROMOTION_OBSERVATIONS
+        ),
+        "minimum_market_coverage": market_coverage >= MINIMUM_MARKET_PROMOTION_COVERAGE,
+        "market_brier_upper_difference_below_zero": market_brier_upper < 0,
+        "market_log_loss_upper_difference_below_zero": market_log_loss_upper < 0,
     }
     if is_demo:
         status = "demo_only"
     elif not checks["minimum_observations"] or not checks["minimum_coverage"]:
         status = "insufficient_evidence"
+    elif (
+        not checks["market_benchmark_available"]
+        or not checks["minimum_market_observations"]
+        or not checks["minimum_market_coverage"]
+    ):
+        status = "insufficient_market_evidence"
     elif all(checks.values()):
         status = "calibrated"
     else:

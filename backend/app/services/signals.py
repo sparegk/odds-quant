@@ -31,6 +31,7 @@ from app.schemas.signals import (
     SignalBatchView,
     ValueSignalView,
 )
+from app.services.evaluation import PROMOTION_POLICY_VERSION
 from app.signals.policy import SignalInput, classify_signal
 
 
@@ -436,7 +437,7 @@ def list_underdog_signals(session: Session, *, limit: int = 50) -> list[ValueSig
 def _calibration_evidence(
     session: Session, model_id: int, inputs_as_of: datetime
 ) -> tuple[BacktestRun, float]:
-    run = session.scalar(
+    runs = session.scalars(
         select(BacktestRun)
         .where(
             BacktestRun.model_version_id == model_id,
@@ -446,6 +447,15 @@ def _calibration_evidence(
             BacktestRun.test_end <= inputs_as_of,
         )
         .order_by(BacktestRun.test_end.desc(), BacktestRun.id.desc())
+    ).all()
+    run = next(
+        (
+            candidate
+            for candidate in runs
+            if candidate.policy.get("version") == PROMOTION_POLICY_VERSION
+            and _market_policy_checks_pass(candidate.policy)
+        ),
+        None,
     )
     if run is None:
         raise SignalGenerationError(
@@ -467,6 +477,20 @@ def _calibration_evidence(
     if calibration_error < 0:
         raise SignalGenerationError("calibration error cannot be negative")
     return run, float(calibration_error)
+
+
+def _market_policy_checks_pass(policy: dict[str, object]) -> bool:
+    checks = policy.get("checks")
+    if not isinstance(checks, dict):
+        return False
+    required = (
+        "market_benchmark_available",
+        "minimum_market_observations",
+        "minimum_market_coverage",
+        "market_brier_upper_difference_below_zero",
+        "market_log_loss_upper_difference_below_zero",
+    )
+    return all(checks.get(key) is True for key in required)
 
 
 def _latest_compatible_snapshots(

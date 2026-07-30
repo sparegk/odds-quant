@@ -108,7 +108,17 @@ def _make_live_and_calibrated(
         test_end=AS_OF - timedelta(days=1),
         fingerprint=f"signal-evaluation-{model.id:044d}",
         config={"kind": "test"},
-        policy={"decision": "calibrated"},
+        policy={
+            "version": "market-relative-calibration-v3",
+            "decision": "calibrated",
+            "checks": {
+                "market_benchmark_available": True,
+                "minimum_market_observations": True,
+                "minimum_market_coverage": True,
+                "market_brier_upper_difference_below_zero": True,
+                "market_log_loss_upper_difference_below_zero": True,
+            },
+        },
         evaluation_status="calibrated",
         is_demo=False,
     )
@@ -150,6 +160,26 @@ def test_uncalibrated_or_demo_prediction_is_blocked(session: Session) -> None:
         generate_value_signals(
             session,
             GenerateSignalsRequest(output_id=output.id, generated_at=AS_OF + timedelta(minutes=5)),
+        )
+
+
+def test_legacy_uniform_only_calibration_cannot_authorize_signals(session: Session) -> None:
+    model, output, event = _prepared_output(session)
+    run = _make_live_and_calibrated(session, model, output, event)
+    run.policy = {
+        "version": "probability-calibration-v2",
+        "decision": "calibrated",
+        "checks": {},
+    }
+    session.commit()
+
+    with pytest.raises(SignalGenerationError, match="no non-demo calibrated evaluation"):
+        generate_value_signals(
+            session,
+            GenerateSignalsRequest(
+                output_id=output.id,
+                generated_at=AS_OF + timedelta(minutes=5),
+            ),
         )
 
 

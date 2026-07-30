@@ -144,7 +144,7 @@ def test_walk_forward_evaluation_persists_immutable_demo_evidence(
     assert bootstrap_config["confidence_level"] == pytest.approx(0.95)
     assert bootstrap_config["resamples"] == 2000
     assert len(str(bootstrap_config["seed_material_sha256"])) == 64
-    assert run.policy["version"] == "probability-calibration-v2"
+    assert run.policy["version"] == "market-relative-calibration-v3"
     checks = run.policy["checks"]
     assert isinstance(checks, dict)
     paired_log_loss = paired["log_loss"]
@@ -269,9 +269,19 @@ def test_market_benchmark_uses_only_compatible_pre_cutoff_snapshot(
     event = session.scalar(
         select(Event).where(Event.provider_event_key == "demo-history-20260719-25")
     )
-    provider_id = session.scalar(select(Provider.id))
-    assert event is not None and provider_id is not None
-    bookmaker = Bookmaker(slug="benchmark-book", name="Benchmark Book", is_demo=True)
+    assert event is not None
+    provider = Provider(
+        slug="licensed-benchmark-provider",
+        name="Licensed benchmark provider",
+        kind="licensed_api",
+        is_demo=False,
+        terms_url="https://example.test/terms",
+        capabilities={"odds": True},
+    )
+    bookmakers = [
+        Bookmaker(slug="benchmark-book-a", name="Benchmark Book A", is_demo=False),
+        Bookmaker(slug="benchmark-book-b", name="Benchmark Book B", is_demo=False),
+    ]
     market = Market(
         event_id=event.id,
         market_type="MATCH_RESULT",
@@ -281,7 +291,7 @@ def test_market_benchmark_uses_only_compatible_pre_cutoff_snapshot(
         currency="EUR",
         settlement_rule_key="standard_90_minutes",
     )
-    session.add_all([bookmaker, market])
+    session.add_all([provider, *bookmakers, market])
     session.flush()
     selections = {
         code: Selection(market_id=market.id, code=code, name=code.title())
@@ -289,28 +299,31 @@ def test_market_benchmark_uses_only_compatible_pre_cutoff_snapshot(
     }
     session.add_all(selections.values())
     session.flush()
-    snapshot = OddsSnapshot(
-        market_id=market.id,
-        bookmaker_id=bookmaker.id,
-        provider_id=provider_id,
-        import_job_id=None,
-        source_updated_at=event.kickoff_at - timedelta(hours=2),
-        observed_at=event.kickoff_at - timedelta(hours=2),
-        ingested_at=AS_OF,
-        is_closing=False,
-        is_complete=True,
-        source_label="timestamped benchmark fixture",
-    )
-    session.add(snapshot)
-    session.flush()
-    for code, odds in {"HOME": "2.00", "DRAW": "3.00", "AWAY": "4.00"}.items():
-        session.add(
-            OddsPrice(
-                snapshot_id=snapshot.id,
-                selection_id=selections[code].id,
-                decimal_odds=Decimal(odds),
-            )
+    snapshots: list[OddsSnapshot] = []
+    for bookmaker in bookmakers:
+        snapshot = OddsSnapshot(
+            market_id=market.id,
+            bookmaker_id=bookmaker.id,
+            provider_id=provider.id,
+            import_job_id=None,
+            source_updated_at=event.kickoff_at - timedelta(hours=2),
+            observed_at=event.kickoff_at - timedelta(hours=2),
+            ingested_at=AS_OF,
+            is_closing=False,
+            is_complete=True,
+            source_label="timestamped benchmark fixture",
         )
+        session.add(snapshot)
+        session.flush()
+        snapshots.append(snapshot)
+        for code, odds in {"HOME": "2.00", "DRAW": "3.00", "AWAY": "4.00"}.items():
+            session.add(
+                OddsPrice(
+                    snapshot_id=snapshot.id,
+                    selection_id=selections[code].id,
+                    decimal_odds=Decimal(odds),
+                )
+            )
     session.commit()
 
     run = evaluate_model(session, model.id, _request(), now=AS_OF)
@@ -332,7 +345,7 @@ def test_market_benchmark_uses_only_compatible_pre_cutoff_snapshot(
         )
     )
     assert stored is not None
-    assert stored.market_snapshot_ids == [snapshot.id]
+    assert stored.market_snapshot_ids == [snapshot.id for snapshot in snapshots]
     assert stored.market_probabilities == pytest.approx(
         {"HOME": 6 / 13, "DRAW": 4 / 13, "AWAY": 3 / 13}
     )
@@ -363,7 +376,7 @@ def test_evaluation_rejects_future_end_and_ineligible_window(session: Session) -
         )
 
 
-def test_promotion_requires_confident_uniform_baseline_superiority() -> None:
+def test_promotion_requires_confident_uniform_and_market_superiority() -> None:
     metrics: dict[str, object] = {
         "observations": 200,
         "coverage": 0.95,
@@ -375,8 +388,16 @@ def test_promotion_requires_confident_uniform_baseline_superiority() -> None:
             "log_loss": {"estimate": -0.03, "lower": -0.05, "upper": -0.002},
         }
     }
+    market_metrics: dict[str, object] = {
+        "observations": 180,
+        "coverage": 0.9,
+        "paired_loss_difference": {
+            "brier_score": {"estimate": -0.01, "lower": -0.02, "upper": -0.001},
+            "log_loss": {"estimate": -0.02, "lower": -0.03, "upper": -0.001},
+        },
+    }
 
-    status, policy = _policy_decision(metrics, uniform_metrics, is_demo=False)
+    status, policy = _policy_decision(metrics, uniform_metrics, market_metrics, is_demo=False)
 
     assert status == "calibration_failed"
     checks = policy["checks"]
@@ -387,9 +408,74 @@ def test_promotion_requires_confident_uniform_baseline_superiority() -> None:
     paired = uniform_metrics["paired_loss_difference"]
     assert isinstance(paired, dict)
     paired["brier_score"] = {"estimate": -0.02, "lower": -0.04, "upper": -0.001}
-    status, policy = _policy_decision(metrics, uniform_metrics, is_demo=False)
+    status, policy = _policy_decision(metrics, uniform_metrics, market_metrics, is_demo=False)
 
     assert status == "calibrated"
     checks = policy["checks"]
     assert isinstance(checks, dict)
     assert all(policy_check is True for policy_check in checks.values())
+
+
+def test_promotion_fails_closed_without_adequate_market_coverage() -> None:
+    metrics: dict[str, object] = {
+        "observations": 220,
+        "coverage": 0.95,
+        "expected_calibration_error": 0.04,
+    }
+    strong_comparison = {
+        "paired_loss_difference": {
+            "brier_score": {"estimate": -0.02, "lower": -0.03, "upper": -0.001},
+            "log_loss": {"estimate": -0.02, "lower": -0.03, "upper": -0.001},
+        }
+    }
+    uniform_metrics: dict[str, object] = dict(strong_comparison)
+
+    status, policy = _policy_decision(metrics, uniform_metrics, None, is_demo=False)
+
+    assert status == "insufficient_market_evidence"
+    checks = policy["checks"]
+    assert isinstance(checks, dict)
+    assert checks["market_benchmark_available"] is False
+
+    market_metrics: dict[str, object] = {
+        **strong_comparison,
+        "observations": 159,
+        "coverage": 0.79,
+    }
+    status, policy = _policy_decision(metrics, uniform_metrics, market_metrics, is_demo=False)
+
+    assert status == "insufficient_market_evidence"
+    checks = policy["checks"]
+    assert isinstance(checks, dict)
+    assert checks["minimum_market_observations"] is False
+    assert checks["minimum_market_coverage"] is False
+
+
+def test_market_loss_uncertainty_can_block_promotion() -> None:
+    metrics: dict[str, object] = {
+        "observations": 220,
+        "coverage": 0.95,
+        "expected_calibration_error": 0.04,
+    }
+    uniform_metrics: dict[str, object] = {
+        "paired_loss_difference": {
+            "brier_score": {"estimate": -0.02, "lower": -0.03, "upper": -0.001},
+            "log_loss": {"estimate": -0.02, "lower": -0.03, "upper": -0.001},
+        }
+    }
+    market_metrics: dict[str, object] = {
+        "observations": 180,
+        "coverage": 0.82,
+        "paired_loss_difference": {
+            "brier_score": {"estimate": -0.01, "lower": -0.02, "upper": 0.002},
+            "log_loss": {"estimate": -0.01, "lower": -0.02, "upper": -0.001},
+        },
+    }
+
+    status, policy = _policy_decision(metrics, uniform_metrics, market_metrics, is_demo=False)
+
+    assert status == "calibration_failed"
+    checks = policy["checks"]
+    assert isinstance(checks, dict)
+    assert checks["market_brier_upper_difference_below_zero"] is False
+    assert checks["market_log_loss_upper_difference_below_zero"] is True
