@@ -487,3 +487,7 @@ infer closing flags, or enable player props before their independent validation 
   suite passed with 259 tests; Ruff, format checking, and Mypy passed; all 65 frontend tests,
   ESLint, and the production build passed. This is deterministic software verification only, not
   evidence that any current model passes the new promotion policy or produces profitable signals.
+- [x] Verify remote CI for calibration implementation commit `d0f31f4`. GitHub Actions run
+  `30569429687` completed successfully on `main` after the migration, backend, and frontend
+  checkpoints were pushed. This receipt confirms the remote repository gates only; it does not
+  change the provider cooldown, authorize historical data, or promote a model.
