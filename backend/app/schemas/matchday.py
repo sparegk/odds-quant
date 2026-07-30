@@ -127,6 +127,35 @@ class AvailabilityAuditItemView(BaseModel):
     unlock_requirements: list[str]
 
 
+class ModelMarketComparisonView(BaseModel):
+    market_id: int
+    market_type: str
+    line: float | None
+    selection_id: int
+    selection_code: str
+    selection_name: str
+    bookmaker_count: int
+    best_bookmaker: str
+    best_odds: float
+    best_price_observed_at: datetime
+    best_price_age_seconds: int
+    model_probability: float
+    lower_probability: float
+    upper_probability: float
+    model_fair_odds: float
+    market_consensus_probability: float
+    market_probability_low: float
+    market_probability_high: float
+    devig_method_spread: float
+    bookmaker_disagreement: float
+    probability_edge: float
+    conservative_edge: float
+    expected_value: float
+    lower_expected_value: float
+    research_only: Literal[True] = True
+    qualification_blockers: list[str]
+
+
 class MatchdayEventDetailView(BaseModel):
     event: EventSummary
     competition_group: str
@@ -135,6 +164,7 @@ class MatchdayEventDetailView(BaseModel):
     team_form: list[TeamFormView]
     markets: list[MarketComparison]
     latest_prediction: ModelOutputView | None
+    model_market_comparisons: list[ModelMarketComparisonView]
     signals: list[ValueSignalView]
     builder_quotes: list[BetBuilderQuoteView]
     suggestions: list[MatchSuggestionView]

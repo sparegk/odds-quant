@@ -10,16 +10,119 @@ from app.quant.match_suggestions import (
     bookmaker_code,
     rank_match_suggestions,
 )
-from app.schemas.api import MarketComparison
+from app.quant.model_market import compare_model_to_market
+from app.schemas.api import MarketComparison, PriceComparison, SnapshotComparison
 from app.schemas.builder import BetBuilderQuoteView
 from app.schemas.matchday import (
     MatchdayBookmakerOptionView,
     MatchSuggestionView,
+    ModelMarketComparisonView,
     SuggestionMarketStatusView,
 )
+from app.schemas.models import ModelOutputView
 from app.schemas.signals import ValueSignalView
 
 BOOKMAKER_CODES: tuple[BookmakerCode, BookmakerCode] = ("allwyn", "novibet")
+
+
+def build_model_market_comparisons(
+    *,
+    latest_prediction: ModelOutputView | None,
+    markets: list[MarketComparison],
+    selected_bookmakers: set[BookmakerCode],
+) -> list[ModelMarketComparisonView]:
+    if latest_prediction is None:
+        return []
+
+    markets_by_id = {market.market_id: market for market in markets}
+    comparisons: list[ModelMarketComparisonView] = []
+    for prediction in latest_prediction.predictions:
+        market = markets_by_id.get(prediction.market_id)
+        if (
+            market is None
+            or market.market_type != prediction.market_type
+            or market.line != prediction.line
+        ):
+            continue
+
+        quotes_by_bookmaker: dict[BookmakerCode, tuple[SnapshotComparison, PriceComparison]] = {}
+        for snapshot in market.snapshots:
+            code = bookmaker_code(snapshot.bookmaker)
+            if code is None or code not in selected_bookmakers or snapshot.is_stale:
+                continue
+            price = next(
+                (
+                    item
+                    for item in snapshot.prices
+                    if item.selection_code == prediction.selection_code
+                ),
+                None,
+            )
+            if price is None:
+                continue
+            existing = quotes_by_bookmaker.get(code)
+            if existing is None or snapshot.observed_at > existing[0].observed_at:
+                quotes_by_bookmaker[code] = (snapshot, price)
+
+        if not quotes_by_bookmaker:
+            continue
+        quotes = list(quotes_by_bookmaker.values())
+        best_snapshot, best_price = max(
+            quotes,
+            key=lambda item: (
+                item[1].decimal_odds,
+                item[0].observed_at,
+                item[0].bookmaker,
+            ),
+        )
+        metrics = compare_model_to_market(
+            model_probability=prediction.probability,
+            lower_probability=prediction.lower_probability,
+            upper_probability=prediction.upper_probability,
+            market_estimates=[
+                (
+                    price.proportional_fair_probability,
+                    price.power_fair_probability,
+                )
+                for _, price in quotes
+            ],
+            best_odds=best_price.decimal_odds,
+        )
+        comparisons.append(
+            ModelMarketComparisonView(
+                market_id=market.market_id,
+                market_type=market.market_type,
+                line=market.line,
+                selection_id=prediction.selection_id,
+                selection_code=prediction.selection_code,
+                selection_name=prediction.selection_name,
+                bookmaker_count=len(quotes_by_bookmaker),
+                best_bookmaker=best_snapshot.bookmaker,
+                best_odds=best_price.decimal_odds,
+                best_price_observed_at=best_snapshot.observed_at,
+                best_price_age_seconds=best_snapshot.freshness_seconds,
+                model_probability=prediction.probability,
+                lower_probability=prediction.lower_probability,
+                upper_probability=prediction.upper_probability,
+                model_fair_odds=prediction.fair_odds,
+                market_consensus_probability=metrics.market_consensus_probability,
+                market_probability_low=metrics.market_probability_low,
+                market_probability_high=metrics.market_probability_high,
+                devig_method_spread=metrics.devig_method_spread,
+                bookmaker_disagreement=metrics.bookmaker_disagreement,
+                probability_edge=metrics.probability_edge,
+                conservative_edge=metrics.conservative_edge,
+                expected_value=metrics.expected_value,
+                lower_expected_value=metrics.lower_expected_value,
+                qualification_blockers=[
+                    "Descriptive comparison only; no calibrated VALUE signal is stored "
+                    "at this cutoff.",
+                    "Consensus averages selected bookmakers after proportional and power "
+                    "de-vigging; it is not a closing line.",
+                ],
+            )
+        )
+    return sorted(comparisons, key=lambda item: (item.market_id, item.selection_code))
 
 
 def build_match_suggestions(

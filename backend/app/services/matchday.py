@@ -43,6 +43,7 @@ from app.services.lineup_projection import latest_stored_lineups, project_expect
 from app.services.match_suggestions import (
     bookmaker_options,
     build_match_suggestions,
+    build_model_market_comparisons,
     market_statuses,
 )
 from app.services.modeling import list_event_predictions
@@ -507,6 +508,11 @@ def get_matchday_event_detail(
         max_price_age_minutes=stale_after_seconds / 60,
         event_is_demo=event.is_demo,
     )
+    model_market_comparisons = build_model_market_comparisons(
+        latest_prediction=latest_prediction,
+        markets=markets,
+        selected_bookmakers=selected,
+    )
 
     player_records = (
         session.scalar(
@@ -685,6 +691,7 @@ def get_matchday_event_detail(
         team_form=team_form,
         markets=markets,
         latest_prediction=latest_prediction,
+        model_market_comparisons=model_market_comparisons,
         signals=signals,
         builder_quotes=builder_quotes,
         suggestions=suggestions,
