@@ -10,7 +10,7 @@ const base: DashboardData = { status: { phase: 'model_baseline', sports: ['footb
 
 describe('ModelPerformance', () => {
   it('keeps training provenance separate from absent evaluation evidence', () => {
-    render(<ModelPerformance dashboard={{ ...base, models: [{ id: 3, name: 'Poisson baseline', version: 'poisson-v1', kind: 'poisson', training_start: '2026-01-01T00:00:00Z', training_end: '2026-06-01T00:00:00Z', data_fingerprint: 'abcdef1234567890', feature_version: 'team-strength-v1', sample_size: 80, evaluation_status: 'unvalidated', config: {}, metrics: {}, status: 'trained', is_demo: false, created_at: '2026-06-01T01:00:00Z' }] }} />)
+    render(<ModelPerformance dashboard={{ ...base, models: [{ id: 3, name: 'Poisson baseline', version: 'poisson-v1', kind: 'poisson', training_start: '2026-01-01T00:00:00Z', training_end: '2026-06-01T00:00:00Z', data_fingerprint: 'abcdef1234567890', feature_version: 'team-strength-v1', sample_size: 80, probability_evaluation_status: 'unvalidated', evaluation_status: 'unvalidated', config: {}, metrics: {}, status: 'trained', is_demo: false, created_at: '2026-06-01T01:00:00Z' }] }} />)
     expect(screen.getAllByText('poisson-v1')).toHaveLength(2)
     expect(screen.getByText('80')).toBeInTheDocument()
     expect(screen.getByText('Performance is not established')).toBeInTheDocument()
@@ -23,11 +23,11 @@ describe('ModelPerformance', () => {
   })
 
   it('presents block-bootstrap intervals and paired benchmark evidence', () => {
-    const model = { id: 3, name: 'Poisson baseline', version: 'poisson-v1', kind: 'poisson', training_start: '2026-01-01T00:00:00Z', training_end: '2026-06-01T00:00:00Z', data_fingerprint: 'abcdef1234567890', feature_version: 'team-strength-v1', sample_size: 80, evaluation_status: 'calibrated', config: {}, metrics: {}, status: 'trained', is_demo: false, created_at: '2026-06-01T01:00:00Z' }
+    const model = { id: 3, name: 'Poisson baseline', version: 'poisson-v1', kind: 'poisson', training_start: '2026-01-01T00:00:00Z', training_end: '2026-06-01T00:00:00Z', data_fingerprint: 'abcdef1234567890', feature_version: 'team-strength-v1', sample_size: 80, probability_evaluation_status: 'probability_validated', evaluation_status: 'insufficient_market_evidence', config: {}, metrics: {}, status: 'trained', is_demo: false, created_at: '2026-06-01T01:00:00Z' }
     const interval = (estimate: number, lower: number, upper: number) => ({ method: 'moving_block_bootstrap', estimate, lower, upper, confidence_level: 0.95, resamples: 2000, block_length: 3, observations: 40, seed: 17 })
     const paired = (brier: [number, number, number], logLoss: [number, number, number]) => ({ definition: 'poisson_loss_minus_benchmark_loss', negative_values_favor: 'poisson', brier_score: interval(...brier), log_loss: interval(...logLoss) })
     const evaluation = {
-      id: 8, model_version_id: 3, model_version: 'poisson-v1', status: 'completed', evaluation_start: '2026-03-01T00:00:00Z', evaluation_end: '2026-06-01T00:00:00Z', fingerprint: 'evaluation-fingerprint', config: {}, policy: {}, evaluation_status: 'calibrated', is_demo: false,
+      id: 8, model_version_id: 3, model_version: 'poisson-v1', status: 'completed', evaluation_start: '2026-03-01T00:00:00Z', evaluation_end: '2026-06-01T00:00:00Z', fingerprint: 'evaluation-fingerprint', config: {}, policy: {}, probability_evaluation_status: 'probability_validated', evaluation_status: 'insufficient_market_evidence', is_demo: false,
       metrics: { brier_score: 0.5, log_loss: 0.8, expected_calibration_error: 0.04, evaluated_events: 40, candidate_events: 40, observations: 40, score_intervals: { brier_score: interval(0.5, 0.47, 0.53), log_loss: interval(0.8, 0.75, 0.85) } },
       benchmarks: {
         dixon_coles: { brier_score: 0.52, log_loss: 0.82, observations: 40, score_intervals: { brier_score: interval(0.52, 0.49, 0.55), log_loss: interval(0.82, 0.77, 0.87) }, paired_loss_difference: paired([-0.02, -0.04, -0.005], [-0.02, -0.04, -0.003]) },
@@ -49,9 +49,12 @@ describe('ModelPerformance', () => {
     expect(screen.getByText('BENCHMARK BETTER')).toBeInTheDocument()
     expect(screen.getByText('NO INTERVAL')).toBeInTheDocument()
     expect(screen.getByText(/a wholly negative 95% interval favors Poisson/)).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Model promotion readiness' })).toBeInTheDocument()
-    expect(screen.getByText('Promotion remains blocked')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Validation readiness' })).toBeInTheDocument()
+    expect(screen.getByText('Probability research validated')).toBeInTheDocument()
+    expect(screen.getByText('Market / value policy')).toBeInTheDocument()
+    expect(screen.getAllByText('Probability Validated').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Insufficient Market Evidence').length).toBeGreaterThan(0)
     expect(screen.getByText('Paired interval verdict: BENCHMARK BETTER.')).toBeInTheDocument()
-    expect(screen.getByText(/not permission to claim profitability/)).toBeInTheDocument()
+    expect(screen.getByText(/value signals remain blocked unless it is calibrated/)).toBeInTheDocument()
   })
 })

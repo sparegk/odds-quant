@@ -508,3 +508,9 @@ infer closing flags, or enable player props before their independent validation 
   non-null status columns on both model versions and evaluation runs. Probability-validated runs
   may supply their exact accepted pre-cutoff calibrator to later research predictions; this does
   not make the run market-validated. Ruff, formatting, Mypy, and 24 targeted backend tests passed.
+- [x] Expose the two validation tracks through the typed research surface. Model and evaluation API
+  contracts now carry `probability_evaluation_status` alongside the existing market/value
+  `evaluation_status`. Model Performance displays both classifications in the version registry,
+  immutable evaluation history, and readiness audit; a probability-validated run is labelled
+  research-ready while an insufficient market result remains visibly blocked for value use. All 65
+  frontend tests, ESLint, TypeScript compilation, and the production build passed.

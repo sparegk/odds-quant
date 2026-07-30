@@ -113,6 +113,7 @@ export interface ModelVersion {
   data_fingerprint: string
   feature_version: string
   sample_size: number
+  probability_evaluation_status: string
   evaluation_status: string
   config: Record<string, unknown>
   metrics: Record<string, unknown>
@@ -379,6 +380,7 @@ export interface EvaluationRun {
   fingerprint: string
   config: Record<string, unknown>
   policy: Record<string, unknown>
+  probability_evaluation_status: string
   evaluation_status: string
   is_demo: boolean
   metrics: Record<string, unknown>
