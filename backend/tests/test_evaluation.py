@@ -30,6 +30,7 @@ from app.services.demo_seed import seed_demo_results
 from app.services.evaluation import (
     EvaluationError,
     _policy_decision,
+    _temperature_recalibration_metrics,
     evaluate_model,
 )
 from app.services.modeling import train_poisson_model
@@ -139,12 +140,14 @@ def test_walk_forward_evaluation_persists_immutable_demo_evidence(
     }
     bootstrap_config = run.config["bootstrap"]
     assert isinstance(bootstrap_config, dict)
-    assert run.config["evaluation_method_version"] == "expanding-window-block-bootstrap-v2"
+    assert run.config["evaluation_method_version"] == (
+        "expanding-window-block-bootstrap-v3-recalibrated"
+    )
     assert bootstrap_config["method"] == "moving_block_bootstrap"
     assert bootstrap_config["confidence_level"] == pytest.approx(0.95)
     assert bootstrap_config["resamples"] == 2000
     assert len(str(bootstrap_config["seed_material_sha256"])) == 64
-    assert run.policy["version"] == "market-relative-calibration-v3"
+    assert run.policy["version"] == "market-relative-recalibration-v4"
     checks = run.policy["checks"]
     assert isinstance(checks, dict)
     paired_log_loss = paired["log_loss"]
@@ -396,8 +399,15 @@ def test_promotion_requires_confident_uniform_and_market_superiority() -> None:
             "log_loss": {"estimate": -0.02, "lower": -0.03, "upper": -0.001},
         },
     }
+    recalibration_metrics: dict[str, object] = {"activation_status": "accepted"}
 
-    status, policy = _policy_decision(metrics, uniform_metrics, market_metrics, is_demo=False)
+    status, policy = _policy_decision(
+        metrics,
+        uniform_metrics,
+        market_metrics,
+        recalibration_metrics,
+        is_demo=False,
+    )
 
     assert status == "calibration_failed"
     checks = policy["checks"]
@@ -408,12 +418,49 @@ def test_promotion_requires_confident_uniform_and_market_superiority() -> None:
     paired = uniform_metrics["paired_loss_difference"]
     assert isinstance(paired, dict)
     paired["brier_score"] = {"estimate": -0.02, "lower": -0.04, "upper": -0.001}
-    status, policy = _policy_decision(metrics, uniform_metrics, market_metrics, is_demo=False)
+    status, policy = _policy_decision(
+        metrics,
+        uniform_metrics,
+        market_metrics,
+        recalibration_metrics,
+        is_demo=False,
+    )
 
     assert status == "calibrated"
     checks = policy["checks"]
     assert isinstance(checks, dict)
     assert all(policy_check is True for policy_check in checks.values())
+
+
+def test_walk_forward_recalibration_persists_activation_evidence() -> None:
+    outcomes = ("HOME", "DRAW", "AWAY")
+    rows: list[tuple[dict[str, float], str]] = []
+    for index in range(180):
+        predicted = outcomes[index % 3]
+        actual = outcomes[(index + (1 if index % 4 == 0 else 0)) % 3]
+        probabilities = {outcome: 0.05 for outcome in outcomes}
+        probabilities[predicted] = 0.90
+        rows.append((probabilities, actual))
+
+    metrics = _temperature_recalibration_metrics(
+        rows,
+        bins=5,
+        seed_material="chronological-recalibration-test",
+        fit_through=AS_OF,
+    )
+
+    assert metrics is not None
+    assert metrics["version"] == "walk-forward-temperature-scaling-v1"
+    assert metrics["walk_forward_observations"] == 120
+    assert metrics["activation_status"] == "accepted"
+    checks = metrics["activation_checks"]
+    assert isinstance(checks, dict) and all(checks.values())
+    final = metrics["final_calibrator"]
+    assert isinstance(final, dict)
+    assert final["temperature"] > 1
+    assert final["sample_size"] == 180
+    assert len(str(final["input_fingerprint"])) == 64
+    assert final["fit_through"] == AS_OF.isoformat()
 
 
 def test_promotion_fails_closed_without_adequate_market_coverage() -> None:
@@ -430,7 +477,10 @@ def test_promotion_fails_closed_without_adequate_market_coverage() -> None:
     }
     uniform_metrics: dict[str, object] = dict(strong_comparison)
 
-    status, policy = _policy_decision(metrics, uniform_metrics, None, is_demo=False)
+    recalibration_metrics: dict[str, object] = {"activation_status": "accepted"}
+    status, policy = _policy_decision(
+        metrics, uniform_metrics, None, recalibration_metrics, is_demo=False
+    )
 
     assert status == "insufficient_market_evidence"
     checks = policy["checks"]
@@ -442,7 +492,13 @@ def test_promotion_fails_closed_without_adequate_market_coverage() -> None:
         "observations": 159,
         "coverage": 0.79,
     }
-    status, policy = _policy_decision(metrics, uniform_metrics, market_metrics, is_demo=False)
+    status, policy = _policy_decision(
+        metrics,
+        uniform_metrics,
+        market_metrics,
+        recalibration_metrics,
+        is_demo=False,
+    )
 
     assert status == "insufficient_market_evidence"
     checks = policy["checks"]
@@ -472,10 +528,43 @@ def test_market_loss_uncertainty_can_block_promotion() -> None:
         },
     }
 
-    status, policy = _policy_decision(metrics, uniform_metrics, market_metrics, is_demo=False)
+    status, policy = _policy_decision(
+        metrics,
+        uniform_metrics,
+        market_metrics,
+        {"activation_status": "accepted"},
+        is_demo=False,
+    )
 
     assert status == "calibration_failed"
     checks = policy["checks"]
     assert isinstance(checks, dict)
     assert checks["market_brier_upper_difference_below_zero"] is False
     assert checks["market_log_loss_upper_difference_below_zero"] is True
+
+
+def test_promotion_requires_accepted_chronological_recalibration() -> None:
+    metrics: dict[str, object] = {
+        "observations": 220,
+        "coverage": 0.95,
+        "expected_calibration_error": 0.04,
+    }
+    comparison = {
+        "paired_loss_difference": {
+            "brier_score": {"estimate": -0.02, "lower": -0.03, "upper": -0.001},
+            "log_loss": {"estimate": -0.02, "lower": -0.03, "upper": -0.001},
+        }
+    }
+    uniform_metrics: dict[str, object] = dict(comparison)
+    market_metrics: dict[str, object] = {
+        **comparison,
+        "observations": 180,
+        "coverage": 0.82,
+    }
+
+    status, policy = _policy_decision(metrics, uniform_metrics, market_metrics, None, is_demo=False)
+
+    assert status == "insufficient_recalibration_evidence"
+    checks = policy["checks"]
+    assert isinstance(checks, dict)
+    assert checks["chronological_recalibration_accepted"] is False

@@ -111,6 +111,17 @@ class ProbabilityUncertaintyView(BaseModel):
     training_fingerprint: str
 
 
+class ProbabilityCalibrationView(BaseModel):
+    method: str
+    version: str
+    applied: bool
+    temperature: float | None
+    sample_size: int
+    input_fingerprint: str | None
+    fit_through: datetime | None
+    evaluation_run_id: int | None
+
+
 class ModelOutputView(BaseModel):
     id: int
     event_id: int
@@ -124,6 +135,7 @@ class ModelOutputView(BaseModel):
     away_lambda: float
     sample_size: int
     probability_uncertainty: ProbabilityUncertaintyView
+    probability_calibration: ProbabilityCalibrationView
     score_matrix: list[list[float]]
     derived_probabilities: dict[str, dict[str, float]]
     predictions: list[SelectionPredictionView]

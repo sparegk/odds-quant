@@ -109,7 +109,7 @@ def _prepared_backtest(session: Session) -> tuple[ModelVersion, Event, RunSignal
         fingerprint=f"backtest-calibration-{model.id:043d}",
         config={"evaluation_kind": "expanding_window_match_result"},
         policy={
-            "version": "market-relative-calibration-v3",
+            "version": "market-relative-recalibration-v4",
             "decision": "calibrated",
             "checks": {
                 "market_benchmark_available": True,
@@ -117,6 +117,7 @@ def _prepared_backtest(session: Session) -> tuple[ModelVersion, Event, RunSignal
                 "minimum_market_coverage": True,
                 "market_brier_upper_difference_below_zero": True,
                 "market_log_loss_upper_difference_below_zero": True,
+                "chronological_recalibration_accepted": True,
             },
         },
         evaluation_status="calibrated",
@@ -124,6 +125,16 @@ def _prepared_backtest(session: Session) -> tuple[ModelVersion, Event, RunSignal
     )
     session.add(calibration)
     session.flush()
+    output.probability_calibration = {
+        "method": "scalar_temperature_scaling",
+        "version": "walk-forward-temperature-scaling-v1",
+        "applied": True,
+        "temperature": 1.0,
+        "sample_size": 250,
+        "input_fingerprint": "c" * 64,
+        "fit_through": (AS_OF - timedelta(days=1)).isoformat(),
+        "evaluation_run_id": calibration.id,
+    }
     session.add(
         BacktestResult(
             run_id=calibration.id,

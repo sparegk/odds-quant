@@ -612,6 +612,7 @@ function PredictionEvidence({ detail }: { detail: MatchdayEventDetail }) {
         <PredictionMetric label="Prediction time" value={formatDateTime(prediction.predicted_at)} />
         <PredictionMetric label="Lineup snapshots" value={prediction.lineup_snapshot_ids.length ? prediction.lineup_snapshot_ids.map((id) => `#${id}`).join(', ') : 'None applied'} />
         <PredictionMetric label="Uncertainty" value={`${humanizeCode(prediction.probability_uncertainty.version.replaceAll('-', '_'))} / ${prediction.probability_uncertainty.successful_refits || 'legacy'} refits`} />
+        <PredictionMetric label="Calibration" value={prediction.probability_calibration.applied ? `${humanizeCode(prediction.probability_calibration.version.replaceAll('-', '_'))} / T ${prediction.probability_calibration.temperature?.toFixed(3)}` : 'Raw probabilities / no accepted calibrator'} />
       </dl>
     </div>
   </section>

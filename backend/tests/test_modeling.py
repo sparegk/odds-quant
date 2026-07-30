@@ -4,11 +4,14 @@ from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import numpy as np
 import pytest
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 
 from app.db.models import (
+    BacktestResult,
+    BacktestRun,
     Competition,
     Event,
     LineupMember,
@@ -22,6 +25,7 @@ from app.db.models import (
     Provider,
 )
 from app.db.session import Base
+from app.quant.poisson import derive_market
 from app.schemas.models import PredictEventRequest, TrainPoissonRequest
 from app.services.demo_seed import build_demo_results_csv, seed_demo_data, seed_demo_results
 from app.services.modeling import ModelingError, predict_event, train_poisson_model
@@ -141,11 +145,81 @@ def test_training_and_prediction_are_versioned_and_persisted(session: Session) -
     assert output.probability_uncertainty.successful_refits == 400
     assert output.probability_uncertainty.block_length == 6
     assert output.probability_uncertainty.training_fingerprint == model.data_fingerprint
+    assert output.probability_calibration.applied is False
     assert all(
         prediction.lower_probability <= prediction.probability <= prediction.upper_probability
         for prediction in output.predictions
     )
     assert session.scalar(select(func.count()).select_from(ModelPrediction)) == 3
+
+
+def test_prediction_applies_only_an_accepted_pre_cutoff_calibrator(
+    session: Session,
+) -> None:
+    model_view = train_poisson_model(session, _training_request(session), now=AS_OF)
+    model = session.get_one(ModelVersion, model_view.id)
+    target = session.scalar(
+        select(Event).where(Event.status == "scheduled").order_by(Event.kickoff_at)
+    )
+    assert target is not None
+    model.is_demo = False
+    target.is_demo = False
+    run = BacktestRun(
+        model_version_id=model.id,
+        status="completed",
+        train_end=AS_OF - timedelta(days=3),
+        validation_end=AS_OF - timedelta(days=2),
+        test_end=AS_OF - timedelta(days=1),
+        fingerprint="accepted-temperature-calibration-run",
+        config={"evaluation_kind": "expanding_window_match_result"},
+        policy={
+            "version": "market-relative-recalibration-v4",
+            "decision": "calibrated",
+            "checks": {"chronological_recalibration_accepted": True},
+        },
+        evaluation_status="calibrated",
+        is_demo=False,
+    )
+    session.add(run)
+    session.flush()
+    session.add(
+        BacktestResult(
+            run_id=run.id,
+            benchmark="temperature_scaled",
+            dimension="overall",
+            dimension_value="all",
+            metrics={
+                "activation_status": "accepted",
+                "final_calibrator": {
+                    "version": "walk-forward-temperature-scaling-v1",
+                    "temperature": 2.0,
+                    "sample_size": 240,
+                    "input_fingerprint": "a" * 64,
+                    "fit_through": (AS_OF - timedelta(days=1)).isoformat(),
+                    "accepted": True,
+                },
+            },
+        )
+    )
+    session.commit()
+
+    output = predict_event(
+        session,
+        model.id,
+        PredictEventRequest(event_id=target.id, predicted_at=AS_OF, inputs_as_of=AS_OF),
+        now=AS_OF,
+    )
+
+    raw = derive_market(np.asarray(output.score_matrix), "MATCH_RESULT")
+    calibrated = output.derived_probabilities["MATCH_RESULT"]
+    assert output.probability_calibration.applied is True
+    assert output.probability_calibration.temperature == pytest.approx(2.0)
+    assert output.probability_calibration.evaluation_run_id == run.id
+    assert calibrated["HOME"] != pytest.approx(raw["HOME"])
+    assert sum(calibrated.values()) == pytest.approx(1)
+    assert {item.selection_code: item.probability for item in output.predictions} == pytest.approx(
+        calibrated
+    )
 
 
 def test_confirmed_lineups_create_a_separate_unadjusted_context_version(

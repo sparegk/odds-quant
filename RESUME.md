@@ -478,3 +478,12 @@ infer closing flags, or enable player props before their independent validation 
   predecessor `b8c9d0e1f2a3` and then applied the exact predecessor-to-head transition successfully;
   inspection confirmed the same column contract. The isolated database was removed after the
   check. No production database, credential, or raw data was exposed by this receipt.
+- [x] Complete and verify walk-forward probability recalibration. Evaluation now fits scalar
+  temperature only from earlier held-out outcomes, persists acceptance checks and immutable fit
+  provenance, and requires sufficient market-relative and recalibration evidence before promotion.
+  Later 1X2 predictions apply only the exact accepted pre-cutoff calibrator, transform bootstrap
+  intervals sample by sample, expose provenance through the typed API and Matchday dashboard, and
+  block signal generation when calibrator provenance is absent or mismatched. The full backend
+  suite passed with 259 tests; Ruff, format checking, and Mypy passed; all 65 frontend tests,
+  ESLint, and the production build passed. This is deterministic software verification only, not
+  evidence that any current model passes the new promotion policy or produces profitable signals.

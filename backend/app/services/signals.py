@@ -24,6 +24,7 @@ from app.db.models import (
     Team,
     ValueSignal,
 )
+from app.quant.calibration import PROMOTION_POLICY_VERSION, RECALIBRATION_VERSION
 from app.quant.odds import devig_proportional, implied_probability
 from app.schemas.signals import (
     GenerateSignalsRequest,
@@ -31,7 +32,6 @@ from app.schemas.signals import (
     SignalBatchView,
     ValueSignalView,
 )
-from app.services.evaluation import PROMOTION_POLICY_VERSION
 from app.signals.policy import SignalInput, classify_signal
 
 
@@ -248,6 +248,10 @@ def generate_value_signals(
     evaluation, calibration_error = _calibration_evidence(
         session, model.id, _utc(output.inputs_as_of)
     )
+    if not _output_uses_evaluation_calibrator(output, evaluation):
+        raise SignalGenerationError(
+            "prediction does not apply the accepted pre-cutoff probability calibrator"
+        )
     existing = _signals_for_output_at(session, output.id, generated_at)
     if existing:
         return _batch_view(
@@ -489,8 +493,21 @@ def _market_policy_checks_pass(policy: dict[str, object]) -> bool:
         "minimum_market_coverage",
         "market_brier_upper_difference_below_zero",
         "market_log_loss_upper_difference_below_zero",
+        "chronological_recalibration_accepted",
     )
     return all(checks.get(key) is True for key in required)
+
+
+def _output_uses_evaluation_calibrator(
+    output: ModelEventOutput,
+    evaluation: BacktestRun,
+) -> bool:
+    calibration = output.probability_calibration
+    return bool(
+        calibration.get("applied") is True
+        and calibration.get("version") == RECALIBRATION_VERSION
+        and calibration.get("evaluation_run_id") == evaluation.id
+    )
 
 
 def _latest_compatible_snapshots(

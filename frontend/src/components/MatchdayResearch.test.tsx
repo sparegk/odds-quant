@@ -191,6 +191,16 @@ const detail: MatchdayEventDetail = {
       seed_fingerprint: 'abcdef123456',
       training_fingerprint: 'training123456',
     },
+    probability_calibration: {
+      method: 'scalar_temperature_scaling',
+      version: 'walk-forward-temperature-scaling-v1',
+      applied: true,
+      temperature: 1.18,
+      sample_size: 240,
+      input_fingerprint: 'calibration123456',
+      fit_through: '2026-07-20T00:00:00Z',
+      evaluation_run_id: 8,
+    },
     score_matrix: [],
     derived_probabilities: {},
     predictions: [
@@ -449,6 +459,7 @@ describe('MatchdayResearch', () => {
     expect(screen.getByText(/No expected or confirmed lineup adjustment/)).toBeInTheDocument()
     expect(screen.getByText('None applied')).toBeInTheDocument()
     expect(screen.getByText(/Probability uncertainty v1 \/ 400 refits/i)).toBeInTheDocument()
+    expect(screen.getByText(/Walk Forward Temperature Scaling V1 \/ T 1.180/i)).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Model vs market lab' })).toBeInTheDocument()
     expect(screen.getByText('Research-only arithmetic.')).toBeInTheDocument()
     expect(screen.getByText('+4.5 pp')).toBeInTheDocument()

@@ -23,6 +23,12 @@ from app.db.models import (
     Provider,
     Selection,
 )
+from app.quant.calibration import (
+    PROMOTION_POLICY_VERSION,
+    RECALIBRATION_VERSION,
+    fit_temperature_calibrator,
+    walk_forward_temperature_scaling,
+)
 from app.quant.dixon_coles import DixonColesMatch, fit_dixon_coles
 from app.quant.elo import EloConfig, EloMatchResult, elo_probabilities_as_of
 from app.quant.evaluation import (
@@ -48,8 +54,9 @@ MARKET_BENCHMARK_MAX_AGE = timedelta(hours=24)
 MAXIMUM_PROMOTION_ECE = 0.08
 BOOTSTRAP_CONFIDENCE_LEVEL = 0.95
 BOOTSTRAP_RESAMPLES = 2000
-EVALUATION_METHOD_VERSION = "expanding-window-block-bootstrap-v2"
-PROMOTION_POLICY_VERSION = "market-relative-calibration-v3"
+EVALUATION_METHOD_VERSION = "expanding-window-block-bootstrap-v3-recalibrated"
+MINIMUM_RECALIBRATION_HISTORY = 60
+MINIMUM_RECALIBRATION_EVALUATION_OBSERVATIONS = 100
 
 
 PROMOTION_POLICY: dict[str, object] = {
@@ -66,6 +73,12 @@ PROMOTION_POLICY: dict[str, object] = {
     "require_uniform_log_loss_upper_difference_below_zero": True,
     "require_market_brier_upper_difference_below_zero": True,
     "require_market_log_loss_upper_difference_below_zero": True,
+    "recalibration_version": RECALIBRATION_VERSION,
+    "minimum_recalibration_history": MINIMUM_RECALIBRATION_HISTORY,
+    "minimum_recalibration_evaluation_observations": (
+        MINIMUM_RECALIBRATION_EVALUATION_OBSERVATIONS
+    ),
+    "require_chronological_recalibration_acceptance": True,
     "demo_data_eligible": False,
 }
 
@@ -322,11 +335,19 @@ def evaluate_model(
             namespace="market_consensus",
         )
 
+    recalibration_metrics = _temperature_recalibration_metrics(
+        probability_rows,
+        bins=request.calibration_bins,
+        seed_material=bootstrap_seed_material,
+        fit_through=evaluation_end,
+    )
+
     is_demo = bool(model.is_demo or any(row.event.is_demo for row in replayed))
     evaluation_status, policy = _policy_decision(
         metrics,
         uniform_metrics,
         market_metrics,
+        recalibration_metrics,
         is_demo=is_demo,
     )
     fingerprint = _evaluation_fingerprint(
@@ -364,6 +385,13 @@ def evaluate_model(
             "paired_difference_definition": "poisson_loss_minus_benchmark_loss",
         },
         "market_benchmark": "mean_proportional_devig_of_latest_compatible_snapshot_per_bookmaker",
+        "probability_recalibration": {
+            "version": RECALIBRATION_VERSION,
+            "method": "scalar_temperature_scaling",
+            "minimum_history": MINIMUM_RECALIBRATION_HISTORY,
+            "fit_schedule": "expanding_window_refit_before_each_held_out_prediction",
+            "activation_rule": "held_out_brier_log_loss_and_ece_must_improve",
+        },
         "elo_benchmark": {
             "version": "davidson-elo-v1",
             **EloConfig().__dict__,
@@ -425,6 +453,7 @@ def evaluate_model(
         elo_metrics=elo_metrics,
         dixon_coles_metrics=dixon_coles_metrics,
         market_metrics=market_metrics,
+        recalibration_metrics=recalibration_metrics,
         buckets=buckets,
     )
     if evaluation_status == "calibrated":
@@ -673,6 +702,80 @@ def _attach_paired_loss_difference(
     }
 
 
+def _temperature_recalibration_metrics(
+    probability_rows: list[tuple[dict[str, float], str]],
+    *,
+    bins: int,
+    seed_material: str,
+    fit_through: datetime,
+) -> dict[str, object] | None:
+    walk_forward = walk_forward_temperature_scaling(
+        probability_rows,
+        minimum_history=MINIMUM_RECALIBRATION_HISTORY,
+    )
+    if len(walk_forward) < MINIMUM_RECALIBRATION_EVALUATION_OBSERVATIONS:
+        return None
+    raw_rows = [probability_rows[item.index] for item in walk_forward]
+    calibrated_rows = [
+        (item.probabilities, probability_rows[item.index][1]) for item in walk_forward
+    ]
+    calibrated_metrics, _ = summarize_probabilities(calibrated_rows, bins=bins)
+    raw_subset_metrics, _ = summarize_probabilities(raw_rows, bins=bins)
+    calibrated_metrics["coverage"] = len(calibrated_rows) / len(probability_rows)
+    calibrated_metrics["minimum_history"] = MINIMUM_RECALIBRATION_HISTORY
+    calibrated_metrics["walk_forward_observations"] = len(calibrated_rows)
+    _attach_score_intervals(
+        calibrated_metrics,
+        calibrated_rows,
+        seed_material=seed_material,
+        namespace="temperature_scaled",
+    )
+    _attach_paired_loss_difference(
+        calibrated_metrics,
+        raw_rows,
+        calibrated_rows,
+        seed_material=seed_material,
+        namespace="temperature_scaled",
+    )
+    paired = calibrated_metrics["paired_loss_difference"]
+    assert isinstance(paired, dict)
+    brier_difference = paired["brier_score"]
+    log_loss_difference = paired["log_loss"]
+    assert isinstance(brier_difference, dict) and isinstance(log_loss_difference, dict)
+    checks = {
+        "minimum_walk_forward_observations": (
+            len(calibrated_rows) >= MINIMUM_RECALIBRATION_EVALUATION_OBSERVATIONS
+        ),
+        "held_out_brier_improved": _metric_number(brier_difference, "estimate") > 0,
+        "held_out_log_loss_improved": _metric_number(log_loss_difference, "estimate") > 0,
+        "held_out_ece_not_worse": (
+            _metric_number(calibrated_metrics, "expected_calibration_error")
+            <= _metric_number(raw_subset_metrics, "expected_calibration_error")
+        ),
+    }
+    accepted = all(checks.values())
+    final_calibrator = fit_temperature_calibrator(probability_rows)
+    calibrated_metrics.update(
+        {
+            "version": RECALIBRATION_VERSION,
+            "method": "scalar_temperature_scaling",
+            "activation_status": "accepted" if accepted else "rejected",
+            "activation_checks": checks,
+            "raw_subset_metrics": raw_subset_metrics,
+            "final_calibrator": {
+                "version": RECALIBRATION_VERSION,
+                "temperature": final_calibrator.temperature,
+                "sample_size": final_calibrator.sample_size,
+                "input_fingerprint": final_calibrator.input_fingerprint,
+                "fit_through": fit_through.isoformat(),
+                "accepted": accepted,
+            },
+            "last_walk_forward_training_fingerprint": walk_forward[-1].training_fingerprint,
+        }
+    )
+    return calibrated_metrics
+
+
 def _bootstrap_seed_material(replayed: list[_ReplayObservation]) -> str:
     payload = [
         {
@@ -709,6 +812,7 @@ def _policy_decision(
     metrics: dict[str, object],
     uniform_metrics: dict[str, object],
     market_metrics: dict[str, object] | None,
+    recalibration_metrics: dict[str, object] | None,
     *,
     is_demo: bool,
 ) -> tuple[str, dict[str, object]]:
@@ -747,6 +851,10 @@ def _policy_decision(
         "minimum_market_coverage": market_coverage >= MINIMUM_MARKET_PROMOTION_COVERAGE,
         "market_brier_upper_difference_below_zero": market_brier_upper < 0,
         "market_log_loss_upper_difference_below_zero": market_log_loss_upper < 0,
+        "chronological_recalibration_accepted": (
+            recalibration_metrics is not None
+            and recalibration_metrics.get("activation_status") == "accepted"
+        ),
     }
     if is_demo:
         status = "demo_only"
@@ -758,6 +866,8 @@ def _policy_decision(
         or not checks["minimum_market_coverage"]
     ):
         status = "insufficient_market_evidence"
+    elif recalibration_metrics is None:
+        status = "insufficient_recalibration_evidence"
     elif all(checks.values()):
         status = "calibrated"
     else:
@@ -774,6 +884,7 @@ def _persist_results(
     elo_metrics: dict[str, object],
     dixon_coles_metrics: dict[str, object],
     market_metrics: dict[str, object] | None,
+    recalibration_metrics: dict[str, object] | None,
     buckets: list[CalibrationBucket],
 ) -> None:
     session.add(
@@ -820,6 +931,16 @@ def _persist_results(
                 dimension="overall",
                 dimension_value="available_events",
                 metrics=market_metrics,
+            )
+        )
+    if recalibration_metrics is not None:
+        session.add(
+            BacktestResult(
+                run_id=run_id,
+                benchmark="temperature_scaled",
+                dimension="overall",
+                dimension_value="all",
+                metrics=recalibration_metrics,
             )
         )
     for bucket in buckets:

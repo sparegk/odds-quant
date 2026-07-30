@@ -169,6 +169,16 @@ export interface ModelOutput {
     seed_fingerprint: string | null
     training_fingerprint: string
   }
+  probability_calibration: {
+    method: string
+    version: string
+    applied: boolean
+    temperature: number | null
+    sample_size: number
+    input_fingerprint: string | null
+    fit_through: string | null
+    evaluation_run_id: number | null
+  }
   score_matrix: number[][]
   derived_probabilities: Record<string, Record<string, number>>
   predictions: SelectionPrediction[]

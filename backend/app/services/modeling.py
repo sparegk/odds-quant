@@ -10,6 +10,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.models import (
+    BacktestResult,
+    BacktestRun,
     Competition,
     Event,
     LineupMember,
@@ -23,6 +25,11 @@ from app.db.models import (
     Provider,
     Selection,
 )
+from app.quant.calibration import (
+    PROMOTION_POLICY_VERSION,
+    temperature_scale,
+)
+from app.quant.evaluation import OUTCOMES
 from app.quant.odds import fair_odds
 from app.quant.poisson import derive_market, score_matrix, selection_probability
 from app.quant.team_strength import (
@@ -39,6 +46,7 @@ from app.schemas.models import (
     ModelOutputView,
     ModelVersionView,
     PredictEventRequest,
+    ProbabilityCalibrationView,
     ProbabilityUncertaintyView,
     SelectionPredictionView,
     TrainPoissonRequest,
@@ -228,6 +236,11 @@ def predict_event(
         model=model,
         event=event,
     )
+    calibration, calibration_temperature = _prediction_calibration(
+        session,
+        model=model,
+        inputs_as_of=inputs_as_of,
+    )
     output = ModelEventOutput(
         event_id=event.id,
         model_version_id=model.id,
@@ -241,6 +254,7 @@ def predict_event(
         score_matrix=matrix.tolist(),
         sample_size=model.sample_size,
         probability_uncertainty=uncertainty,
+        probability_calibration=calibration,
     )
     session.add(output)
     session.flush()
@@ -258,6 +272,7 @@ def predict_event(
         matrix,
         bootstrap_matrices=bootstrap_matrices,
         confidence_level=_config_float(uncertainty, "confidence_level"),
+        calibration_temperature=calibration_temperature,
     )
     session.commit()
     return _output_view(session, output, model)
@@ -405,6 +420,7 @@ def _persist_selection_predictions(
     *,
     bootstrap_matrices: list[np.ndarray[tuple[int, int], np.dtype[np.float64]]] | None,
     confidence_level: float,
+    calibration_temperature: float | None,
 ) -> None:
     rows = session.execute(
         select(Market, Selection)
@@ -412,12 +428,68 @@ def _persist_selection_predictions(
         .where(Market.event_id == event.id)
         .order_by(Market.id, Selection.id)
     ).all()
+    grouped: dict[int, tuple[Market, list[Selection]]] = {}
     for market, selection in rows:
+        grouped.setdefault(market.id, (market, []))[1].append(selection)
+    for market, selections in grouped.values():
         line = float(market.line) if market.line is not None else None
         if line is not None and not _is_half_goal_line(line):
             continue
+        raw_probabilities = _selection_probabilities(matrix, market, selections, line)
+        if not raw_probabilities:
+            continue
+        probabilities = _calibrate_match_result(
+            market,
+            raw_probabilities,
+            calibration_temperature,
+        )
+        sampled_by_selection: dict[str, list[float]] = {
+            selection.code: [] for selection in selections if selection.code in probabilities
+        }
+        if bootstrap_matrices is not None:
+            for sample in bootstrap_matrices:
+                sample_raw = _selection_probabilities(sample, market, selections, line)
+                sample_probabilities = _calibrate_match_result(
+                    market,
+                    sample_raw,
+                    calibration_temperature,
+                )
+                for code in sampled_by_selection:
+                    sampled_by_selection[code].append(sample_probabilities[code])
+        for selection in selections:
+            probability = probabilities.get(selection.code)
+            if probability is None:
+                continue
+            if bootstrap_matrices is None:
+                lower, upper = _wilson_interval(probability, output.sample_size)
+            else:
+                lower, upper = bootstrap_probability_interval(
+                    probability,
+                    sampled_by_selection[selection.code],
+                    confidence_level=confidence_level,
+                )
+            session.add(
+                ModelPrediction(
+                    output_id=output.id,
+                    selection_id=selection.id,
+                    probability=probability,
+                    lower_probability=lower,
+                    upper_probability=upper,
+                    fair_odds=fair_odds(probability),
+                )
+            )
+
+
+def _selection_probabilities(
+    matrix: np.ndarray[tuple[int, int], np.dtype[np.float64]],
+    market: Market,
+    selections: list[Selection],
+    line: float | None,
+) -> dict[str, float]:
+    probabilities: dict[str, float] = {}
+    for selection in selections:
         try:
-            probability = selection_probability(
+            probabilities[selection.code] = selection_probability(
                 matrix,
                 market.market_type,
                 selection.code,
@@ -425,28 +497,21 @@ def _persist_selection_predictions(
             )
         except ValueError:
             continue
-        if bootstrap_matrices is None:
-            lower, upper = _wilson_interval(probability, output.sample_size)
-        else:
-            sampled_probabilities = [
-                selection_probability(sample, market.market_type, selection.code, line)
-                for sample in bootstrap_matrices
-            ]
-            lower, upper = bootstrap_probability_interval(
-                probability,
-                sampled_probabilities,
-                confidence_level=confidence_level,
-            )
-        session.add(
-            ModelPrediction(
-                output_id=output.id,
-                selection_id=selection.id,
-                probability=probability,
-                lower_probability=lower,
-                upper_probability=upper,
-                fair_odds=fair_odds(probability),
-            )
-        )
+    return probabilities
+
+
+def _calibrate_match_result(
+    market: Market,
+    probabilities: dict[str, float],
+    temperature: float | None,
+) -> dict[str, float]:
+    if (
+        temperature is None
+        or market.market_type != "MATCH_RESULT"
+        or set(probabilities) != set(OUTCOMES)
+    ):
+        return probabilities
+    return temperature_scale(probabilities, temperature)
 
 
 def _output_view(
@@ -482,8 +547,12 @@ def _output_view(
         away_lambda=output.away_lambda,
         sample_size=output.sample_size,
         probability_uncertainty=_uncertainty_view(output, model),
+        probability_calibration=_calibration_view(output),
         score_matrix=[[float(value) for value in row] for row in matrix],
-        derived_probabilities=_derived_probabilities(matrix),
+        derived_probabilities=_derived_probabilities(
+            matrix,
+            calibration_temperature=_output_calibration_temperature(output),
+        ),
         predictions=[
             SelectionPredictionView(
                 id=prediction.id,
@@ -505,9 +574,14 @@ def _output_view(
 
 def _derived_probabilities(
     matrix: np.ndarray[tuple[int, int], np.dtype[np.float64]],
+    *,
+    calibration_temperature: float | None,
 ) -> dict[str, dict[str, float]]:
+    match_result = derive_market(matrix, "MATCH_RESULT")
+    if calibration_temperature is not None:
+        match_result = temperature_scale(match_result, calibration_temperature)
     return {
-        "MATCH_RESULT": derive_market(matrix, "MATCH_RESULT"),
+        "MATCH_RESULT": match_result,
         "TOTAL_GOALS_2.5": derive_market(matrix, "TOTAL_GOALS", 2.5),
         "BOTH_TEAMS_TO_SCORE": derive_market(matrix, "BOTH_TEAMS_TO_SCORE"),
         "DOUBLE_CHANCE": {
@@ -613,6 +687,97 @@ def _uncertainty_view(
     return ProbabilityUncertaintyView.model_validate(values)
 
 
+def _prediction_calibration(
+    session: Session,
+    *,
+    model: ModelVersion,
+    inputs_as_of: datetime,
+) -> tuple[dict[str, object], float | None]:
+    runs = session.scalars(
+        select(BacktestRun)
+        .where(
+            BacktestRun.model_version_id == model.id,
+            BacktestRun.status == "completed",
+            BacktestRun.evaluation_status == "calibrated",
+            BacktestRun.is_demo.is_(False),
+            BacktestRun.test_end <= inputs_as_of,
+        )
+        .order_by(BacktestRun.test_end.desc(), BacktestRun.id.desc())
+    ).all()
+    for run in runs:
+        checks = run.policy.get("checks")
+        if (
+            run.policy.get("version") != PROMOTION_POLICY_VERSION
+            or not isinstance(checks, dict)
+            or checks.get("chronological_recalibration_accepted") is not True
+        ):
+            continue
+        result = session.scalar(
+            select(BacktestResult).where(
+                BacktestResult.run_id == run.id,
+                BacktestResult.benchmark == "temperature_scaled",
+                BacktestResult.dimension == "overall",
+                BacktestResult.dimension_value == "all",
+            )
+        )
+        if result is None:
+            continue
+        final = result.metrics.get("final_calibrator")
+        if not isinstance(final, dict) or final.get("accepted") is not True:
+            continue
+        fit_through = _setting_datetime(final, "fit_through")
+        if fit_through > inputs_as_of:
+            continue
+        temperature = _setting_float(final, "temperature")
+        if temperature <= 0:
+            raise ModelingError("accepted probability calibrator has invalid temperature")
+        return (
+            {
+                "method": "scalar_temperature_scaling",
+                "version": _setting_string(final, "version"),
+                "applied": True,
+                "temperature": temperature,
+                "sample_size": _setting_int(final, "sample_size"),
+                "input_fingerprint": _setting_string(final, "input_fingerprint"),
+                "fit_through": fit_through.isoformat(),
+                "evaluation_run_id": run.id,
+            },
+            temperature,
+        )
+    return (
+        {
+            "method": "none",
+            "version": "raw-probability-v1",
+            "applied": False,
+            "temperature": None,
+            "sample_size": 0,
+            "input_fingerprint": None,
+            "fit_through": None,
+            "evaluation_run_id": None,
+        },
+        None,
+    )
+
+
+def _calibration_view(output: ModelEventOutput) -> ProbabilityCalibrationView:
+    values = output.probability_calibration or {
+        "method": "none",
+        "version": "raw-probability-v1",
+        "applied": False,
+        "temperature": None,
+        "sample_size": 0,
+        "input_fingerprint": None,
+        "fit_through": None,
+        "evaluation_run_id": None,
+    }
+    return ProbabilityCalibrationView.model_validate(values)
+
+
+def _output_calibration_temperature(output: ModelEventOutput) -> float | None:
+    calibration = _calibration_view(output)
+    return calibration.temperature if calibration.applied else None
+
+
 def _fingerprint(observations: list[tuple[MatchResult, Event]]) -> str:
     payload = [
         {
@@ -696,6 +861,17 @@ def _setting_int(settings: dict[str, object], key: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise ModelingError(f"probability uncertainty setting {key} is invalid")
     return value
+
+
+def _setting_datetime(settings: dict[str, object], key: str) -> datetime:
+    value = _setting_string(settings, key)
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ModelingError(f"probability calibration setting {key} is invalid") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ModelingError(f"probability calibration setting {key} must include an offset")
+    return _utc(parsed)
 
 
 def _require_team_history(observed: int, required: int, label: str) -> None:

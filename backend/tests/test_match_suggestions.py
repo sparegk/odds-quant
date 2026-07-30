@@ -66,6 +66,16 @@ def prediction_output() -> ModelOutputView:
             "seed_fingerprint": None,
             "training_fingerprint": "fixture-training-fingerprint",
         },
+        probability_calibration={
+            "method": "none",
+            "version": "raw-probability-v1",
+            "applied": False,
+            "temperature": None,
+            "sample_size": 0,
+            "input_fingerprint": None,
+            "fit_through": None,
+            "evaluation_run_id": None,
+        },
         score_matrix=[[1.0]],
         derived_probabilities={},
         predictions=[

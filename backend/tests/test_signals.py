@@ -109,7 +109,7 @@ def _make_live_and_calibrated(
         fingerprint=f"signal-evaluation-{model.id:044d}",
         config={"kind": "test"},
         policy={
-            "version": "market-relative-calibration-v3",
+            "version": "market-relative-recalibration-v4",
             "decision": "calibrated",
             "checks": {
                 "market_benchmark_available": True,
@@ -117,6 +117,7 @@ def _make_live_and_calibrated(
                 "minimum_market_coverage": True,
                 "market_brier_upper_difference_below_zero": True,
                 "market_log_loss_upper_difference_below_zero": True,
+                "chronological_recalibration_accepted": True,
             },
         },
         evaluation_status="calibrated",
@@ -124,6 +125,16 @@ def _make_live_and_calibrated(
     )
     session.add(run)
     session.flush()
+    output.probability_calibration = {
+        "method": "scalar_temperature_scaling",
+        "version": "walk-forward-temperature-scaling-v1",
+        "applied": True,
+        "temperature": 1.0,
+        "sample_size": 250,
+        "input_fingerprint": "b" * 64,
+        "fit_through": (AS_OF - timedelta(days=1)).isoformat(),
+        "evaluation_run_id": run.id,
+    }
     session.add(
         BacktestResult(
             run_id=run.id,
