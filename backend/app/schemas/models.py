@@ -29,6 +29,34 @@ class TrainPoissonRequest(BaseModel):
         return self
 
 
+class TrainEloRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    competition_id: int = Field(gt=0)
+    training_start: datetime
+    training_end: datetime
+    minimum_matches: int = Field(default=20, ge=6, le=100_000)
+    minimum_team_matches: int = Field(default=3, ge=1, le=100)
+    initial_rating: float = Field(default=1500.0, gt=0, le=10_000)
+    k_factor: float = Field(default=20.0, gt=0, le=200)
+    scale: float = Field(default=400.0, gt=0, le=2_000)
+    home_advantage: float = Field(default=75.0, ge=-400, le=400)
+    draw_probability_at_even_strength: float = Field(default=0.26, gt=0, lt=1)
+
+    @field_validator("training_start", "training_end")
+    @classmethod
+    def require_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("timestamp must include a UTC offset")
+        return value
+
+    @model_validator(mode="after")
+    def validate_window(self) -> TrainEloRequest:
+        if self.training_end <= self.training_start:
+            raise ValueError("training_end must be after training_start")
+        return self
+
+
 class PredictEventRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

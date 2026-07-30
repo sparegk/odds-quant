@@ -20,13 +20,23 @@ from app.providers.openfootball import (
     normalize_openfootball_text_results,
 )
 from app.schemas.api import CollectionMonitoringView
-from app.schemas.models import EvaluateModelRequest, PredictEventRequest, TrainPoissonRequest
+from app.schemas.models import (
+    EvaluateModelRequest,
+    PredictEventRequest,
+    TrainEloRequest,
+    TrainPoissonRequest,
+)
 from app.schemas.signals import GenerateSignalsRequest
 from app.services.api_football_collection import collect_api_football_intelligence
 from app.services.collection_monitoring import collection_monitoring
 from app.services.demo_seed import seed_demo_data, seed_demo_results
 from app.services.evaluation import EvaluationError, evaluate_model
-from app.services.modeling import ModelingError, predict_event, train_poisson_model
+from app.services.modeling import (
+    ModelingError,
+    predict_event,
+    train_elo_model,
+    train_poisson_model,
+)
 from app.services.odds_import import OddsImportError, import_odds_csv
 from app.services.results_import import (
     ResultImportError,
@@ -113,6 +123,19 @@ def _parser() -> argparse.ArgumentParser:
     train.add_argument("--minimum-matches", type=int, default=20)
     train.add_argument("--minimum-team-matches", type=int, default=3)
     train.add_argument("--shrinkage-matches", type=float, default=5.0)
+    train_elo = commands.add_parser(
+        "train-elo", help="register a versioned Davidson Elo research candidate"
+    )
+    train_elo.add_argument("competition_id", type=int)
+    train_elo.add_argument("training_start", type=datetime.fromisoformat)
+    train_elo.add_argument("training_end", type=datetime.fromisoformat)
+    train_elo.add_argument("--minimum-matches", type=int, default=20)
+    train_elo.add_argument("--minimum-team-matches", type=int, default=3)
+    train_elo.add_argument("--initial-rating", type=float, default=1500.0)
+    train_elo.add_argument("--k-factor", type=float, default=20.0)
+    train_elo.add_argument("--scale", type=float, default=400.0)
+    train_elo.add_argument("--home-advantage", type=float, default=75.0)
+    train_elo.add_argument("--draw-probability-at-even-strength", type=float, default=0.26)
     predict = commands.add_parser("predict-event", help="store a pre-kickoff model prediction")
     predict.add_argument("model_id", type=int)
     predict.add_argument("event_id", type=int)
@@ -272,6 +295,22 @@ def main() -> int:
                         minimum_matches=args.minimum_matches,
                         minimum_team_matches=args.minimum_team_matches,
                         shrinkage_matches=args.shrinkage_matches,
+                    ),
+                )
+            elif args.command == "train-elo":
+                result = train_elo_model(
+                    session,
+                    TrainEloRequest(
+                        competition_id=args.competition_id,
+                        training_start=args.training_start,
+                        training_end=args.training_end,
+                        minimum_matches=args.minimum_matches,
+                        minimum_team_matches=args.minimum_team_matches,
+                        initial_rating=args.initial_rating,
+                        k_factor=args.k_factor,
+                        scale=args.scale,
+                        home_advantage=args.home_advantage,
+                        draw_probability_at_even_strength=(args.draw_probability_at_even_strength),
                     ),
                 )
             elif args.command == "predict-event":

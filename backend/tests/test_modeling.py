@@ -26,9 +26,15 @@ from app.db.models import (
 )
 from app.db.session import Base
 from app.quant.poisson import derive_market
-from app.schemas.models import PredictEventRequest, TrainPoissonRequest
+from app.schemas.models import PredictEventRequest, TrainEloRequest, TrainPoissonRequest
 from app.services.demo_seed import build_demo_results_csv, seed_demo_data, seed_demo_results
-from app.services.modeling import ModelingError, predict_event, train_poisson_model
+from app.services.modeling import (
+    ELO_MODEL_KIND,
+    ModelingError,
+    predict_event,
+    train_elo_model,
+    train_poisson_model,
+)
 from app.services.results_import import import_results_csv
 
 AS_OF = datetime(2026, 7, 19, 10, 0, tzinfo=UTC)
@@ -54,6 +60,18 @@ def _training_request(session: Session) -> TrainPoissonRequest:
         minimum_matches=20,
         minimum_team_matches=3,
         shrinkage_matches=5,
+    )
+
+
+def _elo_training_request(session: Session) -> TrainEloRequest:
+    competition_id = session.scalar(select(Competition.id))
+    assert competition_id is not None
+    return TrainEloRequest(
+        competition_id=competition_id,
+        training_start=AS_OF - timedelta(days=150),
+        training_end=AS_OF,
+        minimum_matches=20,
+        minimum_team_matches=3,
     )
 
 
@@ -151,6 +169,66 @@ def test_training_and_prediction_are_versioned_and_persisted(session: Session) -
         for prediction in output.predictions
     )
     assert session.scalar(select(func.count()).select_from(ModelPrediction)) == 3
+
+
+def test_elo_candidate_training_is_versioned_deterministic_and_unvalidated(
+    session: Session,
+) -> None:
+    request = _elo_training_request(session)
+
+    original = train_elo_model(session, request, now=AS_OF)
+    repeated = train_elo_model(session, request, now=AS_OF + timedelta(hours=1))
+
+    assert repeated.id == original.id
+    assert original.kind == ELO_MODEL_KIND
+    assert original.version.startswith("elo1-")
+    assert original.sample_size == 32
+    assert original.probability_evaluation_status == "unvalidated"
+    assert original.evaluation_status == "unvalidated"
+    assert original.metrics == {
+        "metric_scope": "training_descriptive_only",
+        "held_out_evaluation": False,
+        "teams": 8,
+        "outcome_counts": {"HOME": 16, "DRAW": 8, "AWAY": 8},
+    }
+    assert original.config["algorithm_version"] == "davidson-elo-v1"
+    assert original.config["results_ordering"] == "observed_at_then_event_id"
+    assert original.config["initial_rating"] == 1500.0
+    assert original.config["k_factor"] == 20.0
+    assert original.config["scale"] == 400.0
+    assert original.config["home_advantage"] == 75.0
+    assert original.config["draw_probability_at_even_strength"] == 0.26
+    assert session.scalar(select(func.count()).select_from(ModelEventOutput)) == 0
+
+
+def test_post_cutoff_correction_cannot_change_elo_candidate_training(
+    session: Session,
+) -> None:
+    request = _elo_training_request(session)
+    original = train_elo_model(session, request, now=AS_OF)
+    result = session.scalar(select(MatchResult).order_by(MatchResult.id))
+    assert result is not None
+    session.add(
+        MatchResult(
+            event_id=result.event_id,
+            provider_id=result.provider_id,
+            home_goals=result.home_goals + 5,
+            away_goals=result.away_goals,
+            status="final",
+            is_final=True,
+            source_updated_at=AS_OF + timedelta(hours=1),
+            observed_at=AS_OF + timedelta(hours=1),
+            settled_at=AS_OF + timedelta(hours=1),
+            supersedes_id=result.id,
+        )
+    )
+    session.commit()
+
+    repeated = train_elo_model(session, request, now=AS_OF + timedelta(hours=2))
+
+    assert repeated.id == original.id
+    assert repeated.data_fingerprint == original.data_fingerprint
+    assert repeated.sample_size == 32
 
 
 def test_prediction_applies_only_an_accepted_pre_cutoff_calibrator(

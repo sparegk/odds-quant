@@ -13,6 +13,7 @@ from app.schemas.models import (
     ModelOutputView,
     ModelVersionView,
     PredictEventRequest,
+    TrainEloRequest,
     TrainPoissonRequest,
 )
 from app.services.catalog import get_event
@@ -28,6 +29,7 @@ from app.services.modeling import (
     list_event_predictions,
     list_models,
     predict_event,
+    train_elo_model,
     train_poisson_model,
 )
 
@@ -50,6 +52,23 @@ def models(database: Database) -> list[ModelVersionView]:
 def train_model(request: TrainPoissonRequest, database: Database) -> ModelVersionView:
     try:
         return train_poisson_model(database, request)
+    except ModelingError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post(
+    "/models/train-elo",
+    response_model=ModelVersionView,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_admin_key)],
+    tags=["models"],
+)
+def train_elo(request: TrainEloRequest, database: Database) -> ModelVersionView:
+    try:
+        return train_elo_model(database, request)
     except ModelingError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

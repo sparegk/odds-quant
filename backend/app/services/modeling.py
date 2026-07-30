@@ -29,6 +29,7 @@ from app.quant.calibration import (
     PROMOTION_POLICY_VERSION,
     temperature_scale,
 )
+from app.quant.elo import EloConfig
 from app.quant.evaluation import OUTCOMES
 from app.quant.odds import fair_odds
 from app.quant.poisson import derive_market, score_matrix, selection_probability
@@ -49,11 +50,14 @@ from app.schemas.models import (
     ProbabilityCalibrationView,
     ProbabilityUncertaintyView,
     SelectionPredictionView,
+    TrainEloRequest,
     TrainPoissonRequest,
 )
 
 MODEL_KIND = "poisson_team_strength"
+ELO_MODEL_KIND = "davidson_elo"
 FEATURE_VERSION = "final-score-home-away-v3-bootstrap-uncertainty"
+ELO_FEATURE_VERSION = "final-score-result-sequence-v1"
 UNCERTAINTY_METHOD = "chronological_moving_block_bootstrap_refit"
 UNCERTAINTY_VERSION = "probability-uncertainty-v1"
 UNCERTAINTY_CONFIDENCE_LEVEL = 0.95
@@ -160,6 +164,109 @@ def train_poisson_model(
             "mean_home_goals": fitted.league_home_goals,
             "mean_away_goals": fitted.league_away_goals,
             "teams": len(fitted.teams),
+        },
+        status="trained",
+        is_demo=all(event.is_demo for _, event in observations),
+    )
+    session.add(model)
+    session.commit()
+    return _model_view(model)
+
+
+def train_elo_model(
+    session: Session,
+    request: TrainEloRequest,
+    *,
+    now: datetime | None = None,
+) -> ModelVersionView:
+    reference = _utc(now or datetime.now(UTC))
+    training_start = _utc(request.training_start)
+    training_end = _utc(request.training_end)
+    if training_end > reference:
+        raise ModelingError("training_end cannot be in the future")
+    competition = session.get(Competition, request.competition_id)
+    if competition is None:
+        raise ModelingError("competition not found")
+    training_competition_ids = competition_family_ids(session, competition)
+    observations = _training_observations(
+        session,
+        competition_id=request.competition_id,
+        training_start=training_start,
+        training_end=training_end,
+    )
+    if len(observations) < request.minimum_matches:
+        raise ModelingError(
+            f"insufficient historical matches: {len(observations)} available, "
+            f"{request.minimum_matches} required"
+        )
+
+    elo = EloConfig(
+        initial_rating=request.initial_rating,
+        k_factor=request.k_factor,
+        scale=request.scale,
+        home_advantage=request.home_advantage,
+        draw_probability_at_even_strength=request.draw_probability_at_even_strength,
+    )
+    fingerprint = _fingerprint(observations)
+    specification = json.dumps(
+        {
+            "algorithm_version": "davidson-elo-v1",
+            "data_fingerprint": fingerprint,
+            "feature_version": ELO_FEATURE_VERSION,
+            "minimum_team_matches": request.minimum_team_matches,
+            "training_start": training_start.isoformat(),
+            "training_competition_ids": training_competition_ids,
+            **elo.__dict__,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
+    specification_hash = hashlib.sha256(specification).hexdigest()
+    version = f"elo1-c{request.competition_id}-{training_end:%Y%m%d%H%M}-{specification_hash[:8]}"
+    existing = session.scalar(select(ModelVersion).where(ModelVersion.version == version))
+    if existing is not None:
+        return _model_view(existing)
+
+    outcome_counts = {"HOME": 0, "DRAW": 0, "AWAY": 0}
+    team_ids: set[int] = set()
+    for result, event in observations:
+        team_ids.update((event.home_team_id, event.away_team_id))
+        outcome = (
+            "HOME"
+            if result.home_goals > result.away_goals
+            else "DRAW"
+            if result.home_goals == result.away_goals
+            else "AWAY"
+        )
+        outcome_counts[outcome] += 1
+
+    model = ModelVersion(
+        name="Davidson Elo team-strength candidate",
+        version=version,
+        kind=ELO_MODEL_KIND,
+        training_start=training_start,
+        training_end=training_end,
+        data_fingerprint=fingerprint,
+        feature_version=ELO_FEATURE_VERSION,
+        sample_size=len(observations),
+        probability_evaluation_status="unvalidated",
+        evaluation_status="unvalidated",
+        config={
+            "algorithm_version": "davidson-elo-v1",
+            "competition_id": request.competition_id,
+            "training_competition_ids": training_competition_ids,
+            "training_competition_scope": "same_sport_name_country_all_seasons",
+            "minimum_team_matches": request.minimum_team_matches,
+            "training_cutoff_inclusive_for_observations": True,
+            "training_kickoff_end_exclusive": True,
+            "results_ordering": "observed_at_then_event_id",
+            **elo.__dict__,
+        },
+        metrics={
+            "metric_scope": "training_descriptive_only",
+            "held_out_evaluation": False,
+            "teams": len(team_ids),
+            "outcome_counts": outcome_counts,
         },
         status="trained",
         is_demo=all(event.is_demo for _, event in observations),

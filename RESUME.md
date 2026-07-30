@@ -562,3 +562,13 @@ infer closing flags, or enable player props before their independent validation 
   evidence alone. Elo is the next implementation candidate because it has the strongest proper-
   scoring and calibration point estimates and avoids the repeated numerical optimization cost;
   it must still pass an identical chronological evaluation before selection.
+- [x] Develop Elo as a first-class, still-unvalidated team-level research candidate. The new
+  `train-elo` CLI command and admin API persist an immutable `davidson_elo` model version with
+  explicit Davidson parameters, canonical competition-family scope, original result timestamps,
+  chronological result ordering, minimum-history policy, and an exact input fingerprint. No Elo
+  prediction or signal path is enabled before evaluation. The configured non-demo candidate is
+  model `6`, version `elo1-c8-202508010000-083c8468`, trained through
+  `2025-08-01T00:00:00Z` on 1,140 canonical fixtures and retained both validation statuses as
+  `unvalidated`. Deterministic tests prove idempotent versioning and that a post-cutoff correction
+  cannot change its fingerprint or sample. All 262 backend tests, Ruff, formatting, Mypy, and the
+  CLI contract passed.

@@ -596,6 +596,22 @@ def test_results_training_and_prediction_api_are_connected(
     assert training.status_code == 201
     assert training.json()["evaluation_status"] == "unvalidated"
 
+    elo_training = client.post(
+        "/api/v1/models/train-elo",
+        json={
+            "competition_id": competition_id,
+            "training_start": (as_of - timedelta(days=150)).isoformat(),
+            "training_end": as_of.isoformat(),
+            "minimum_matches": 20,
+            "minimum_team_matches": 3,
+        },
+    )
+    assert elo_training.status_code == 201
+    assert elo_training.json()["kind"] == "davidson_elo"
+    assert elo_training.json()["sample_size"] == 32
+    assert elo_training.json()["probability_evaluation_status"] == "unvalidated"
+    assert elo_training.json()["evaluation_status"] == "unvalidated"
+
     evaluation = client.post(
         f"/api/v1/models/{training.json()['id']}/evaluate",
         json={
