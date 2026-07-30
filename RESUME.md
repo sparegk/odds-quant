@@ -514,3 +514,10 @@ infer closing flags, or enable player props before their independent validation 
   immutable evaluation history, and readiness audit; a probability-validated run is labelled
   research-ready while an insufficient market result remains visibly blocked for value use. All 65
   frontend tests, ESLint, TypeScript compilation, and the production build passed.
+- [x] Prove probability validation cannot authorize betting-value output. Signal generation still
+  requires model and evaluation `evaluation_status == calibrated`, the complete v5 market-policy
+  checks, and the exact evaluation calibrator on the prediction. A deterministic regression creates
+  a probability-validated, temperature-calibrated output whose market decision is
+  `insufficient_market_evidence`; generation fails with `model is not market validated` and stores
+  zero value signals. Research-candidate blockers now name the missing market-validated evaluation
+  explicitly. Ruff, Mypy, and all 35 signal, suggestion, and backtesting tests passed.

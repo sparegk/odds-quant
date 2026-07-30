@@ -143,7 +143,7 @@ def list_research_value_candidates(
                 )
                 blockers: list[str] = []
                 if model.evaluation_status != "calibrated":
-                    blockers.append("Model has no qualifying chronological calibration.")
+                    blockers.append("Model has no qualifying market-validated evaluation.")
                 if sample_size_per_team < 8:
                     blockers.append(
                         "Fewer than 8 venue-specific matches per team support this comparison."
@@ -243,7 +243,7 @@ def generate_value_signals(
     if model.is_demo or event.is_demo:
         raise SignalGenerationError("demo models or events cannot generate value signals")
     if model.evaluation_status != "calibrated":
-        raise SignalGenerationError("model is not calibrated")
+        raise SignalGenerationError("model is not market validated")
 
     evaluation, calibration_error = _calibration_evidence(
         session, model.id, _utc(output.inputs_as_of)

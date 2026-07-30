@@ -91,6 +91,7 @@ def _make_live_and_calibrated(
         bookmaker.is_demo = False
     event.is_demo = False
     model.is_demo = False
+    model.probability_evaluation_status = "probability_validated"
     model.evaluation_status = "calibrated"
     config = dict(model.config)
     raw_teams = config["teams"]
@@ -109,7 +110,9 @@ def _make_live_and_calibrated(
         fingerprint=f"signal-evaluation-{model.id:044d}",
         config={"kind": "test"},
         policy={
-            "version": "market-relative-recalibration-v4",
+            "version": "separated-probability-market-v5",
+            "probability_decision": "probability_validated",
+            "market_decision": "calibrated",
             "decision": "calibrated",
             "checks": {
                 "market_benchmark_available": True,
@@ -120,6 +123,7 @@ def _make_live_and_calibrated(
                 "chronological_recalibration_accepted": True,
             },
         },
+        probability_evaluation_status="probability_validated",
         evaluation_status="calibrated",
         is_demo=False,
     )
@@ -225,8 +229,34 @@ def test_upcoming_uncalibrated_model_price_gaps_remain_research_only(
     assert away.expected_value > 0
     assert away.probability_edge > 0
     assert away.odds_observed_at <= AS_OF + timedelta(minutes=5)
-    assert "chronological calibration" in away.qualification_blockers[0]
+    assert "market-validated evaluation" in away.qualification_blockers[0]
     assert away.risks[0].endswith("not a betting recommendation.")
+
+
+def test_probability_validation_without_market_validation_cannot_authorize_signals(
+    session: Session,
+) -> None:
+    model, output, event = _prepared_output(session)
+    run = _make_live_and_calibrated(session, model, output, event)
+    model.evaluation_status = "insufficient_market_evidence"
+    run.evaluation_status = "insufficient_market_evidence"
+    run.policy = {
+        **run.policy,
+        "market_decision": "insufficient_market_evidence",
+        "decision": "insufficient_market_evidence",
+    }
+    session.commit()
+
+    with pytest.raises(SignalGenerationError, match="not market validated"):
+        generate_value_signals(
+            session,
+            GenerateSignalsRequest(
+                output_id=output.id,
+                generated_at=AS_OF + timedelta(minutes=5),
+            ),
+        )
+
+    assert session.scalar(select(func.count()).select_from(ValueSignal)) == 0
 
 
 def test_research_candidates_reject_predictions_after_the_requested_cutoff(

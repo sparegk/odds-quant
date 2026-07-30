@@ -88,6 +88,7 @@ def _prepared_backtest(session: Session) -> tuple[ModelVersion, Event, RunSignal
         bookmaker.is_demo = False
     event.is_demo = False
     model.is_demo = False
+    model.probability_evaluation_status = "probability_validated"
     model.evaluation_status = "calibrated"
     config = dict(model.config)
     raw_teams = config["teams"]
@@ -109,7 +110,9 @@ def _prepared_backtest(session: Session) -> tuple[ModelVersion, Event, RunSignal
         fingerprint=f"backtest-calibration-{model.id:043d}",
         config={"evaluation_kind": "expanding_window_match_result"},
         policy={
-            "version": "market-relative-recalibration-v4",
+            "version": "separated-probability-market-v5",
+            "probability_decision": "probability_validated",
+            "market_decision": "calibrated",
             "decision": "calibrated",
             "checks": {
                 "market_benchmark_available": True,
@@ -120,6 +123,7 @@ def _prepared_backtest(session: Session) -> tuple[ModelVersion, Event, RunSignal
                 "chronological_recalibration_accepted": True,
             },
         },
+        probability_evaluation_status="probability_validated",
         evaluation_status="calibrated",
         is_demo=False,
     )
