@@ -25,7 +25,7 @@ from app.db.models import (
     Selection,
 )
 from app.db.session import Base
-from app.schemas.models import EvaluateModelRequest, TrainPoissonRequest
+from app.schemas.models import EvaluateModelRequest, TrainEloRequest, TrainPoissonRequest
 from app.services.demo_seed import seed_demo_results
 from app.services.evaluation import (
     EvaluationError,
@@ -33,7 +33,7 @@ from app.services.evaluation import (
     _temperature_recalibration_metrics,
     evaluate_model,
 )
-from app.services.modeling import train_poisson_model
+from app.services.modeling import train_elo_model, train_poisson_model
 
 AS_OF = datetime(2026, 7, 19, 10, 0, tzinfo=UTC)
 
@@ -65,6 +65,23 @@ def _model(session: Session) -> ModelVersion:
     model = session.get(ModelVersion, view.id)
     assert model is not None
     return model
+
+
+def _elo_model(session: Session) -> ModelVersion:
+    competition_id = session.scalar(select(Competition.id))
+    assert competition_id is not None
+    view = train_elo_model(
+        session,
+        TrainEloRequest(
+            competition_id=competition_id,
+            training_start=AS_OF - timedelta(days=150),
+            training_end=AS_OF,
+            minimum_matches=20,
+            minimum_team_matches=3,
+        ),
+        now=AS_OF,
+    )
+    return session.get_one(ModelVersion, view.id)
 
 
 def _request() -> EvaluateModelRequest:
@@ -180,6 +197,39 @@ def test_walk_forward_evaluation_persists_immutable_demo_evidence(
         observation.predicted_at < session.get_one(Event, observation.event_id).kickoff_at
         for observation in observations
     )
+
+
+def test_elo_primary_evaluation_matches_aligned_benchmark_and_skips_dixon_coles(
+    session: Session,
+) -> None:
+    poisson_run = evaluate_model(session, _model(session).id, _request(), now=AS_OF)
+    elo_model = _elo_model(session)
+
+    elo_run = evaluate_model(session, elo_model.id, _request(), now=AS_OF)
+    repeated = evaluate_model(session, elo_model.id, _request(), now=AS_OF)
+
+    assert repeated.id == elo_run.id
+    assert elo_run.config["primary_benchmark"] == "elo"
+    assert elo_run.config["primary_model_kind"] == "davidson_elo"
+    assert elo_run.config["evaluation_method_version"] == (
+        "expanding-window-block-bootstrap-v4-elo-primary"
+    )
+    assert elo_run.metrics["observations"] == 8
+    assert elo_run.metrics["brier_score"] == pytest.approx(
+        poisson_run.benchmarks["elo"]["brier_score"]
+    )
+    assert elo_run.metrics["log_loss"] == pytest.approx(poisson_run.benchmarks["elo"]["log_loss"])
+    assert elo_run.benchmarks["poisson"]["brier_score"] == pytest.approx(
+        poisson_run.metrics["brier_score"]
+    )
+    assert "dixon_coles" not in elo_run.benchmarks
+    paired = elo_run.benchmarks["poisson"]["paired_loss_difference"]
+    assert isinstance(paired, dict)
+    assert paired["definition"] == "elo_loss_minus_benchmark_loss"
+    assert paired["negative_values_favor"] == "elo"
+    assert elo_run.probability_evaluation_status == "demo_only"
+    assert elo_model.probability_evaluation_status == "unvalidated"
+    assert len(elo_run.calibration) > 0
 
 
 def test_walk_forward_evaluation_uses_prior_canonical_competition_seasons(

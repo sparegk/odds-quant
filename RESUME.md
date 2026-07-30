@@ -572,3 +572,15 @@ infer closing flags, or enable player props before their independent validation 
   `unvalidated`. Deterministic tests prove idempotent versioning and that a post-cutoff correction
   cannot change its fingerprint or sample. All 262 backend tests, Ruff, formatting, Mypy, and the
   CLI contract passed.
+- [x] Evaluate the Elo candidate on the identical holdout and apply the challenger-selection gate.
+  Elo-primary evaluation now persists its model kind, primary benchmark, aligned Poisson
+  comparison, calibration buckets, and model-specific paired-loss provenance while preserving the
+  prior Poisson replay contract. Immutable run `4`, fingerprint
+  `9ccc83a9e2fe94781e441103309e422fa0127706123bcad182d589336825d02b`, evaluated the same 342 of
+  380 fixtures. Elo improved point Brier score from Poisson `0.619119` to `0.615412` and log loss
+  from `1.030631` to `1.024991`, but its Elo-minus-Poisson paired 95% intervals were
+  `[-0.018042, 0.010941]` and `[-0.025559, 0.013215]`; both cross zero, so Elo is not selected.
+  Walk-forward temperature scaling also worsened Brier `0.623256` to `0.624918`, log loss
+  `1.034874` to `1.037277`, and ECE `0.049211` to `0.065760`. The run therefore remains
+  `probability_validation_failed`, model `6` remains `unvalidated`, and zero Elo outputs or
+  signals exist. All 263 backend tests, Ruff, formatting, and Mypy passed.

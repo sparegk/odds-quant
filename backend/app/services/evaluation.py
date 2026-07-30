@@ -43,7 +43,7 @@ from app.quant.odds import devig_proportional
 from app.quant.poisson import derive_market, score_matrix
 from app.quant.team_strength import HistoricalScore, fit_poisson_team_strength
 from app.schemas.models import CalibrationBucketView, EvaluateModelRequest, EvaluationRunView
-from app.services.modeling import MODEL_KIND, competition_family_ids
+from app.services.modeling import ELO_MODEL_KIND, MODEL_KIND, competition_family_ids
 
 MINIMUM_PROMOTION_OBSERVATIONS = 200
 MINIMUM_PROMOTION_COVERAGE = 0.90
@@ -55,6 +55,7 @@ MAXIMUM_PROMOTION_ECE = 0.08
 BOOTSTRAP_CONFIDENCE_LEVEL = 0.95
 BOOTSTRAP_RESAMPLES = 2000
 EVALUATION_METHOD_VERSION = "expanding-window-block-bootstrap-v3-recalibrated"
+ELO_EVALUATION_METHOD_VERSION = "expanding-window-block-bootstrap-v4-elo-primary"
 MINIMUM_RECALIBRATION_HISTORY = 60
 MINIMUM_RECALIBRATION_EVALUATION_OBSERVATIONS = 100
 
@@ -98,8 +99,9 @@ class _ReplayObservation:
     actual_outcome: str
     brier_score: float
     log_loss: float
+    poisson_probabilities: dict[str, float]
     elo_probabilities: dict[str, float]
-    dixon_coles_probabilities: dict[str, float]
+    dixon_coles_probabilities: dict[str, float] | None
     market_snapshot_ids: list[int]
     market_probabilities: dict[str, float] | None
     market_brier_score: float | None
@@ -121,12 +123,31 @@ def evaluate_model(
     model = session.get(ModelVersion, model_id)
     if model is None:
         raise EvaluationError("model version not found")
-    if model.kind != MODEL_KIND or model.status != "trained":
-        raise EvaluationError("model version is not a trained Poisson team-strength model")
+    if model.kind not in {MODEL_KIND, ELO_MODEL_KIND} or model.status != "trained":
+        raise EvaluationError("model version is not a trained supported team-strength model")
 
     competition_id = _config_int(model.config, "competition_id")
     minimum_team_matches = _config_int(model.config, "minimum_team_matches")
-    shrinkage_matches = _config_number(model.config, "shrinkage_matches")
+    primary_benchmark = "elo" if model.kind == ELO_MODEL_KIND else "poisson"
+    evaluation_method_version = (
+        ELO_EVALUATION_METHOD_VERSION if model.kind == ELO_MODEL_KIND else EVALUATION_METHOD_VERSION
+    )
+    shrinkage_matches = (
+        _config_number(model.config, "shrinkage_matches") if model.kind == MODEL_KIND else 5.0
+    )
+    elo_config = (
+        EloConfig(
+            initial_rating=_config_number(model.config, "initial_rating"),
+            k_factor=_config_number(model.config, "k_factor"),
+            scale=_config_number(model.config, "scale"),
+            home_advantage=_config_number(model.config, "home_advantage"),
+            draw_probability_at_even_strength=_config_number(
+                model.config, "draw_probability_at_even_strength"
+            ),
+        )
+        if model.kind == ELO_MODEL_KIND
+        else EloConfig()
+    )
     candidate_rows = _evaluation_observations(
         session,
         competition_id=competition_id,
@@ -194,17 +215,25 @@ def evaluate_model(
             continue
 
         home_lambda, away_lambda = fitted.expected_goals(event.home_team_id, event.away_team_id)
-        probabilities = derive_market(score_matrix(home_lambda, away_lambda), "MATCH_RESULT")
+        poisson_probabilities = derive_market(
+            score_matrix(home_lambda, away_lambda), "MATCH_RESULT"
+        )
         elo_probabilities = elo_probabilities_as_of(
             elo_history,
             home_team_id=event.home_team_id,
             away_team_id=event.away_team_id,
             as_of=predicted_at,
+            config=elo_config,
         ).probabilities
-        dixon_coles_probabilities = fit_dixon_coles(
-            dixon_coles_history,
-            as_of=predicted_at,
-        ).probabilities(event.home_team_id, event.away_team_id)
+        probabilities = elo_probabilities if primary_benchmark == "elo" else poisson_probabilities
+        dixon_coles_probabilities = (
+            fit_dixon_coles(
+                dixon_coles_history,
+                as_of=predicted_at,
+            ).probabilities(event.home_team_id, event.away_team_id)
+            if primary_benchmark == "poisson"
+            else None
+        )
         actual_outcome = _actual_outcome(result)
         market_snapshot_ids, market_probabilities = _market_consensus(
             session, event.id, predicted_at
@@ -220,6 +249,7 @@ def evaluate_model(
                 actual_outcome=actual_outcome,
                 brier_score=multiclass_brier(probabilities, actual_outcome),
                 log_loss=multiclass_log_loss(probabilities, actual_outcome),
+                poisson_probabilities=poisson_probabilities,
                 elo_probabilities=elo_probabilities,
                 dixon_coles_probabilities=dixon_coles_probabilities,
                 market_snapshot_ids=market_snapshot_ids,
@@ -244,10 +274,15 @@ def evaluate_model(
     probability_rows = [
         (observation.probabilities, observation.actual_outcome) for observation in replayed
     ]
-    bootstrap_seed_material = _bootstrap_seed_material(replayed)
+    bootstrap_seed_material = _bootstrap_seed_material(
+        replayed, primary_benchmark=primary_benchmark
+    )
     metrics, buckets = summarize_probabilities(probability_rows, bins=request.calibration_bins)
     _attach_score_intervals(
-        metrics, probability_rows, seed_material=bootstrap_seed_material, namespace="poisson"
+        metrics,
+        probability_rows,
+        seed_material=bootstrap_seed_material,
+        namespace=primary_benchmark,
     )
     metrics.update(
         {
@@ -271,41 +306,68 @@ def evaluate_model(
         uniform_rows,
         seed_material=bootstrap_seed_material,
         namespace="uniform",
+        primary_name=primary_benchmark,
     )
+    benchmark_metrics: dict[str, dict[str, object]] = {"uniform": uniform_metrics}
     elo_rows = [
         (observation.elo_probabilities, observation.actual_outcome) for observation in replayed
     ]
-    elo_metrics, _ = summarize_probabilities(elo_rows, bins=request.calibration_bins)
-    _attach_score_intervals(
-        elo_metrics, elo_rows, seed_material=bootstrap_seed_material, namespace="elo"
-    )
-    _attach_paired_loss_difference(
-        elo_metrics,
-        probability_rows,
-        elo_rows,
-        seed_material=bootstrap_seed_material,
-        namespace="elo",
-    )
-    dixon_coles_rows = [
-        (observation.dixon_coles_probabilities, observation.actual_outcome)
-        for observation in replayed
-    ]
-    dixon_coles_metrics, _ = summarize_probabilities(
-        dixon_coles_rows, bins=request.calibration_bins
-    )
-    _attach_score_intervals(
-        dixon_coles_metrics,
-        dixon_coles_rows,
-        seed_material=bootstrap_seed_material,
-        namespace="dixon_coles",
-    )
-    _attach_paired_loss_difference(
-        dixon_coles_metrics,
-        probability_rows,
-        dixon_coles_rows,
-        seed_material=bootstrap_seed_material,
-        namespace="dixon_coles",
-    )
+    if primary_benchmark == "poisson":
+        elo_metrics, _ = summarize_probabilities(elo_rows, bins=request.calibration_bins)
+        _attach_score_intervals(
+            elo_metrics, elo_rows, seed_material=bootstrap_seed_material, namespace="elo"
+        )
+        _attach_paired_loss_difference(
+            elo_metrics,
+            probability_rows,
+            elo_rows,
+            seed_material=bootstrap_seed_material,
+            namespace="elo",
+        )
+        benchmark_metrics["elo"] = elo_metrics
+        dixon_coles_rows = [
+            (dixon_probabilities, observation.actual_outcome)
+            for observation in replayed
+            if (dixon_probabilities := observation.dixon_coles_probabilities) is not None
+        ]
+        dixon_coles_metrics, _ = summarize_probabilities(
+            dixon_coles_rows, bins=request.calibration_bins
+        )
+        _attach_score_intervals(
+            dixon_coles_metrics,
+            dixon_coles_rows,
+            seed_material=bootstrap_seed_material,
+            namespace="dixon_coles",
+        )
+        _attach_paired_loss_difference(
+            dixon_coles_metrics,
+            probability_rows,
+            dixon_coles_rows,
+            seed_material=bootstrap_seed_material,
+            namespace="dixon_coles",
+        )
+        benchmark_metrics["dixon_coles"] = dixon_coles_metrics
+    else:
+        poisson_rows = [
+            (observation.poisson_probabilities, observation.actual_outcome)
+            for observation in replayed
+        ]
+        poisson_metrics, _ = summarize_probabilities(poisson_rows, bins=request.calibration_bins)
+        _attach_score_intervals(
+            poisson_metrics,
+            poisson_rows,
+            seed_material=bootstrap_seed_material,
+            namespace="poisson",
+        )
+        _attach_paired_loss_difference(
+            poisson_metrics,
+            probability_rows,
+            poisson_rows,
+            seed_material=bootstrap_seed_material,
+            namespace="poisson",
+            primary_name=primary_benchmark,
+        )
+        benchmark_metrics["poisson"] = poisson_metrics
     market_pairs = [
         (
             observation.probabilities,
@@ -333,6 +395,7 @@ def evaluate_model(
             market_rows,
             seed_material=bootstrap_seed_material,
             namespace="market_consensus",
+            primary_name=primary_benchmark,
         )
 
     recalibration_metrics = _temperature_recalibration_metrics(
@@ -340,6 +403,7 @@ def evaluate_model(
         bins=request.calibration_bins,
         seed_material=bootstrap_seed_material,
         fit_through=evaluation_end,
+        primary_name=primary_benchmark,
     )
 
     is_demo = bool(model.is_demo or any(row.event.is_demo for row in replayed))
@@ -356,6 +420,7 @@ def evaluate_model(
         replayed=replayed,
         evaluation_status=evaluation_status,
         probability_evaluation_status=probability_evaluation_status,
+        evaluation_method_version=evaluation_method_version,
     )
     existing = session.scalar(select(BacktestRun).where(BacktestRun.fingerprint == fingerprint))
     if existing is not None:
@@ -363,7 +428,9 @@ def evaluate_model(
 
     config: dict[str, object] = {
         "evaluation_kind": "expanding_window_match_result",
-        "evaluation_method_version": EVALUATION_METHOD_VERSION,
+        "evaluation_method_version": evaluation_method_version,
+        "primary_benchmark": primary_benchmark,
+        "primary_model_kind": model.kind,
         "competition_id": competition_id,
         "training_start": _utc(model.training_start).isoformat(),
         "evaluation_start": evaluation_start.isoformat(),
@@ -383,7 +450,7 @@ def evaluate_model(
             "block_length_rule": "round_cube_root_sample_size_minimum_1",
             "seed_derivation": "sha256_seed_material_and_metric_namespace",
             "seed_material_sha256": bootstrap_seed_material,
-            "paired_difference_definition": "poisson_loss_minus_benchmark_loss",
+            "paired_difference_definition": (f"{primary_benchmark}_loss_minus_benchmark_loss"),
         },
         "market_benchmark": "mean_proportional_devig_of_latest_compatible_snapshot_per_bookmaker",
         "probability_recalibration": {
@@ -395,13 +462,19 @@ def evaluate_model(
         },
         "elo_benchmark": {
             "version": "davidson-elo-v1",
-            **EloConfig().__dict__,
+            **elo_config.__dict__,
         },
-        "dixon_coles_benchmark": {
-            "version": "time-decayed-dixon-coles-v1",
-            "decay_rate": 0.0018,
-            "low_score_rho_bounds": [-0.2, 0.2],
-        },
+        **(
+            {
+                "dixon_coles_benchmark": {
+                    "version": "time-decayed-dixon-coles-v1",
+                    "decay_rate": 0.0018,
+                    "low_score_rho_bounds": [-0.2, 0.2],
+                }
+            }
+            if primary_benchmark == "poisson"
+            else {}
+        ),
     }
     run = BacktestRun(
         model_version_id=model.id,
@@ -450,10 +523,9 @@ def evaluate_model(
     _persist_results(
         session,
         run_id=run.id,
+        primary_benchmark=primary_benchmark,
         metrics=metrics,
-        uniform_metrics=uniform_metrics,
-        elo_metrics=elo_metrics,
-        dixon_coles_metrics=dixon_coles_metrics,
+        benchmark_metrics=benchmark_metrics,
         market_metrics=market_metrics,
         recalibration_metrics=recalibration_metrics,
         buckets=buckets,
@@ -669,32 +741,33 @@ def _attach_score_intervals(
 
 def _attach_paired_loss_difference(
     metrics: dict[str, object],
-    poisson_rows: list[tuple[dict[str, float], str]],
+    primary_rows: list[tuple[dict[str, float], str]],
     benchmark_rows: list[tuple[dict[str, float], str]],
     *,
     seed_material: str,
     namespace: str,
+    primary_name: str = "poisson",
 ) -> None:
-    if len(poisson_rows) != len(benchmark_rows) or not poisson_rows:
+    if len(primary_rows) != len(benchmark_rows) or not primary_rows:
         raise EvaluationError("paired benchmark comparison requires aligned observations")
     brier_differences: list[float] = []
     log_loss_differences: list[float] = []
-    for (poisson_probabilities, poisson_actual), (benchmark_probabilities, actual) in zip(
-        poisson_rows, benchmark_rows, strict=True
+    for (primary_probabilities, primary_actual), (benchmark_probabilities, actual) in zip(
+        primary_rows, benchmark_rows, strict=True
     ):
-        if poisson_actual != actual:
+        if primary_actual != actual:
             raise EvaluationError("paired benchmark comparison outcomes are not aligned")
         brier_differences.append(
-            multiclass_brier(poisson_probabilities, actual)
+            multiclass_brier(primary_probabilities, actual)
             - multiclass_brier(benchmark_probabilities, actual)
         )
         log_loss_differences.append(
-            multiclass_log_loss(poisson_probabilities, actual)
+            multiclass_log_loss(primary_probabilities, actual)
             - multiclass_log_loss(benchmark_probabilities, actual)
         )
     metrics["paired_loss_difference"] = {
-        "definition": "poisson_loss_minus_benchmark_loss",
-        "negative_values_favor": "poisson",
+        "definition": f"{primary_name}_loss_minus_benchmark_loss",
+        "negative_values_favor": primary_name,
         "brier_score": moving_block_mean_interval(
             brier_differences,
             confidence_level=BOOTSTRAP_CONFIDENCE_LEVEL,
@@ -716,6 +789,7 @@ def _temperature_recalibration_metrics(
     bins: int,
     seed_material: str,
     fit_through: datetime,
+    primary_name: str = "poisson",
 ) -> dict[str, object] | None:
     walk_forward = walk_forward_temperature_scaling(
         probability_rows,
@@ -744,6 +818,7 @@ def _temperature_recalibration_metrics(
         calibrated_rows,
         seed_material=seed_material,
         namespace="temperature_scaled",
+        primary_name=primary_name,
     )
     paired = calibrated_metrics["paired_loss_difference"]
     assert isinstance(paired, dict)
@@ -784,19 +859,29 @@ def _temperature_recalibration_metrics(
     return calibrated_metrics
 
 
-def _bootstrap_seed_material(replayed: list[_ReplayObservation]) -> str:
-    payload = [
-        {
+def _bootstrap_seed_material(
+    replayed: list[_ReplayObservation],
+    *,
+    primary_benchmark: str = "poisson",
+) -> str:
+    payload = []
+    for observation in replayed:
+        row: dict[str, object] = {
             "event_id": observation.event.id,
             "actual_outcome": observation.actual_outcome,
-            "poisson": observation.probabilities,
+            "poisson": (
+                observation.probabilities
+                if primary_benchmark == "poisson"
+                else observation.poisson_probabilities
+            ),
             "elo": observation.elo_probabilities,
             "dixon_coles": observation.dixon_coles_probabilities,
             "market_snapshot_ids": observation.market_snapshot_ids,
             "market": observation.market_probabilities,
         }
-        for observation in replayed
-    ]
+        if primary_benchmark != "poisson":
+            row["primary"] = observation.probabilities
+        payload.append(row)
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(encoded).hexdigest()
 
@@ -913,10 +998,9 @@ def _persist_results(
     session: Session,
     *,
     run_id: int,
+    primary_benchmark: str,
     metrics: dict[str, object],
-    uniform_metrics: dict[str, object],
-    elo_metrics: dict[str, object],
-    dixon_coles_metrics: dict[str, object],
+    benchmark_metrics: dict[str, dict[str, object]],
     market_metrics: dict[str, object] | None,
     recalibration_metrics: dict[str, object] | None,
     buckets: list[CalibrationBucket],
@@ -924,39 +1008,22 @@ def _persist_results(
     session.add(
         BacktestResult(
             run_id=run_id,
-            benchmark="poisson",
+            benchmark=primary_benchmark,
             dimension="overall",
             dimension_value="all",
             metrics=metrics,
         )
     )
-    session.add(
-        BacktestResult(
-            run_id=run_id,
-            benchmark="dixon_coles",
-            dimension="overall",
-            dimension_value="all",
-            metrics=dixon_coles_metrics,
+    for benchmark, benchmark_values in benchmark_metrics.items():
+        session.add(
+            BacktestResult(
+                run_id=run_id,
+                benchmark=benchmark,
+                dimension="overall",
+                dimension_value="all",
+                metrics=benchmark_values,
+            )
         )
-    )
-    session.add(
-        BacktestResult(
-            run_id=run_id,
-            benchmark="elo",
-            dimension="overall",
-            dimension_value="all",
-            metrics=elo_metrics,
-        )
-    )
-    session.add(
-        BacktestResult(
-            run_id=run_id,
-            benchmark="uniform",
-            dimension="overall",
-            dimension_value="all",
-            metrics=uniform_metrics,
-        )
-    )
     if market_metrics is not None:
         session.add(
             BacktestResult(
@@ -981,7 +1048,7 @@ def _persist_results(
         session.add(
             BacktestResult(
                 run_id=run_id,
-                benchmark="poisson",
+                benchmark=primary_benchmark,
                 dimension="calibration_bucket",
                 dimension_value=f"{bucket.selection_code}:{bucket.bucket_index}",
                 metrics=bucket.as_dict(),
@@ -1001,10 +1068,13 @@ def _run_view(session: Session, run: BacktestRun) -> EvaluationRunView:
     overall = {
         result.benchmark: result.metrics for result in results if result.dimension == "overall"
     }
+    primary_benchmark = run.config.get("primary_benchmark", "poisson")
+    if not isinstance(primary_benchmark, str) or primary_benchmark not in overall:
+        raise EvaluationError("evaluation primary benchmark is missing or invalid")
     calibration = [
         CalibrationBucketView.model_validate(result.metrics)
         for result in results
-        if result.benchmark == "poisson" and result.dimension == "calibration_bucket"
+        if result.benchmark == primary_benchmark and result.dimension == "calibration_bucket"
     ]
     return EvaluationRunView(
         id=run.id,
@@ -1019,9 +1089,11 @@ def _run_view(session: Session, run: BacktestRun) -> EvaluationRunView:
         probability_evaluation_status=run.probability_evaluation_status,
         evaluation_status=run.evaluation_status,
         is_demo=run.is_demo,
-        metrics=overall.get("poisson", {}),
+        metrics=overall[primary_benchmark],
         benchmarks={
-            benchmark: values for benchmark, values in overall.items() if benchmark != "poisson"
+            benchmark: values
+            for benchmark, values in overall.items()
+            if benchmark != primary_benchmark
         },
         calibration=calibration,
         created_at=_utc(run.created_at),
@@ -1035,10 +1107,11 @@ def _evaluation_fingerprint(
     replayed: list[_ReplayObservation],
     evaluation_status: str,
     probability_evaluation_status: str,
+    evaluation_method_version: str = EVALUATION_METHOD_VERSION,
 ) -> str:
     payload = {
         "model_version": model.version,
-        "evaluation_method_version": EVALUATION_METHOD_VERSION,
+        "evaluation_method_version": evaluation_method_version,
         "request": request.model_dump(mode="json"),
         "evaluation_status": evaluation_status,
         "probability_evaluation_status": probability_evaluation_status,
@@ -1052,6 +1125,11 @@ def _evaluation_fingerprint(
                 "elo_probabilities": row.elo_probabilities,
                 "dixon_coles_probabilities": row.dixon_coles_probabilities,
                 "market_snapshot_ids": row.market_snapshot_ids,
+                **(
+                    {"poisson_probabilities": row.poisson_probabilities}
+                    if model.kind == ELO_MODEL_KIND
+                    else {}
+                ),
             }
             for row in replayed
         ],
