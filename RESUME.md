@@ -440,8 +440,13 @@ infer closing flags, or enable player props before their independent validation 
   history for only seven days and has no configured subscription; Odds-API.io still lacks a
   per-price timestamp on its claimed closing response. No source passes the complete gate, so no
   purchase, adapter, historical import, or closing flag is authorized.
-- [ ] Revisit signal thresholds, staking, CLV, and market benchmarks only if the acquired evidence
-  passes chronology, identity, price-provenance, completeness, and sample-size gates.
+- [x] Revisit signal thresholds, staking, CLV, and market benchmarks only if the acquired evidence
+  passes chronology, identity, price-provenance, completeness, and sample-size gates. The
+  authorization audit found one calibrated non-demo probability run with 342 observations, but
+  zero observations reference an odds snapshot, profit unit, or closing-line value. The database
+  also retains zero non-demo signals and zero closing snapshots. This supports probability scoring
+  only; no threshold, staking, market-benchmark, CLV, ROI, or profitability validation is
+  authorized, and all existing policies remain unchanged.
 - [ ] Keep player-strength adjustments and player props blocked until timestamped licensed player
   targets, stable identities, minimum-minute and recency rules, settlement contracts, and
   chronological ablation evidence are independently validated.
