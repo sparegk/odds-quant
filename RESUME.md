@@ -461,3 +461,14 @@ infer closing flags, or enable player props before their independent validation 
   through job `214`. Scheduler PID `5948` remains active. Monitoring is expected to report the Odds
   provider unhealthy until the cooldown expires and fresh consecutive jobs complete; do not probe,
   restart, or manually bypass the boundary.
+
+### Probability recalibration checkpoint (2026-07-30)
+
+- [x] Align the tracked methodology and roadmap with the implemented uncertainty, market-relative
+  promotion, and chronological recalibration contracts. Current model versions use deterministic
+  chronological moving-block bootstrap refits rather than the legacy Wilson-only proxy. Promotion
+  requires paired-bootstrap superiority to both uniform and sufficiently covered compatible market
+  benchmarks, plus accepted held-out scalar temperature scaling. Predictions persist the exact
+  calibrator cutoff and fingerprint, and signal generation fails closed unless the output applies
+  the accepted pre-cutoff calibrator from the qualifying evaluation. These controls are software
+  and provenance evidence only; no historical-odds, CLV, ROI, or profitability claim is added.
