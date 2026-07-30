@@ -73,6 +73,10 @@ function signedPercentage(value: number): string {
   return `${value >= 0 ? '+' : ''}${(value * 100).toFixed(1)}%`
 }
 
+function signedPoints(value: number): string {
+  return `${value >= 0 ? '+' : ''}${(value * 100).toFixed(1)} pp`
+}
+
 function findFirstEvent(competitions: MatchdayCompetition[]): number | null {
   const events = competitions.flatMap((competition) => competition.events)
   return (
@@ -436,6 +440,7 @@ export function MatchDetail({ detail }: { detail: MatchdayEventDetail }) {
         <BookmakerAvailability detail={detail} />
         <AvailabilityExplorer detail={detail} />
         <PredictionEvidence detail={detail} />
+        <ModelMarketLab detail={detail} />
         <section>
           <DetailHeading eyebrow="Probability versus exact price" title="Ranked match suggestions" />
           {detail.suggestions.length ? (
@@ -527,6 +532,62 @@ export function MatchDetail({ detail }: { detail: MatchdayEventDetail }) {
       </div>
     </article>
   )
+}
+
+function ModelMarketLab({ detail }: { detail: MatchdayEventDetail }) {
+  const comparisons = detail.model_market_comparisons
+  return <section>
+    <DetailHeading eyebrow="Transparent arithmetic" title="Model vs market lab" />
+    <div className="mb-3 border-l-4 border-sky-500 bg-sky-50 px-3 py-2 text-xs leading-5 text-sky-950">
+      <strong>Research-only arithmetic.</strong> This joins the stored model interval to fresh,
+      exact prices from the selected bookmakers. It does not create a VALUE signal, use a closing
+      line, or make a staking recommendation.
+    </div>
+    {comparisons.length ? (
+      <div className="space-y-3">
+        {comparisons.map((comparison) => (
+          <article className="border border-zinc-200" key={`${comparison.market_id}-${comparison.selection_code}`}>
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-200 bg-zinc-50 p-3">
+              <div>
+                <p className="text-xs font-bold uppercase text-zinc-500">
+                  {humanizeCode(comparison.market_type)}{comparison.line === null ? '' : ` ${comparison.line}`}
+                </p>
+                <h4 className="mt-1 font-bold">{comparison.selection_name}</h4>
+              </div>
+              <div className="text-right">
+                <p className="font-mono text-lg font-bold">{comparison.best_odds.toFixed(2)}</p>
+                <p className="text-xs text-zinc-500">{comparison.best_bookmaker} / best selected price</p>
+              </div>
+            </div>
+            <dl className="grid grid-cols-2 gap-px bg-zinc-200 sm:grid-cols-4">
+              <LabMetric label="Model probability" value={percentage(comparison.model_probability)} />
+              <LabMetric label="Market consensus" value={percentage(comparison.market_consensus_probability)} />
+              <LabMetric label="Model edge" value={signedPoints(comparison.probability_edge)} />
+              <LabMetric label="Conservative edge" value={signedPoints(comparison.conservative_edge)} warning={comparison.conservative_edge <= 0} />
+              <LabMetric label={`Raw EV @ ${comparison.best_odds.toFixed(2)}`} value={signedPercentage(comparison.expected_value)} />
+              <LabMetric label="Lower-bound EV" value={signedPercentage(comparison.lower_expected_value)} warning={comparison.lower_expected_value <= 0} />
+              <LabMetric label="Market range" value={`${percentage(comparison.market_probability_low)}–${percentage(comparison.market_probability_high)}`} />
+              <LabMetric label="Book / method spread" value={`${signedPoints(comparison.bookmaker_disagreement).replace('+', '')} / ${signedPoints(comparison.devig_method_spread).replace('+', '')}`} />
+            </dl>
+            <div className="p-3 text-xs leading-5 text-zinc-600">
+              <p>{comparison.bookmaker_count} selected bookmaker{comparison.bookmaker_count === 1 ? '' : 's'} included. Best price observed {formatDateTime(comparison.best_price_observed_at)}.</p>
+              <ul className="mt-1 list-disc pl-4">
+                {comparison.qualification_blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}
+              </ul>
+            </div>
+          </article>
+        ))}
+      </div>
+    ) : (
+      <ResearchEmpty text={detail.latest_prediction
+        ? 'Comparison blocked: no fresh exact selected-bookmaker price matches the stored prediction.'
+        : 'Comparison blocked: no timestamp-valid pre-kickoff model output is stored.'} />
+    )}
+  </section>
+}
+
+function LabMetric({ label, value, warning = false }: { label: string; value: string; warning?: boolean }) {
+  return <div className="bg-white p-3"><dt className="text-[11px] font-semibold uppercase text-zinc-500">{label}</dt><dd className={`mt-1 font-mono font-bold ${warning ? 'text-amber-700' : 'text-zinc-900'}`}>{value}</dd></div>
 }
 
 function PredictionEvidence({ detail }: { detail: MatchdayEventDetail }) {

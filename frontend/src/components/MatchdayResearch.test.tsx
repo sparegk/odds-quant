@@ -198,6 +198,39 @@ const detail: MatchdayEventDetail = {
       },
     ],
   },
+  model_market_comparisons: [
+    {
+      market_id: 7,
+      market_type: 'MATCH_RESULT',
+      line: null,
+      selection_id: 17,
+      selection_code: 'HOME',
+      selection_name: 'Home win',
+      bookmaker_count: 2,
+      best_bookmaker: 'Novibet',
+      best_odds: 2.15,
+      best_price_observed_at: '2026-07-21T12:03:00Z',
+      best_price_age_seconds: 120,
+      model_probability: 0.52,
+      lower_probability: 0.47,
+      upper_probability: 0.57,
+      model_fair_odds: 1.92,
+      market_consensus_probability: 0.475,
+      market_probability_low: 0.46,
+      market_probability_high: 0.49,
+      devig_method_spread: 0.02,
+      bookmaker_disagreement: 0.03,
+      probability_edge: 0.045,
+      conservative_edge: -0.02,
+      expected_value: 0.118,
+      lower_expected_value: 0.0105,
+      research_only: true,
+      qualification_blockers: [
+        'Descriptive comparison only; no calibrated VALUE signal is stored at this cutoff.',
+        'Consensus is not a closing line.',
+      ],
+    },
+  ],
   signals: [],
   builder_quotes: [],
   suggestions: [
@@ -404,6 +437,12 @@ describe('MatchdayResearch', () => {
     expect(screen.getByText('Team Baseline')).toBeInTheDocument()
     expect(screen.getByText(/No expected or confirmed lineup adjustment/)).toBeInTheDocument()
     expect(screen.getByText('None applied')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Model vs market lab' })).toBeInTheDocument()
+    expect(screen.getByText('Research-only arithmetic.')).toBeInTheDocument()
+    expect(screen.getByText('+4.5 pp')).toBeInTheDocument()
+    expect(screen.getByText('-2.0 pp')).toBeInTheDocument()
+    expect(screen.getByText('11.8%', { exact: false })).toBeInTheDocument()
+    expect(screen.getByText(/does not create a VALUE signal/)).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Availability evidence explorer' })).toBeInTheDocument()
     expect(screen.getAllByTestId('availability-audit-item')).toHaveLength(5)
     expect(screen.getByText('Unavailable does not mean invisible.', { exact: false })).toBeInTheDocument()
@@ -444,6 +483,12 @@ describe('MatchdayResearch', () => {
     expect(screen.getByText(/Probabilities remain team-baseline values/)).toBeInTheDocument()
     expect(screen.getByText('CONTEXT ONLY')).toBeInTheDocument()
     expect(screen.getByText('#71, #72')).toBeInTheDocument()
+  })
+
+  it('explains why model-versus-market arithmetic is blocked', () => {
+    render(<MatchDetail detail={{ ...detail, model_market_comparisons: [] }} />)
+
+    expect(screen.getByText(/Comparison blocked: no fresh exact selected-bookmaker price/)).toBeInTheDocument()
   })
 
   it('retries a failed matchday without losing the selected date', async () => {

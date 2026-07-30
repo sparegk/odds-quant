@@ -711,6 +711,35 @@ export interface AvailabilityAuditItem {
   unlock_requirements: string[]
 }
 
+export interface ModelMarketComparison {
+  market_id: number
+  market_type: string
+  line: number | null
+  selection_id: number
+  selection_code: string
+  selection_name: string
+  bookmaker_count: number
+  best_bookmaker: string
+  best_odds: number
+  best_price_observed_at: string
+  best_price_age_seconds: number
+  model_probability: number
+  lower_probability: number
+  upper_probability: number
+  model_fair_odds: number
+  market_consensus_probability: number
+  market_probability_low: number
+  market_probability_high: number
+  devig_method_spread: number
+  bookmaker_disagreement: number
+  probability_edge: number
+  conservative_edge: number
+  expected_value: number
+  lower_expected_value: number
+  research_only: true
+  qualification_blockers: string[]
+}
+
 export interface StoredLineupMember {
   player_id: number
   player: string
@@ -772,6 +801,7 @@ export interface MatchdayEventDetail {
   team_form: TeamForm[]
   markets: MarketComparison[]
   latest_prediction: ModelOutput | null
+  model_market_comparisons: ModelMarketComparison[]
   signals: ValueSignal[]
   builder_quotes: BetBuilderQuote[]
   suggestions: MatchSuggestion[]
