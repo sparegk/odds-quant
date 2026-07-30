@@ -173,11 +173,13 @@ def test_prediction_applies_only_an_accepted_pre_cutoff_calibrator(
         fingerprint="accepted-temperature-calibration-run",
         config={"evaluation_kind": "expanding_window_match_result"},
         policy={
-            "version": "market-relative-recalibration-v4",
-            "decision": "calibrated",
-            "checks": {"chronological_recalibration_accepted": True},
+            "version": "separated-probability-market-v5",
+            "probability_decision": "probability_validated",
+            "market_decision": "insufficient_market_evidence",
+            "probability_checks": {"chronological_recalibration_accepted": True},
         },
-        evaluation_status="calibrated",
+        probability_evaluation_status="probability_validated",
+        evaluation_status="insufficient_market_evidence",
         is_demo=False,
     )
     session.add(run)

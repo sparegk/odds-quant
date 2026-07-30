@@ -10,7 +10,7 @@ from scipy.optimize import minimize_scalar  # type: ignore[import-untyped]
 from app.quant.evaluation import OUTCOMES, multiclass_log_loss
 
 RECALIBRATION_VERSION = "walk-forward-temperature-scaling-v1"
-PROMOTION_POLICY_VERSION = "market-relative-recalibration-v4"
+PROMOTION_POLICY_VERSION = "separated-probability-market-v5"
 
 
 @dataclass(frozen=True)

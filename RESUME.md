@@ -500,3 +500,11 @@ infer closing flags, or enable player props before their independent validation 
   chronological probability validation from market/value validation: the former may support model
   research without historical odds, while signals, CLV, staking, ROI, and profitability remain
   blocked until their independent market-evidence gates pass.
+- [x] Persist independent probability-validation provenance. Policy
+  `separated-probability-market-v5` records a probability decision from non-demo sample size,
+  replay coverage, ECE, paired-bootstrap superiority to uniform, and accepted chronological
+  recalibration, while the existing evaluation status retains the stricter market-relative
+  decision. Additive migration `d0e1f2a3b4c5` upgraded the configured SQLite database and verified
+  non-null status columns on both model versions and evaluation runs. Probability-validated runs
+  may supply their exact accepted pre-cutoff calibrator to later research predictions; this does
+  not make the run market-validated. Ruff, formatting, Mypy, and 24 targeted backend tests passed.

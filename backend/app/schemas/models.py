@@ -77,6 +77,7 @@ class ModelVersionView(BaseModel):
     data_fingerprint: str
     feature_version: str
     sample_size: int
+    probability_evaluation_status: str
     evaluation_status: str
     config: dict[str, object]
     metrics: dict[str, object]
@@ -162,6 +163,7 @@ class EvaluationRunView(BaseModel):
     fingerprint: str
     config: dict[str, object]
     policy: dict[str, object]
+    probability_evaluation_status: str
     evaluation_status: str
     is_demo: bool
     metrics: dict[str, object]

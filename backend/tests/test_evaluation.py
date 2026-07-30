@@ -87,6 +87,7 @@ def test_walk_forward_evaluation_persists_immutable_demo_evidence(
 
     assert repeated.id == run.id
     assert run.evaluation_status == "demo_only"
+    assert run.probability_evaluation_status == "demo_only"
     assert run.is_demo is True
     assert run.metrics["candidate_events"] == 12
     assert run.metrics["evaluated_events"] == 8
@@ -147,7 +148,7 @@ def test_walk_forward_evaluation_persists_immutable_demo_evidence(
     assert bootstrap_config["confidence_level"] == pytest.approx(0.95)
     assert bootstrap_config["resamples"] == 2000
     assert len(str(bootstrap_config["seed_material_sha256"])) == 64
-    assert run.policy["version"] == "market-relative-recalibration-v4"
+    assert run.policy["version"] == "separated-probability-market-v5"
     checks = run.policy["checks"]
     assert isinstance(checks, dict)
     paired_log_loss = paired["log_loss"]
@@ -157,6 +158,7 @@ def test_walk_forward_evaluation_persists_immutable_demo_evidence(
     assert len(run.calibration) > 0
     session.refresh(model)
     assert model.evaluation_status == "unvalidated"
+    assert model.probability_evaluation_status == "unvalidated"
     assert session.scalar(select(func.count()).select_from(BacktestRun)) == 1
     assert session.scalar(select(func.count()).select_from(BacktestObservation)) == 8
     result_count = session.scalar(select(func.count()).select_from(BacktestResult))
@@ -401,7 +403,7 @@ def test_promotion_requires_confident_uniform_and_market_superiority() -> None:
     }
     recalibration_metrics: dict[str, object] = {"activation_status": "accepted"}
 
-    status, policy = _policy_decision(
+    status, probability_status, policy = _policy_decision(
         metrics,
         uniform_metrics,
         market_metrics,
@@ -410,6 +412,7 @@ def test_promotion_requires_confident_uniform_and_market_superiority() -> None:
     )
 
     assert status == "calibration_failed"
+    assert probability_status == "probability_validation_failed"
     checks = policy["checks"]
     assert isinstance(checks, dict)
     assert checks["uniform_brier_upper_difference_below_zero"] is False
@@ -418,7 +421,7 @@ def test_promotion_requires_confident_uniform_and_market_superiority() -> None:
     paired = uniform_metrics["paired_loss_difference"]
     assert isinstance(paired, dict)
     paired["brier_score"] = {"estimate": -0.02, "lower": -0.04, "upper": -0.001}
-    status, policy = _policy_decision(
+    status, probability_status, policy = _policy_decision(
         metrics,
         uniform_metrics,
         market_metrics,
@@ -427,6 +430,7 @@ def test_promotion_requires_confident_uniform_and_market_superiority() -> None:
     )
 
     assert status == "calibrated"
+    assert probability_status == "probability_validated"
     checks = policy["checks"]
     assert isinstance(checks, dict)
     assert all(policy_check is True for policy_check in checks.values())
@@ -478,11 +482,14 @@ def test_promotion_fails_closed_without_adequate_market_coverage() -> None:
     uniform_metrics: dict[str, object] = dict(strong_comparison)
 
     recalibration_metrics: dict[str, object] = {"activation_status": "accepted"}
-    status, policy = _policy_decision(
+    status, probability_status, policy = _policy_decision(
         metrics, uniform_metrics, None, recalibration_metrics, is_demo=False
     )
 
     assert status == "insufficient_market_evidence"
+    assert probability_status == "probability_validated"
+    assert policy["probability_decision"] == "probability_validated"
+    assert policy["market_decision"] == "insufficient_market_evidence"
     checks = policy["checks"]
     assert isinstance(checks, dict)
     assert checks["market_benchmark_available"] is False
@@ -492,7 +499,7 @@ def test_promotion_fails_closed_without_adequate_market_coverage() -> None:
         "observations": 159,
         "coverage": 0.79,
     }
-    status, policy = _policy_decision(
+    status, probability_status, policy = _policy_decision(
         metrics,
         uniform_metrics,
         market_metrics,
@@ -501,6 +508,7 @@ def test_promotion_fails_closed_without_adequate_market_coverage() -> None:
     )
 
     assert status == "insufficient_market_evidence"
+    assert probability_status == "probability_validated"
     checks = policy["checks"]
     assert isinstance(checks, dict)
     assert checks["minimum_market_observations"] is False
@@ -528,7 +536,7 @@ def test_market_loss_uncertainty_can_block_promotion() -> None:
         },
     }
 
-    status, policy = _policy_decision(
+    status, probability_status, policy = _policy_decision(
         metrics,
         uniform_metrics,
         market_metrics,
@@ -537,6 +545,7 @@ def test_market_loss_uncertainty_can_block_promotion() -> None:
     )
 
     assert status == "calibration_failed"
+    assert probability_status == "probability_validated"
     checks = policy["checks"]
     assert isinstance(checks, dict)
     assert checks["market_brier_upper_difference_below_zero"] is False
@@ -562,9 +571,12 @@ def test_promotion_requires_accepted_chronological_recalibration() -> None:
         "coverage": 0.82,
     }
 
-    status, policy = _policy_decision(metrics, uniform_metrics, market_metrics, None, is_demo=False)
+    status, probability_status, policy = _policy_decision(
+        metrics, uniform_metrics, market_metrics, None, is_demo=False
+    )
 
     assert status == "insufficient_recalibration_evidence"
+    assert probability_status == "insufficient_recalibration_evidence"
     checks = policy["checks"]
     assert isinstance(checks, dict)
     assert checks["chronological_recalibration_accepted"] is False

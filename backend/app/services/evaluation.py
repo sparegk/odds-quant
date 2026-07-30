@@ -343,7 +343,7 @@ def evaluate_model(
     )
 
     is_demo = bool(model.is_demo or any(row.event.is_demo for row in replayed))
-    evaluation_status, policy = _policy_decision(
+    evaluation_status, probability_evaluation_status, policy = _policy_decision(
         metrics,
         uniform_metrics,
         market_metrics,
@@ -355,6 +355,7 @@ def evaluate_model(
         request=request,
         replayed=replayed,
         evaluation_status=evaluation_status,
+        probability_evaluation_status=probability_evaluation_status,
     )
     existing = session.scalar(select(BacktestRun).where(BacktestRun.fingerprint == fingerprint))
     if existing is not None:
@@ -411,6 +412,7 @@ def evaluate_model(
         fingerprint=fingerprint,
         config=config,
         policy=policy,
+        probability_evaluation_status=probability_evaluation_status,
         evaluation_status=evaluation_status,
         is_demo=is_demo,
     )
@@ -456,13 +458,19 @@ def evaluate_model(
         recalibration_metrics=recalibration_metrics,
         buckets=buckets,
     )
+    if probability_evaluation_status == "probability_validated":
+        model.probability_evaluation_status = "probability_validated"
+        model.metrics = {
+            **model.metrics,
+            "held_out_evaluation": True,
+            "latest_probability_evaluation_run_id": run.id,
+            "held_out_metrics": metrics,
+        }
     if evaluation_status == "calibrated":
         model.evaluation_status = "calibrated"
         model.metrics = {
             **model.metrics,
-            "held_out_evaluation": True,
             "latest_evaluation_run_id": run.id,
-            "held_out_metrics": metrics,
         }
     session.commit()
     return _run_view(session, run)
@@ -815,7 +823,7 @@ def _policy_decision(
     recalibration_metrics: dict[str, object] | None,
     *,
     is_demo: bool,
-) -> tuple[str, dict[str, object]]:
+) -> tuple[str, str, dict[str, object]]:
     observations = _metric_number(metrics, "observations")
     coverage = _metric_number(metrics, "coverage")
     ece = _metric_number(metrics, "expected_calibration_error")
@@ -837,13 +845,20 @@ def _policy_decision(
         if market_metrics is not None
         else float("inf")
     )
-    checks = {
+    probability_checks = {
         "non_demo_data": not is_demo,
         "minimum_observations": observations >= MINIMUM_PROMOTION_OBSERVATIONS,
         "minimum_coverage": coverage >= MINIMUM_PROMOTION_COVERAGE,
         "maximum_expected_calibration_error": ece <= MAXIMUM_PROMOTION_ECE,
         "uniform_brier_upper_difference_below_zero": uniform_brier_upper < 0,
         "uniform_log_loss_upper_difference_below_zero": uniform_log_loss_upper < 0,
+        "chronological_recalibration_accepted": (
+            recalibration_metrics is not None
+            and recalibration_metrics.get("activation_status") == "accepted"
+        ),
+    }
+    checks = {
+        **probability_checks,
         "market_benchmark_available": market_metrics is not None,
         "minimum_market_observations": (
             market_observations >= MINIMUM_MARKET_PROMOTION_OBSERVATIONS
@@ -851,11 +866,19 @@ def _policy_decision(
         "minimum_market_coverage": market_coverage >= MINIMUM_MARKET_PROMOTION_COVERAGE,
         "market_brier_upper_difference_below_zero": market_brier_upper < 0,
         "market_log_loss_upper_difference_below_zero": market_log_loss_upper < 0,
-        "chronological_recalibration_accepted": (
-            recalibration_metrics is not None
-            and recalibration_metrics.get("activation_status") == "accepted"
-        ),
     }
+    if is_demo:
+        probability_status = "demo_only"
+    elif (
+        not probability_checks["minimum_observations"] or not probability_checks["minimum_coverage"]
+    ):
+        probability_status = "insufficient_evidence"
+    elif recalibration_metrics is None:
+        probability_status = "insufficient_recalibration_evidence"
+    elif all(probability_checks.values()):
+        probability_status = "probability_validated"
+    else:
+        probability_status = "probability_validation_failed"
     if is_demo:
         status = "demo_only"
     elif not checks["minimum_observations"] or not checks["minimum_coverage"]:
@@ -872,7 +895,18 @@ def _policy_decision(
         status = "calibrated"
     else:
         status = "calibration_failed"
-    return status, {**PROMOTION_POLICY, "checks": checks, "decision": status}
+    return (
+        status,
+        probability_status,
+        {
+            **PROMOTION_POLICY,
+            "probability_checks": probability_checks,
+            "checks": checks,
+            "probability_decision": probability_status,
+            "market_decision": status,
+            "decision": status,
+        },
+    )
 
 
 def _persist_results(
@@ -982,6 +1016,7 @@ def _run_view(session: Session, run: BacktestRun) -> EvaluationRunView:
         fingerprint=run.fingerprint,
         config=run.config,
         policy=run.policy,
+        probability_evaluation_status=run.probability_evaluation_status,
         evaluation_status=run.evaluation_status,
         is_demo=run.is_demo,
         metrics=overall.get("poisson", {}),
@@ -999,12 +1034,14 @@ def _evaluation_fingerprint(
     request: EvaluateModelRequest,
     replayed: list[_ReplayObservation],
     evaluation_status: str,
+    probability_evaluation_status: str,
 ) -> str:
     payload = {
         "model_version": model.version,
         "evaluation_method_version": EVALUATION_METHOD_VERSION,
         "request": request.model_dump(mode="json"),
         "evaluation_status": evaluation_status,
+        "probability_evaluation_status": probability_evaluation_status,
         "observations": [
             {
                 "event_id": row.event.id,

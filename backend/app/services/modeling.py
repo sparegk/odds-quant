@@ -151,6 +151,7 @@ def train_poisson_model(
         data_fingerprint=fingerprint,
         feature_version=FEATURE_VERSION,
         sample_size=fitted.sample_size,
+        probability_evaluation_status="unvalidated",
         evaluation_status="unvalidated",
         config=config,
         metrics={
@@ -698,16 +699,17 @@ def _prediction_calibration(
         .where(
             BacktestRun.model_version_id == model.id,
             BacktestRun.status == "completed",
-            BacktestRun.evaluation_status == "calibrated",
+            BacktestRun.probability_evaluation_status == "probability_validated",
             BacktestRun.is_demo.is_(False),
             BacktestRun.test_end <= inputs_as_of,
         )
         .order_by(BacktestRun.test_end.desc(), BacktestRun.id.desc())
     ).all()
     for run in runs:
-        checks = run.policy.get("checks")
+        checks = run.policy.get("probability_checks")
         if (
             run.policy.get("version") != PROMOTION_POLICY_VERSION
+            or run.policy.get("probability_decision") != "probability_validated"
             or not isinstance(checks, dict)
             or checks.get("chronological_recalibration_accepted") is not True
         ):
@@ -807,6 +809,7 @@ def _model_view(model: ModelVersion) -> ModelVersionView:
         data_fingerprint=model.data_fingerprint,
         feature_version=model.feature_version,
         sample_size=model.sample_size,
+        probability_evaluation_status=model.probability_evaluation_status,
         evaluation_status=model.evaluation_status,
         config=model.config,
         metrics=model.metrics,

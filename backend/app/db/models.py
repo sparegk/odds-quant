@@ -507,6 +507,7 @@ class ModelVersion(Base, TimestampMixin):
     data_fingerprint: Mapped[str] = mapped_column(String(64))
     feature_version: Mapped[str] = mapped_column(String(60))
     sample_size: Mapped[int] = mapped_column(Integer)
+    probability_evaluation_status: Mapped[str] = mapped_column(String(40), default="unvalidated")
     evaluation_status: Mapped[str] = mapped_column(String(30), default="unvalidated")
     config: Mapped[dict[str, object]] = mapped_column(JSON)
     metrics: Mapped[dict[str, object]] = mapped_column(JSON)
@@ -726,6 +727,7 @@ class BacktestRun(Base, TimestampMixin):
     fingerprint: Mapped[str | None] = mapped_column(String(64), unique=True)
     config: Mapped[dict[str, object]] = mapped_column(JSON)
     policy: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+    probability_evaluation_status: Mapped[str] = mapped_column(String(40), default="unvalidated")
     evaluation_status: Mapped[str] = mapped_column(String(30), default="unvalidated")
     is_demo: Mapped[bool] = mapped_column(Boolean, default=False)
     __table_args__ = (
