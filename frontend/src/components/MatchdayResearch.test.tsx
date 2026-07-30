@@ -180,6 +180,17 @@ const detail: MatchdayEventDetail = {
     home_lambda: 1.5,
     away_lambda: 0.9,
     sample_size: 500,
+    probability_uncertainty: {
+      method: 'chronological_moving_block_bootstrap_refit',
+      version: 'probability-uncertainty-v1',
+      confidence_level: 0.95,
+      requested_refits: 400,
+      successful_refits: 400,
+      attempted_refits: 405,
+      block_length: 22,
+      seed_fingerprint: 'abcdef123456',
+      training_fingerprint: 'training123456',
+    },
     score_matrix: [],
     derived_probabilities: {},
     predictions: [
@@ -437,6 +448,7 @@ describe('MatchdayResearch', () => {
     expect(screen.getByText('Team Baseline')).toBeInTheDocument()
     expect(screen.getByText(/No expected or confirmed lineup adjustment/)).toBeInTheDocument()
     expect(screen.getByText('None applied')).toBeInTheDocument()
+    expect(screen.getByText(/Probability uncertainty v1 \/ 400 refits/i)).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Model vs market lab' })).toBeInTheDocument()
     expect(screen.getByText('Research-only arithmetic.')).toBeInTheDocument()
     expect(screen.getByText('+4.5 pp')).toBeInTheDocument()

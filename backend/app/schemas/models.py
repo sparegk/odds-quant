@@ -99,6 +99,18 @@ class SelectionPredictionView(BaseModel):
     fair_odds: float
 
 
+class ProbabilityUncertaintyView(BaseModel):
+    method: str
+    version: str
+    confidence_level: float
+    requested_refits: int
+    successful_refits: int
+    attempted_refits: int
+    block_length: int | None
+    seed_fingerprint: str | None
+    training_fingerprint: str
+
+
 class ModelOutputView(BaseModel):
     id: int
     event_id: int
@@ -111,6 +123,7 @@ class ModelOutputView(BaseModel):
     home_lambda: float
     away_lambda: float
     sample_size: int
+    probability_uncertainty: ProbabilityUncertaintyView
     score_matrix: list[list[float]]
     derived_probabilities: dict[str, dict[str, float]]
     predictions: list[SelectionPredictionView]

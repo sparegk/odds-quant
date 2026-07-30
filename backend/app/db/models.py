@@ -534,6 +534,7 @@ class ModelEventOutput(Base):
     away_lambda: Mapped[float] = mapped_column(Float)
     score_matrix: Mapped[list[list[float]]] = mapped_column(JSON)
     sample_size: Mapped[int] = mapped_column(Integer)
+    probability_uncertainty: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
     __table_args__ = (
         UniqueConstraint(
             "event_id",

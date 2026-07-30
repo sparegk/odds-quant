@@ -136,6 +136,15 @@ def test_training_and_prediction_are_versioned_and_persisted(session: Session) -
     assert sum(output.derived_probabilities["MATCH_RESULT"].values()) == pytest.approx(1)
     assert sum(output.derived_probabilities["TOTAL_GOALS_2.5"].values()) == pytest.approx(1)
     assert len(output.predictions) == 3
+    assert output.probability_uncertainty.method == ("chronological_moving_block_bootstrap_refit")
+    assert output.probability_uncertainty.version == "probability-uncertainty-v1"
+    assert output.probability_uncertainty.successful_refits == 400
+    assert output.probability_uncertainty.block_length == 6
+    assert output.probability_uncertainty.training_fingerprint == model.data_fingerprint
+    assert all(
+        prediction.lower_probability <= prediction.probability <= prediction.upper_probability
+        for prediction in output.predictions
+    )
     assert session.scalar(select(func.count()).select_from(ModelPrediction)) == 3
 
 
@@ -313,7 +322,7 @@ def test_current_season_model_uses_only_same_canonical_competition_history(
     )
 
     assert model.sample_size == 32
-    assert model.feature_version == "final-score-home-away-v2-cross-season"
+    assert model.feature_version == "final-score-home-away-v3-bootstrap-uncertainty"
     assert model.config["competition_id"] == current_season.id
     assert model.config["training_competition_ids"] == [
         prior_season.id,

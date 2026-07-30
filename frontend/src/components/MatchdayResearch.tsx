@@ -611,6 +611,7 @@ function PredictionEvidence({ detail }: { detail: MatchdayEventDetail }) {
         <PredictionMetric label="Inputs as of" value={formatDateTime(prediction.inputs_as_of)} />
         <PredictionMetric label="Prediction time" value={formatDateTime(prediction.predicted_at)} />
         <PredictionMetric label="Lineup snapshots" value={prediction.lineup_snapshot_ids.length ? prediction.lineup_snapshot_ids.map((id) => `#${id}`).join(', ') : 'None applied'} />
+        <PredictionMetric label="Uncertainty" value={`${humanizeCode(prediction.probability_uncertainty.version.replaceAll('-', '_'))} / ${prediction.probability_uncertainty.successful_refits || 'legacy'} refits`} />
       </dl>
     </div>
   </section>

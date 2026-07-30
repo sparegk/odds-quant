@@ -31,16 +31,25 @@ from app.quant.team_strength import (
     model_from_config,
     model_to_config,
 )
+from app.quant.uncertainty import (
+    bootstrap_probability_interval,
+    chronological_block_bootstrap_expected_goals,
+)
 from app.schemas.models import (
     ModelOutputView,
     ModelVersionView,
     PredictEventRequest,
+    ProbabilityUncertaintyView,
     SelectionPredictionView,
     TrainPoissonRequest,
 )
 
 MODEL_KIND = "poisson_team_strength"
-FEATURE_VERSION = "final-score-home-away-v2-cross-season"
+FEATURE_VERSION = "final-score-home-away-v3-bootstrap-uncertainty"
+UNCERTAINTY_METHOD = "chronological_moving_block_bootstrap_refit"
+UNCERTAINTY_VERSION = "probability-uncertainty-v1"
+UNCERTAINTY_CONFIDENCE_LEVEL = 0.95
+UNCERTAINTY_RESAMPLES = 400
 
 
 class ModelingError(ValueError):
@@ -93,6 +102,7 @@ def train_poisson_model(
             "shrinkage_matches": request.shrinkage_matches,
             "training_start": training_start.isoformat(),
             "training_competition_ids": training_competition_ids,
+            "probability_uncertainty_version": UNCERTAINTY_VERSION,
         },
         sort_keys=True,
         separators=(",", ":"),
@@ -114,6 +124,14 @@ def train_poisson_model(
             "score_matrix_max_goals": 20,
             "training_cutoff_inclusive_for_observations": True,
             "training_kickoff_end_exclusive": True,
+            "probability_uncertainty": {
+                "method": UNCERTAINTY_METHOD,
+                "version": UNCERTAINTY_VERSION,
+                "confidence_level": UNCERTAINTY_CONFIDENCE_LEVEL,
+                "resamples": UNCERTAINTY_RESAMPLES,
+                "block_length_rule": "round_sqrt_training_matches_minimum_2",
+                "seed_scope": "training_fingerprint_event_id_method_version",
+            },
         }
     )
     model = ModelVersion(
@@ -205,6 +223,11 @@ def predict_event(
     )
     home_lambda, away_lambda = fitted.expected_goals(event.home_team_id, event.away_team_id)
     matrix = score_matrix(home_lambda, away_lambda)
+    uncertainty, bootstrap_matrices = _prediction_uncertainty(
+        session,
+        model=model,
+        event=event,
+    )
     output = ModelEventOutput(
         event_id=event.id,
         model_version_id=model.id,
@@ -217,6 +240,7 @@ def predict_event(
         away_lambda=away_lambda,
         score_matrix=matrix.tolist(),
         sample_size=model.sample_size,
+        probability_uncertainty=uncertainty,
     )
     session.add(output)
     session.flush()
@@ -227,7 +251,14 @@ def predict_event(
                 lineup_snapshot_id=lineup.id,
             )
         )
-    _persist_selection_predictions(session, output, event, matrix)
+    _persist_selection_predictions(
+        session,
+        output,
+        event,
+        matrix,
+        bootstrap_matrices=bootstrap_matrices,
+        confidence_level=_config_float(uncertainty, "confidence_level"),
+    )
     session.commit()
     return _output_view(session, output, model)
 
@@ -371,6 +402,9 @@ def _persist_selection_predictions(
     output: ModelEventOutput,
     event: Event,
     matrix: np.ndarray[tuple[int, int], np.dtype[np.float64]],
+    *,
+    bootstrap_matrices: list[np.ndarray[tuple[int, int], np.dtype[np.float64]]] | None,
+    confidence_level: float,
 ) -> None:
     rows = session.execute(
         select(Market, Selection)
@@ -391,7 +425,18 @@ def _persist_selection_predictions(
             )
         except ValueError:
             continue
-        lower, upper = _wilson_interval(probability, output.sample_size)
+        if bootstrap_matrices is None:
+            lower, upper = _wilson_interval(probability, output.sample_size)
+        else:
+            sampled_probabilities = [
+                selection_probability(sample, market.market_type, selection.code, line)
+                for sample in bootstrap_matrices
+            ]
+            lower, upper = bootstrap_probability_interval(
+                probability,
+                sampled_probabilities,
+                confidence_level=confidence_level,
+            )
         session.add(
             ModelPrediction(
                 output_id=output.id,
@@ -436,6 +481,7 @@ def _output_view(
         home_lambda=output.home_lambda,
         away_lambda=output.away_lambda,
         sample_size=output.sample_size,
+        probability_uncertainty=_uncertainty_view(output, model),
         score_matrix=[[float(value) for value in row] for row in matrix],
         derived_probabilities=_derived_probabilities(matrix),
         predictions=[
@@ -472,6 +518,99 @@ def _derived_probabilities(
         "TEAM_TOTAL_HOME_1.5": derive_market(matrix, "TEAM_TOTAL_HOME", 1.5),
         "TEAM_TOTAL_AWAY_1.5": derive_market(matrix, "TEAM_TOTAL_AWAY", 1.5),
     }
+
+
+def _prediction_uncertainty(
+    session: Session,
+    *,
+    model: ModelVersion,
+    event: Event,
+) -> tuple[
+    dict[str, object],
+    list[np.ndarray[tuple[int, int], np.dtype[np.float64]]] | None,
+]:
+    settings = model.config.get("probability_uncertainty")
+    if not isinstance(settings, dict) or settings.get("method") != UNCERTAINTY_METHOD:
+        return (
+            {
+                "method": "wilson_training_sample_proxy",
+                "version": "legacy-v1",
+                "confidence_level": 0.95,
+                "requested_refits": 0,
+                "successful_refits": 0,
+                "attempted_refits": 0,
+                "block_length": None,
+                "seed_fingerprint": None,
+                "training_fingerprint": model.data_fingerprint,
+            },
+            None,
+        )
+
+    observations = _training_observations(
+        session,
+        competition_id=_config_int(model.config, "competition_id"),
+        training_start=_utc(model.training_start),
+        training_end=_utc(model.training_end),
+    )
+    if _fingerprint(observations) != model.data_fingerprint:
+        raise ModelingError("uncertainty training fingerprint does not match the model version")
+    scores = [
+        HistoricalScore(
+            home_team_id=historical_event.home_team_id,
+            away_team_id=historical_event.away_team_id,
+            home_goals=result.home_goals,
+            away_goals=result.away_goals,
+        )
+        for result, historical_event in observations
+    ]
+    version = _setting_string(settings, "version")
+    confidence_level = _setting_float(settings, "confidence_level")
+    resamples = _setting_int(settings, "resamples")
+    seed_material = f"{model.data_fingerprint}:{event.id}:{UNCERTAINTY_METHOD}:{version}"
+    try:
+        distribution = chronological_block_bootstrap_expected_goals(
+            scores,
+            home_team_id=event.home_team_id,
+            away_team_id=event.away_team_id,
+            shrinkage_matches=_config_float(model.config, "shrinkage_matches"),
+            resamples=resamples,
+            seed_material=seed_material,
+        )
+    except ValueError as exc:
+        raise ModelingError(f"probability uncertainty failed closed: {exc}") from exc
+    matrices = [score_matrix(home, away) for home, away in distribution.samples]
+    return (
+        {
+            "method": UNCERTAINTY_METHOD,
+            "version": version,
+            "confidence_level": confidence_level,
+            "requested_refits": distribution.requested_refits,
+            "successful_refits": len(distribution.samples),
+            "attempted_refits": distribution.attempted_refits,
+            "block_length": distribution.block_length,
+            "seed_fingerprint": distribution.seed_fingerprint,
+            "training_fingerprint": model.data_fingerprint,
+        },
+        matrices,
+    )
+
+
+def _uncertainty_view(
+    output: ModelEventOutput,
+    model: ModelVersion,
+) -> ProbabilityUncertaintyView:
+    values = output.probability_uncertainty or {
+        "method": "wilson_training_sample_proxy",
+        "version": "legacy-v1",
+        "confidence_level": 0.95,
+        "requested_refits": 0,
+        "successful_refits": 0,
+        "attempted_refits": 0,
+        "block_length": None,
+        "seed_fingerprint": None,
+        "training_fingerprint": model.data_fingerprint,
+    }
+    return ProbabilityUncertaintyView.model_validate(values)
 
 
 def _fingerprint(observations: list[tuple[MatchResult, Event]]) -> str:
@@ -528,6 +667,34 @@ def _config_int(config: dict[str, object], key: str) -> int:
     value = config.get(key)
     if isinstance(value, bool) or not isinstance(value, int):
         raise ModelingError(f"model configuration field {key} is invalid")
+    return value
+
+
+def _config_float(config: dict[str, object], key: str) -> float:
+    value = config.get(key)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ModelingError(f"model configuration field {key} is invalid")
+    return float(value)
+
+
+def _setting_string(settings: dict[str, object], key: str) -> str:
+    value = settings.get(key)
+    if not isinstance(value, str) or not value:
+        raise ModelingError(f"probability uncertainty setting {key} is invalid")
+    return value
+
+
+def _setting_float(settings: dict[str, object], key: str) -> float:
+    value = settings.get(key)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ModelingError(f"probability uncertainty setting {key} is invalid")
+    return float(value)
+
+
+def _setting_int(settings: dict[str, object], key: str) -> int:
+    value = settings.get(key)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ModelingError(f"probability uncertainty setting {key} is invalid")
     return value
 
 

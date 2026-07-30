@@ -158,6 +158,17 @@ export interface ModelOutput {
   home_lambda: number
   away_lambda: number
   sample_size: number
+  probability_uncertainty: {
+    method: string
+    version: string
+    confidence_level: number
+    requested_refits: number
+    successful_refits: number
+    attempted_refits: number
+    block_length: number | null
+    seed_fingerprint: string | null
+    training_fingerprint: string
+  }
   score_matrix: number[][]
   derived_probabilities: Record<string, Record<string, number>>
   predictions: SelectionPrediction[]

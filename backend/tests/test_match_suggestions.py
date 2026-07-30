@@ -55,6 +55,17 @@ def prediction_output() -> ModelOutputView:
         home_lambda=1.5,
         away_lambda=1.0,
         sample_size=100,
+        probability_uncertainty={
+            "method": "wilson_training_sample_proxy",
+            "version": "legacy-v1",
+            "confidence_level": 0.95,
+            "requested_refits": 0,
+            "successful_refits": 0,
+            "attempted_refits": 0,
+            "block_length": None,
+            "seed_fingerprint": None,
+            "training_fingerprint": "fixture-training-fingerprint",
+        },
         score_matrix=[[1.0]],
         derived_probabilities={},
         predictions=[
