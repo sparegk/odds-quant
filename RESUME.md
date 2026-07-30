@@ -521,3 +521,8 @@ infer closing flags, or enable player props before their independent validation 
   `insufficient_market_evidence`; generation fails with `model is not market validated` and stores
   zero value signals. Research-candidate blockers now name the missing market-validated evaluation
   explicitly. Ruff, Mypy, and all 35 signal, suggestion, and backtesting tests passed.
+- [x] Complete the probability-research scope verification. The full backend suite passed with 260
+  tests; Ruff, format checking, and Mypy passed across 119 source files; the configured database is
+  at Alembic head `d0e1f2a3b4c5`; all 65 frontend tests, ESLint, TypeScript compilation, and the
+  production build passed. Arbitrage remains maintenance-only, probability validation is visible
+  as a distinct research status, and market/value outputs remain independently fail-closed.
