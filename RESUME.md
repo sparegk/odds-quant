@@ -545,3 +545,10 @@ infer closing flags, or enable player props before their independent validation 
   the sole failed probability gate is `chronological_recalibration_accepted`; temperature
   `1.263689`, fitted through the 342-observation run, remains explicitly unaccepted and cannot be
   applied to later predictions.
+- [x] Apply the post-validation prediction condition without bypassing the failed gate. Because run
+  `3` did not become probability validated and its final calibrator is unaccepted, no later
+  calibrated research prediction was created. A direct database audit found model version `3`
+  remains `unvalidated` on the probability track and retains zero model outputs, zero selection
+  predictions, and zero value signals. Its legacy market-status label does not satisfy the v5
+  evaluation-policy and exact-calibrator requirements used by signal generation. The project
+  therefore remains fail-closed while model research continues.
