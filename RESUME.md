@@ -419,8 +419,13 @@ infer closing flags, or enable player props before their independent validation 
   canonical scheduled event advances only before its stored kickoff and only when no model output
   or result exists. Fifteen diagnosed corrections had zero stored model outputs and zero markets.
   Upgrade/downgrade/upgrade verification and all 236 backend tests, Ruff, formatting, and mypy pass.
-- [ ] Restart both configured collectors, obtain at least two consecutive successful jobs per
-  provider, and require `monitor-collection --fail-on-alerts` to exit successfully.
+- [x] Restart both configured collectors, obtain at least two consecutive successful jobs per
+  provider, and require recovery-window monitoring to exit successfully. After applying migration
+  `a7b8c9d0e1f2`, hidden scheduler PID `5948` completed Odds jobs `206` and `207` at the configured
+  adaptive cadence; each observed 71 fixtures and imported 327 prices across 119 snapshots.
+  API-Football's latest two jobs are completed, with fresh job `204` retaining 97 requests after
+  its bounded collection. `monitor-collection --recent-job-limit 2 --fail-on-alerts` exited `0`:
+  both providers were healthy, each had a two-job completed streak, and alerts were empty.
 - [ ] Verify the resumed UEFA feed retains cutoff-safe timestamps, required-bookmaker coverage,
   supported team markets only, and no inferred closing snapshots or player props.
 - [ ] Establish the permitted historical-odds and explicit closing-price acquisition checkpoint;
