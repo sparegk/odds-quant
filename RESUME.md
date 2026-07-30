@@ -535,3 +535,13 @@ infer closing flags, or enable player props before their independent validation 
   `separated-probability-market-v5` classified the run `probability_validation_failed` and retained
   the independent market result `insufficient_market_evidence`; this receipt records the replay
   outcome without promoting the model or authorizing signals.
+- [x] Audit every probability-validation gate on immutable run `3`. The non-demo, 342-observation
+  minimum, 90% coverage, and maximum-ECE gates passed; Poisson ECE was `0.070717` against the
+  `0.08` ceiling. Paired moving-block bootstrap superiority to uniform also passed: the 95%
+  upper loss-difference bounds were `-0.006187` for Brier score and `-0.012774` for log loss.
+  Chronological temperature scaling evaluated 282 later observations and improved subset Brier
+  score from `0.626013` to `0.623984` and log loss from `1.039833` to `1.037598`, but worsened
+  ECE from `0.066038` to `0.066738`. Because policy requires Brier, log loss, and ECE together,
+  the sole failed probability gate is `chronological_recalibration_accepted`; temperature
+  `1.263689`, fitted through the 342-observation run, remains explicitly unaccepted and cannot be
+  applied to later predictions.
