@@ -134,6 +134,10 @@ class FixtureObservation(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     event_id: Mapped[int] = mapped_column(ForeignKey("events.id", ondelete="CASCADE"))
     provider_id: Mapped[int] = mapped_column(ForeignKey("providers.id"))
+    competition_id: Mapped[int] = mapped_column(ForeignKey("competitions.id"))
+    home_team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"))
+    away_team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"))
+    kickoff_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     source_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     ingested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
@@ -141,6 +145,7 @@ class FixtureObservation(Base):
     __table_args__ = (
         UniqueConstraint("event_id", "provider_id", "observed_at"),
         CheckConstraint("ingested_at >= observed_at"),
+        CheckConstraint("home_team_id <> away_team_id"),
     )
 
 

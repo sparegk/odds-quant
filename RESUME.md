@@ -412,6 +412,13 @@ infer closing flags, or enable player props before their independent validation 
   metrics. The adaptive scheduler reads that persisted boundary before issuing another request;
   absent reset evidence defaults to a configurable 24-hour cooldown. Deterministic provider and
   restart tests pass, as do all 234 backend tests, Ruff, formatting, and mypy.
+- [x] Resolve the first post-restart atomic fixture-import blocker without overwriting historical
+  identity. Scheduler job `205` found that the provider had retained stable event IDs while
+  replacing UEFA `Winner Match` placeholders with qualified teams and precise kickoff times. A
+  new migration versions competition, teams, and kickoff on every fixture observation; the
+  canonical scheduled event advances only before its stored kickoff and only when no model output
+  or result exists. Fifteen diagnosed corrections had zero stored model outputs and zero markets.
+  Upgrade/downgrade/upgrade verification and all 236 backend tests, Ruff, formatting, and mypy pass.
 - [ ] Restart both configured collectors, obtain at least two consecutive successful jobs per
   provider, and require `monitor-collection --fail-on-alerts` to exit successfully.
 - [ ] Verify the resumed UEFA feed retains cutoff-safe timestamps, required-bookmaker coverage,

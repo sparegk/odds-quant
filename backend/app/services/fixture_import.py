@@ -5,7 +5,16 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.models import Competition, Event, FixtureObservation, Provider, Sport, Team
+from app.db.models import (
+    Competition,
+    Event,
+    FixtureObservation,
+    MatchResult,
+    ModelEventOutput,
+    Provider,
+    Sport,
+    Team,
+)
 from app.schemas.fixtures import FixtureImportRow, FixtureImportSummary
 
 
@@ -123,7 +132,14 @@ def import_provider_fixtures(
             event.away_team_id,
             _utc(event.kickoff_at),
         ) != (competition.id, home.id, away.id, _utc(row.kickoff_at)):
-            raise FixtureImportError("fixture conflicts with stored event identity")
+            _apply_pre_kickoff_correction(
+                session,
+                event=event,
+                competition=competition,
+                home=home,
+                away=away,
+                row=row,
+            )
 
         observation_key = (row.provider_event_key, _utc(row.observed_at))
         if observation_key in seen_observations:
@@ -141,6 +157,10 @@ def import_provider_fixtures(
                 FixtureObservation(
                     event_id=event.id,
                     provider_id=provider.id,
+                    competition_id=competition.id,
+                    home_team_id=home.id,
+                    away_team_id=away.id,
+                    kickoff_at=row.kickoff_at,
                     source_updated_at=row.source_updated_at,
                     observed_at=row.observed_at,
                     ingested_at=ingested_at,
@@ -148,6 +168,13 @@ def import_provider_fixtures(
                 )
             )
             observations_created += 1
+        elif (
+            existing.competition_id,
+            existing.home_team_id,
+            existing.away_team_id,
+            _utc(existing.kickoff_at),
+        ) != (competition.id, home.id, away.id, _utc(row.kickoff_at)):
+            raise FixtureImportError("fixture observation conflicts at the same timestamp")
         event.status = row.status
     session.flush()
     return FixtureImportSummary(
@@ -164,6 +191,34 @@ def _team(session: Session, sport_id: int, name: str) -> Team:
         session.add(team)
         session.flush()
     return team
+
+
+def _apply_pre_kickoff_correction(
+    session: Session,
+    *,
+    event: Event,
+    competition: Competition,
+    home: Team,
+    away: Team,
+    row: FixtureImportRow,
+) -> None:
+    if event.competition_id != competition.id:
+        raise FixtureImportError("fixture correction cannot change competition identity")
+    if event.status != "scheduled" or row.status != "scheduled":
+        raise FixtureImportError("fixture correction requires a scheduled event")
+    if _utc(row.observed_at) >= _utc(event.kickoff_at):
+        raise FixtureImportError("fixture correction was observed after the stored kickoff")
+    has_model_output = session.scalar(
+        select(ModelEventOutput.id).where(ModelEventOutput.event_id == event.id).limit(1)
+    )
+    has_result = session.scalar(
+        select(MatchResult.id).where(MatchResult.event_id == event.id).limit(1)
+    )
+    if has_model_output is not None or has_result is not None:
+        raise FixtureImportError("fixture correction conflicts with downstream event evidence")
+    event.home_team_id = home.id
+    event.away_team_id = away.id
+    event.kickoff_at = row.kickoff_at
 
 
 def _utc(value: datetime) -> datetime:
