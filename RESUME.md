@@ -397,3 +397,26 @@ infer closing flags, or enable player props before their independent validation 
 - [x] Review production access and retain owner-only mode: exactly one allowed user and no groups.
   Do not make this Quick-Tunnel-backed deployment public without a separate explicit approval and
   a durable origin with appropriate uptime and operational controls.
+
+### Live collection recovery checklist (2026-07-30)
+
+- [x] Check the Odds-API.io quota/reset state with one bounded request before restarting collection.
+  The selected-bookmaker probe completed successfully and retained both required bookmakers,
+  confirming that the earlier HTTP 429 condition had reset. No repeated or collection-sized probe
+  was issued. Persisted jobs `189` through `203` remain sanitized evidence that the old scheduler
+  retried a sustained 429 condition every normal interval; collection stays stopped until a
+  persistent cooldown is implemented.
+- [ ] Persist an HTTP 429 cooldown across scheduler heartbeats and process restarts, honoring a
+  valid provider `Retry-After` value while using a conservative fallback when reset evidence is
+  unavailable. Add deterministic tests before restarting live collection.
+- [ ] Restart both configured collectors, obtain at least two consecutive successful jobs per
+  provider, and require `monitor-collection --fail-on-alerts` to exit successfully.
+- [ ] Verify the resumed UEFA feed retains cutoff-safe timestamps, required-bookmaker coverage,
+  supported team markets only, and no inferred closing snapshots or player props.
+- [ ] Establish the permitted historical-odds and explicit closing-price acquisition checkpoint;
+  do not authorize market, CLV, ROI, or profitability validation without that evidence.
+- [ ] Revisit signal thresholds, staking, CLV, and market benchmarks only if the acquired evidence
+  passes chronology, identity, price-provenance, completeness, and sample-size gates.
+- [ ] Keep player-strength adjustments and player props blocked until timestamped licensed player
+  targets, stable identities, minimum-minute and recency rules, settlement contracts, and
+  chronological ablation evidence are independently validated.
