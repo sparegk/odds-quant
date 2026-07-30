@@ -526,3 +526,12 @@ infer closing flags, or enable player props before their independent validation 
   at Alembic head `d0e1f2a3b4c5`; all 65 frontend tests, ESLint, TypeScript compilation, and the
   production build passed. Arbitrage remains maintenance-only, probability validation is visible
   as a distinct research status, and market/value outputs remain independently fail-closed.
+- [x] Replay the existing non-demo 2025/26 Premier League holdout under the separated probability
+  and market policy before developing another model. Immutable run `3`, fingerprint
+  `aa389cbbc5f9c3bf0baa26466047b88c64c247bfa132ac4863a59419adc487b5`, reused model version `3`,
+  the exact `2025-08-01T00:00:00Z` through `2026-05-27T00:00:00Z` window, a 60-minute lead, a
+  200-match training floor, and 10 calibration bins. It evaluated 342 of 380 fixtures (90%
+  coverage): Poisson Brier score `0.619119`, log loss `1.030631`, and ECE `0.070717`. Policy
+  `separated-probability-market-v5` classified the run `probability_validation_failed` and retained
+  the independent market result `insufficient_market_evidence`; this receipt records the replay
+  outcome without promoting the model or authorizing signals.
