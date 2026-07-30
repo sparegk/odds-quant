@@ -14,12 +14,13 @@ Completed slices: Alembic schema lifecycle, labelled demo odds and results, atom
 - Completed: dashboard-driven atomic odds/result/player-availability imports and full timestamped football-intelligence bundle ingestion.
 - Completed: provenance-aware permitted-data coverage API and Data Operations audit with per-competition result, odds, closing-price, and evaluation blockers; the audit refreshes after successful imports and excludes demo provenance.
 - Completed: tax-aware football arbitrage engine for complete 1X2, over/under, and BTTS markets, including best-price selection, per-leg taxes/fees, rounded stake optimization, provenance fingerprints, conservative net-profit ranking, and execution-risk warnings.
+- Scope decision: arbitrage is maintenance-only. Preserve its tested safety contracts, but do not expand markets, execution behavior, or validation work while probability-model research is the active goal.
 - Completed: leakage-safe Poisson training, sampling intervals, immutable versions, and scoreline-derived predictions.
 - Completed: expanding-window chronological evaluation, immutable replay evidence, Brier/log-loss/ECE metrics, calibration buckets, uniform and market-relative paired-bootstrap benchmarks, walk-forward temperature recalibration, and a fail-closed non-demo promotion policy.
 - Completed: point-in-time Davidson-style Elo forecasts and a persisted Poisson-versus-Elo proper-score comparison exposed in Model Performance.
 - Completed: time-decayed Dixon–Coles fitting with bounded low-score correction, chronological held-out replay, persisted proper scores, and dashboard comparison.
 - Completed: gated explainable value signals, best-price selection, compatible market consensus, lower-bound EV, freshness and movement checks, immutable calibration provenance, and positive-EV team-underdog ranking.
-- Remaining: import adequate licensed or user-supplied evaluation history and closing prices, then independently validate confidence thresholds. No local permitted dataset is currently bundled or claimed.
+- Remaining: separate probability-validation evidence from market/value validation so chronological model research can proceed without odds while signals remain fail-closed. Import adequate licensed or user-supplied market and closing-price history only before market-relative, CLV, staking, ROI, or profitability validation.
 - Recency-weighted player and lineup strength, coach-regime handling, tactical matchup features, scenario sensitivity, and walk-forward ablation tests.
 - Completed: value, underdog, arbitrage, bet-builder, backtesting, and bankroll dashboard pages with typed API integration and partial-resource failure states.
 - Completed: protected model operations for training, evaluation, prediction, and signal generation; sourced tax/constraint management; per-tab readiness; automatic post-write synchronization; preserved event context; and success notifications.

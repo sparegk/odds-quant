@@ -491,3 +491,12 @@ infer closing flags, or enable player props before their independent validation 
   `30569429687` completed successfully on `main` after the migration, backend, and frontend
   checkpoints were pushed. This receipt confirms the remote repository gates only; it does not
   change the provider cooldown, authorize historical data, or promote a model.
+
+### Probability-research scope checkpoint (2026-07-30)
+
+- [x] Make match-result probability research the active project goal and move arbitrage to
+  maintenance-only status. Existing arbitrage safety behavior remains tested and available, but no
+  new market or execution work is authorized by this checkpoint. The next implementation separates
+  chronological probability validation from market/value validation: the former may support model
+  research without historical odds, while signals, CLV, staking, ROI, and profitability remain
+  blocked until their independent market-evidence gates pass.

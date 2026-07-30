@@ -2,6 +2,8 @@
 
 OddsQuant separates market measurement, statistical prediction, price comparison, arbitrage, and historical evaluation. A high decimal price is never evidence of value by itself, and demonstration data is never evidence of profitability.
 
+The active research goal is match-result probability quality. Existing arbitrage behavior is maintenance-only. Probability validation and market/value validation are independent evidence tracks: passing chronological proper-score and recalibration gates may authorize probability research, but only a separately passing market-relative evaluation may authorize value signals. Neither status authorizes CLV, staking, ROI, or profitability claims without their own evidence.
+
 ## Odds And Market Probability
 
 For decimal odds `o`, raw implied probability is `1 / o`. A complete mutually exclusive market has overround `sum(1 / o_i)` and bookmaker margin `overround - 1`.
