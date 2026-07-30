@@ -148,6 +148,26 @@ def test_rate_limit_retries_are_bounded_and_fail_closed() -> None:
     assert delays == [1.0, 2.0, 4.0]
 
 
+def test_rate_limit_error_retains_sanitized_retry_after_time() -> None:
+    retry_at = OBSERVED_AT + timedelta(hours=2)
+    transport = httpx.MockTransport(
+        lambda _: httpx.Response(429, headers={"Retry-After": format_datetime(retry_at)})
+    )
+
+    with OddsApiIoClient(
+        SECRET,
+        transport=transport,
+        sleep=lambda _: None,
+        jitter=lambda: 0.0,
+        clock=lambda: OBSERVED_AT,
+    ) as client:
+        with pytest.raises(OddsApiIoError, match="HTTP 429") as caught:
+            client.probe_target_bookmakers()
+
+    assert caught.value.retry_at == retry_at
+    assert SECRET not in str(caught.value)
+
+
 def test_collects_champions_league_fixtures_without_bookmaker_markets() -> None:
     league_slug = "international-clubs-uefa-champions-league-qualification"
     event = _event(

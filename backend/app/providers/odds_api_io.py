@@ -47,7 +47,9 @@ TARGET_BOOKMAKERS: Mapping[str, str] = {
 
 
 class OddsApiIoError(RuntimeError):
-    pass
+    def __init__(self, message: str, *, retry_at: datetime | None = None) -> None:
+        super().__init__(message)
+        self.retry_at = retry_at
 
 
 class TargetBookmakerProbe(BaseModel):
@@ -392,7 +394,7 @@ class OddsApiIoClient:
             raise OddsApiIoError("odds provider request failed")
         self._last_response_date = _parse_http_response_date(response.headers.get("date"))
         if response.status_code != 200:
-            raise OddsApiIoError(f"odds provider returned HTTP {response.status_code}")
+            raise _http_error(response, self._clock)
         try:
             return response.json()
         except ValueError:
@@ -451,6 +453,39 @@ def _rate_limit_delay(response: httpx.Response, attempt: int, jitter: float) -> 
         provider_delay = 0.0
     exponential_delay = float(2**attempt)
     return min(MAX_RETRY_DELAY_SECONDS, max(exponential_delay, provider_delay) + max(0.0, jitter))
+
+
+def _http_error(
+    response: httpx.Response,
+    clock: Callable[[], datetime] | None,
+) -> OddsApiIoError:
+    retry_at = None
+    if response.status_code == 429:
+        received_at = clock() if clock is not None else datetime.now(UTC)
+        _require_aware(received_at, "rate-limit response receipt timestamp")
+        retry_at = _retry_after_at(response.headers.get("Retry-After"), received_at)
+    return OddsApiIoError(
+        f"odds provider returned HTTP {response.status_code}",
+        retry_at=retry_at,
+    )
+
+
+def _retry_after_at(value: str | None, received_at: datetime) -> datetime | None:
+    if not value:
+        return None
+    try:
+        delay = float(value)
+    except ValueError:
+        try:
+            parsed = parsedate_to_datetime(value)
+        except (TypeError, ValueError, OverflowError):
+            return None
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            return None
+        return max(received_at, parsed.astimezone(UTC))
+    if delay < 0:
+        return None
+    return received_at + timedelta(seconds=delay)
 
 
 def _parse_http_response_date(value: str | None) -> datetime | None:

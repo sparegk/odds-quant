@@ -287,6 +287,7 @@ def test_provider_polling_defaults_to_fifteen_minutes() -> None:
     assert Settings().provider_poll_seconds == 900
     assert Settings().provider_near_kickoff_poll_seconds == 300
     assert Settings().provider_near_kickoff_window_seconds == 21600
+    assert Settings().provider_rate_limit_fallback_seconds == 86400
     assert Settings().api_football_poll_seconds == 1800
 
 
@@ -507,6 +508,97 @@ def test_adaptive_polling_backs_off_to_base_interval_after_http_429(
             now=AS_OF + timedelta(seconds=900),
         )
         == 1
+    )
+
+
+def test_rate_limit_fallback_cooldown_persists_across_scheduler_calls(
+    sessions: sessionmaker[Session],
+) -> None:
+    class RateLimitedProvider(FakeLicensedProvider):
+        slug = "odds-api-io"
+        name = "Odds-API.io"
+
+        def collect_odds(self) -> list[OddsImportRow]:
+            raise OddsApiIoError("odds provider returned HTTP 429")
+
+    provider = RateLimitedProvider([])
+    register_odds_provider(provider)
+    settings = Settings(
+        seed_demo=False,
+        provider_poll_seconds=900,
+        provider_near_kickoff_poll_seconds=300,
+        provider_rate_limit_fallback_seconds=3600,
+    )
+
+    job_id = run_provider_collection(
+        provider,
+        session_factory=sessions,
+        now=AS_OF,
+        rate_limit_fallback_seconds=settings.provider_rate_limit_fallback_seconds,
+    )
+    with sessions() as session:
+        job = session.get_one(ProviderJob, job_id)
+        assert job.metrics == {
+            "rate_limit": {
+                "retry_at": (AS_OF + timedelta(hours=1)).isoformat(),
+                "source": "conservative_fallback",
+            }
+        }
+
+    assert (
+        poll_registered_providers_adaptively(
+            settings=settings,
+            session_factory=sessions,
+            now=AS_OF + timedelta(seconds=3599),
+        )
+        == 0
+    )
+    assert (
+        poll_registered_providers_adaptively(
+            settings=settings,
+            session_factory=sessions,
+            now=AS_OF + timedelta(seconds=3600),
+        )
+        == 1
+    )
+
+
+def test_provider_retry_after_overrides_rate_limit_fallback(
+    sessions: sessionmaker[Session],
+) -> None:
+    class RateLimitedProvider(FakeLicensedProvider):
+        slug = "odds-api-io"
+        name = "Odds-API.io"
+
+        def collect_odds(self) -> list[OddsImportRow]:
+            raise OddsApiIoError(
+                "odds provider returned HTTP 429",
+                retry_at=AS_OF + timedelta(hours=2),
+            )
+
+    provider = RateLimitedProvider([])
+    register_odds_provider(provider)
+    settings = Settings(provider_rate_limit_fallback_seconds=3600)
+    job_id = run_provider_collection(
+        provider,
+        session_factory=sessions,
+        now=AS_OF,
+        rate_limit_fallback_seconds=settings.provider_rate_limit_fallback_seconds,
+    )
+    with sessions() as session:
+        job = session.get_one(ProviderJob, job_id)
+        assert job.metrics["rate_limit"] == {
+            "retry_at": (AS_OF + timedelta(hours=2)).isoformat(),
+            "source": "provider_retry_after",
+        }
+
+    assert (
+        poll_registered_providers_adaptively(
+            settings=settings,
+            session_factory=sessions,
+            now=AS_OF + timedelta(hours=1),
+        )
+        == 0
     )
 
 

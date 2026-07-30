@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     provider_poll_seconds: int = Field(default=900, ge=30)
     provider_near_kickoff_poll_seconds: int = Field(default=300, ge=30)
     provider_near_kickoff_window_seconds: int = Field(default=21600, ge=60)
+    provider_rate_limit_fallback_seconds: int = Field(default=86400, ge=900)
     odds_api_io_key: str | None = None
     odds_api_io_base_url: str = "https://api.odds-api.io/v3"
     api_football_key: str | None = None

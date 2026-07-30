@@ -38,6 +38,7 @@ logger = logging.getLogger("oddsquant.worker")
 SessionFactory = Callable[[], Session]
 _SENSITIVE_QUERY_PATTERN = re.compile(r"(?i)([?&](?:api[_-]?key|access[_-]?token|token)=)[^&\s]+")
 _api_football_coverage_cache: tuple[datetime, list[ApiFootballLeagueCoverage]] | None = None
+DEFAULT_RATE_LIMIT_FALLBACK_SECONDS = 86400
 
 
 def _utc(value: datetime) -> datetime:
@@ -80,6 +81,7 @@ def run_provider_collection(
     *,
     session_factory: SessionFactory = SessionLocal,
     now: datetime | None = None,
+    rate_limit_fallback_seconds: int = DEFAULT_RATE_LIMIT_FALLBACK_SECONDS,
 ) -> int:
     started_at = now or datetime.now(UTC)
     supports_fixtures = callable(getattr(provider_adapter, "collect_fixtures", None))
@@ -192,6 +194,11 @@ def run_provider_collection(
     except Exception as exc:
         error_type = type(exc).__name__
         failure_detail = f": {exc}" if isinstance(exc, OddsApiIoError) and str(exc).strip() else ""
+        failure_metrics = (
+            _rate_limit_failure_metrics(exc, started_at, rate_limit_fallback_seconds)
+            if isinstance(exc, OddsApiIoError)
+            else {}
+        )
         logger.error(
             "Provider collection failed: provider=%s error_type=%s%s",
             provider_adapter.slug,
@@ -204,6 +211,7 @@ def run_provider_collection(
             "failed",
             f"Collection failed ({error_type}){failure_detail}",
             started_at,
+            metrics=failure_metrics,
         )
     return job_id
 
@@ -247,6 +255,44 @@ def _collection_metrics(
             "research_candidates_available": (prediction_summary.research_candidates_available),
         }
     return metrics
+
+
+def _rate_limit_failure_metrics(
+    error: OddsApiIoError,
+    started_at: datetime,
+    fallback_seconds: int,
+) -> dict[str, object]:
+    if "HTTP 429" not in str(error):
+        return {}
+    retry_at = error.retry_at
+    source = "provider_retry_after"
+    if retry_at is None:
+        retry_at = _utc(started_at) + timedelta(seconds=fallback_seconds)
+        source = "conservative_fallback"
+    return {
+        "rate_limit": {
+            "retry_at": _utc(retry_at).isoformat(),
+            "source": source,
+        }
+    }
+
+
+def _persisted_rate_limit_retry_at(metrics: object) -> datetime | None:
+    if not isinstance(metrics, dict):
+        return None
+    rate_limit = metrics.get("rate_limit")
+    if not isinstance(rate_limit, dict):
+        return None
+    value = rate_limit.get("retry_at")
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+    return parsed.astimezone(UTC)
 
 
 def _finish_job(
@@ -335,13 +381,21 @@ def poll_registered_providers_adaptively(
                     .limit(1)
                 )
         if latest_job is not None:
+            retry_at = _persisted_rate_limit_retry_at(latest_job.metrics)
+            if retry_at is not None and current < retry_at:
+                continue
             provider_interval = interval
             if latest_job.status == "failed" and "HTTP 429" in latest_job.message:
                 provider_interval = max(provider_interval, runtime_settings.provider_poll_seconds)
             elapsed = (current - _utc(latest_job.created_at)).total_seconds()
             if elapsed < provider_interval:
                 continue
-        run_provider_collection(provider_adapter, session_factory=session_factory, now=current)
+        run_provider_collection(
+            provider_adapter,
+            session_factory=session_factory,
+            now=current,
+            rate_limit_fallback_seconds=runtime_settings.provider_rate_limit_fallback_seconds,
+        )
         jobs_started += 1
     return jobs_started
 

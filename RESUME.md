@@ -406,9 +406,12 @@ infer closing flags, or enable player props before their independent validation 
   was issued. Persisted jobs `189` through `203` remain sanitized evidence that the old scheduler
   retried a sustained 429 condition every normal interval; collection stays stopped until a
   persistent cooldown is implemented.
-- [ ] Persist an HTTP 429 cooldown across scheduler heartbeats and process restarts, honoring a
+- [x] Persist an HTTP 429 cooldown across scheduler heartbeats and process restarts, honoring a
   valid provider `Retry-After` value while using a conservative fallback when reset evidence is
-  unavailable. Add deterministic tests before restarting live collection.
+  unavailable. Failed jobs now retain only a sanitized aware `retry_at` and its source in JSON
+  metrics. The adaptive scheduler reads that persisted boundary before issuing another request;
+  absent reset evidence defaults to a configurable 24-hour cooldown. Deterministic provider and
+  restart tests pass, as do all 234 backend tests, Ruff, formatting, and mypy.
 - [ ] Restart both configured collectors, obtain at least two consecutive successful jobs per
   provider, and require `monitor-collection --fail-on-alerts` to exit successfully.
 - [ ] Verify the resumed UEFA feed retains cutoff-safe timestamps, required-bookmaker coverage,
