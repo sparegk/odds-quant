@@ -454,3 +454,10 @@ infer closing flags, or enable player props before their independent validation 
   expected lineups, confirmed lineups, or confirmed-context outputs. Stored markets remain only
   `MATCH_RESULT` and `TOTAL_CORNERS`. `DATA_SOURCES.md` records the separate player-strength and
   prop activation contracts; no player adjustment or prop behavior was enabled.
+- [x] Verify the persistent circuit breaker against a later live rate limit. After the earlier
+  healthy recovery checkpoint, scheduled Odds job `212` received HTTP 429 at
+  `2026-07-30T14:18:00Z`. The failed job persisted a sanitized conservative retry boundary of
+  `2026-07-31T14:18:00Z`; no later Odds job was issued, while API-Football continued successfully
+  through job `214`. Scheduler PID `5948` remains active. Monitoring is expected to report the Odds
+  provider unhealthy until the cooldown expires and fresh consecutive jobs complete; do not probe,
+  restart, or manually bypass the boundary.
