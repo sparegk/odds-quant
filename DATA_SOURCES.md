@@ -66,6 +66,40 @@ target, or reuse team-market settlement for a player prop.
 
 ## Closing Evidence Audit
 
+### Historical-odds acquisition review: 2026-07-30
+
+No reviewed source currently passes the complete acquisition gate, so no historical-odds
+adapter, paid subscription, import, or closing designation is authorized by this checkpoint.
+
+- [The Odds API v4 historical contract](https://the-odds-api.com/liveapi/guides/v4/)
+  returns timestamp-addressed snapshots with a response snapshot time and bookmaker/market update
+  times. Its official historical catalog lists Champions League Qualification coverage beginning
+  in July 2023, but it does not list Conference League Qualification. Its official bookmaker
+  catalog does not list Novibet or Allwyn / Pamestoixima, and historical access requires a paid
+  plan. The terms permit analytical applications but prohibit raw-data resale or redistribution.
+  No key or paid-plan approval is configured here. This source cannot satisfy the two target
+  competitions and target-bookmaker gate, and its timestamped snapshots are not an explicit
+  provider closing designation.
+- [Sportmonks Premium historical odds](https://docs.sportmonks.com/v3/endpoints-and-entities/endpoints/premium-odds-feed/premium-pre-match-odds/get-all-historical-odds)
+  expose `bookmaker_update` for each historical value, while the
+  [official service description](https://www.sportmonks.com/glossary/premium-odds-feed/)
+  limits retrieval to seven days after kickoff. Its
+  [terms](https://www.sportmonks.com/terms-of-service/) allow storage and distribution while
+  prohibiting unapproved resale, but odds availability is not guaranteed. No token, Premium Odds
+  subscription, target-competition receipt, or target-bookmaker receipt is configured. The
+  seven-day window cannot bootstrap the required older history, and the documented update stream
+  does not explicitly designate a closing record.
+- The configured Odds-API.io source still fails the closing gate described below: its finished
+  event response calls values closing odds but does not attach an original source timestamp to
+  each bookmaker price. A final pre-kickoff movement may not be inferred to be closing.
+
+A future acquisition checkpoint must first obtain explicit approval for any paid account, then
+run a sanitized field-only probe proving exact competition identifiers, seasons, target
+bookmakers, complete 1X2 outcomes, per-price source timestamps, historical depth, quota cost, and
+retention rights. Historical snapshots may enter the ordinary non-closing importer only after
+that proof. `is_closing=true` remains blocked unless the same source record supplies both an
+explicit closing designation and its original timestamp strictly before kickoff.
+
 ### Odds-API.io documentation review: 2026-07-24
 
 The provider's official

@@ -433,8 +433,13 @@ infer closing flags, or enable player props before their independent validation 
   ordering violations, zero canonical-versus-latest fixture identity mismatches, zero prediction
   chronology violations, and zero closing snapshots. The only stored market types remain
   `MATCH_RESULT` and `TOTAL_CORNERS`; player props remain absent and disabled.
-- [ ] Establish the permitted historical-odds and explicit closing-price acquisition checkpoint;
+- [x] Establish the permitted historical-odds and explicit closing-price acquisition checkpoint;
   do not authorize market, CLV, ROI, or profitability validation without that evidence.
+  `DATA_SOURCES.md` records the 2026-07-30 official-contract review. The Odds API lacks published
+  Conference League qualification and target-bookmaker coverage; Sportmonks retains retrievable
+  history for only seven days and has no configured subscription; Odds-API.io still lacks a
+  per-price timestamp on its claimed closing response. No source passes the complete gate, so no
+  purchase, adapter, historical import, or closing flag is authorized.
 - [ ] Revisit signal thresholds, staking, CLV, and market benchmarks only if the acquired evidence
   passes chronology, identity, price-provenance, completeness, and sample-size gates.
 - [ ] Keep player-strength adjustments and player props blocked until timestamped licensed player
