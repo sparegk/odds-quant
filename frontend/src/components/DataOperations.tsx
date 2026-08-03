@@ -1,14 +1,11 @@
 import { useState } from 'react'
-import { AlertTriangle, CheckCircle2, Database, Download, Upload } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Database, Download } from 'lucide-react'
 
-import { uploadCsv } from '../api/client'
 import { formatDateTime, humanizeCode } from '../lib/format'
-import type { CollectionMonitoring, DashboardData, ImportJob, ImportUploadResult } from '../types'
+import type { CollectionMonitoring, DashboardData, ImportJob } from '../types'
 import { CsvImportPanel as ImportPanel } from './CsvImportPanel'
 import { DataCoverageAudit } from './DataCoverageAudit'
 import { IntelligenceBundleImport } from './IntelligenceBundleImport'
-
-type UploadKind = 'odds' | 'results' | 'availability'
 
 export function DataOperations({ dashboard, onChanged }: { dashboard: DashboardData; onChanged?: () => Promise<void> | void }) {
   const [adminKey, setAdminKey] = useState('')
@@ -117,18 +114,10 @@ function RefreshMetric({ label, value }: { label: string; value: number }) {
   return <div className="border-r border-b border-zinc-200 p-3 last:border-r-0"><dt className="text-xs font-semibold uppercase text-zinc-500">{label}</dt><dd className="mt-1 font-mono text-lg font-bold">{value}</dd></div>
 }
 
-export function LegacyImportPanel({ adminKey, kind, title, detail, onChanged }: { adminKey: string; kind: UploadKind; title: string; detail: string; onChanged?: () => Promise<void> | void }) {
-  const [file, setFile] = useState<File | null>(null); const [sourceKey, setSourceKey] = useState(''); const [providerSlug, setProviderSlug] = useState(''); const [providerName, setProviderName] = useState(''); const [result, setResult] = useState<ImportUploadResult | null>(null); const [error, setError] = useState<string | null>(null); const [submitting, setSubmitting] = useState(false)
-  const submit = async () => { if (!file) return; setSubmitting(true); setError(null); setResult(null); try { setResult(await uploadCsv(kind, file, { adminKey: adminKey || undefined, sourceKey, providerSlug, providerName })); await onChanged?.() } catch (caught) { setError(caught instanceof Error ? caught.message : 'Upload failed') } finally { setSubmitting(false) } }
-  const availabilityReady = kind !== 'availability' || Boolean(sourceKey && providerSlug && providerName)
-  return <article className="border border-zinc-200 bg-white p-5"><Upload aria-hidden="true" className="text-emerald-700" size={22} /><h3 className="mt-3 font-bold">{title}</h3><p className="mt-1 min-h-16 text-sm leading-6 text-zinc-500">{detail}</p><label className="mt-4 block"><span className="mb-1.5 block text-xs font-semibold uppercase text-zinc-500">CSV file</span><input accept=".csv,text/csv" aria-label={`${title} CSV file`} className="block w-full text-xs" type="file" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></label>{kind === 'availability' ? <div className="mt-4 grid gap-3"><TextInput label="Source key" value={sourceKey} onChange={setSourceKey} /><TextInput label="Provider slug" value={providerSlug} onChange={setProviderSlug} /><TextInput label="Provider name" value={providerName} onChange={setProviderName} /></div> : null}<button className="mt-5 rounded-[5px] bg-zinc-900 px-4 py-2 text-sm font-bold text-white disabled:opacity-40" disabled={!file || !availabilityReady || submitting} onClick={() => void submit()} type="button">{submitting ? 'Uploading…' : `Import ${kind}`}</button>{result ? <div className="mt-4 flex gap-2 border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900" role="status"><CheckCircle2 aria-hidden="true" className="shrink-0" size={18} /><div><p className="font-bold">Job #{result.job_id} {result.status}</p><p className="text-xs">{result.rows_imported}/{result.rows_received} rows imported atomically.</p></div></div> : null}{error ? <div className="mt-4 flex gap-2 border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900" role="alert"><AlertTriangle aria-hidden="true" className="shrink-0" size={18} /><span>{error}</span></div> : null}</article>
-}
-
 function RejectionReportLink({ job }: { job: ImportJob }) {
   const report = JSON.stringify({ job_id: job.id, filename: job.filename, status: job.status, rows_received: job.rows_received, rows_imported: job.rows_imported, created_at: job.created_at, errors: job.errors }, null, 2)
   return <a className="inline-flex items-center gap-1 border border-rose-300 bg-white px-2 py-1 text-[10px] font-bold text-rose-800" download={`import-${job.id}-rejections.json`} href={`data:application/json;charset=utf-8,${encodeURIComponent(report)}`}><Download aria-hidden="true" size={12} />Download report</a>
 }
-function TextInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { return <label><span className="mb-1 block text-xs font-semibold uppercase text-zinc-500">{label}</span><input aria-label={label} className="h-9 w-full border border-zinc-300 px-3 text-sm" value={value} onChange={(event) => onChange(event.target.value)} /></label> }
 function TemplateLink({ href, label }: { href: string; label: string }) { return <a className="inline-flex items-center gap-2 rounded-[5px] border border-zinc-300 px-3 py-2 text-xs font-bold text-zinc-700 hover:border-zinc-500" download href={href}><Download aria-hidden="true" size={15} />{label}</a> }
 function Heading({ eyebrow, title }: { eyebrow: string; title: string }) { return <div className="mb-3"><p className="text-xs font-bold uppercase text-emerald-700">{eyebrow}</p><h3 className="mt-1 text-lg font-bold">{title}</h3></div> }
 function Badge({ status }: { status: string }) { const good = ['completed', 'external'].includes(status); const bad = ['failed', 'rejected', 'critical'].includes(status); return <span className={`rounded-[4px] border px-2 py-1 text-xs font-bold ${good ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : bad ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>{status.toUpperCase()}</span> }
