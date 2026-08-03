@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test'
+import AxeBuilder from '@axe-core/playwright'
 
 const now = '2026-07-01T12:00:00Z'
 const event = {
@@ -130,6 +131,44 @@ test('explains research concepts on first visit and remembers dismissal', async 
   await expect(guide).toBeHidden()
   await page.getByRole('button', { name: 'Open research guide' }).click()
   await expect(guide).toBeVisible()
+})
+
+test('supports keyboard navigation across normal desktop routes', async ({ page }) => {
+  const overview = page.getByRole('button', { name: 'Research overview' })
+  await overview.focus()
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/\/analytics$/)
+  await expect(overview).toHaveAttribute('aria-current', 'page')
+  await expect(page).toHaveTitle('Research overview | OddsQuant')
+})
+
+test('renders an explicit not-found page and recovers through desktop navigation', async ({ page }) => {
+  await page.goto('/not-a-research-route')
+  await expect(page).toHaveTitle('Page not found | OddsQuant')
+  await expect(page.getByRole('heading', { name: 'This research page does not exist' })).toBeVisible()
+  await page.getByRole('button', { name: 'Return to matchday' }).click()
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.locator('header h1')).toHaveText('Matchday')
+})
+
+test('has no serious accessibility violations on the desktop research shell', async ({ page }) => {
+  const guide = page.getByRole('region', { name: 'Research guide' })
+  if (await guide.isVisible()) await page.getByRole('button', { name: 'Dismiss research guide' }).click()
+  const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()
+  expect(results.violations.filter((violation) => ['serious', 'critical'].includes(violation.impact ?? ''))).toEqual([])
+})
+
+test('isolates a resource failure and recovers on desktop refresh', async ({ page }) => {
+  const statusUrl = 'http://127.0.0.1:8000/api/v1/status'
+  const failStatus = async (route: Route) => json(route, { detail: 'temporary failure' }, 503)
+  await page.route(statusUrl, failStatus)
+  await page.reload()
+  await expect(page.getByText('Some dashboard resources are unavailable')).toBeVisible()
+  await expect(page.getByText(/Status/)).toBeVisible()
+  await page.unroute(statusUrl, failStatus)
+  await page.getByRole('button', { name: 'Refresh dashboard data' }).click()
+  await expect(page.locator('header h1')).toHaveText('Matchday')
+  await expect(page.getByText('Some dashboard resources are unavailable')).toBeHidden()
 })
 
 test('imports odds and completes the model-to-signal workflow', async ({ page }) => {
