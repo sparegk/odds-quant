@@ -14,6 +14,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { loadMatchday, loadMatchdayEvent } from '../api/client'
 import { formatDateTime, humanizeCode } from '../lib/format'
+import { useResearchPreference } from '../lib/researchPreferences'
 import { nextGoodMatchdayDate } from '../lib/matchdays'
 import type {
   AvailabilityAuditItem,
@@ -94,17 +95,14 @@ export function MatchdayResearch({
   events?: EventSummary[]
   onSelectEvent: (eventId: number) => void
 }) {
-  const [timezone] = useState(
-    () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Athens',
-  )
+  const [timezone] = useResearchPreference('matchday_timezone', Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Athens')
   const nextGoodDate = useMemo(
     () => nextGoodMatchdayDate(events, timezone),
     [events, timezone],
   )
-  const [date, setDate] = useState(
-    () => nextGoodMatchdayDate(events, timezone) ?? localDateString(new Date()),
-  )
-  const [filter, setFilter] = useState<(typeof competitionFilters)[number]['key']>('all')
+  const [date, setDate] = useResearchPreference('matchday_date', nextGoodMatchdayDate(events, timezone) ?? localDateString(new Date()), (value) => /^\d{4}-\d{2}-\d{2}$/.test(value))
+  const [filterPreference, setFilter] = useResearchPreference('matchday_competition', 'all', (value) => competitionFilters.some((item) => item.key === value))
+  const filter = filterPreference as (typeof competitionFilters)[number]['key']
   const [schedule, setSchedule] = useState<Matchday | null>(null)
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null)
   const [detail, setDetail] = useState<MatchdayEventDetail | null>(null)
@@ -114,7 +112,8 @@ export function MatchdayResearch({
   const [detailError, setDetailError] = useState<string | null>(null)
   const [scheduleReload, setScheduleReload] = useState(0)
   const [detailReload, setDetailReload] = useState(0)
-  const [bookmakerMode, setBookmakerMode] = useState<BookmakerMode>('both')
+  const [bookmakerPreference, setBookmakerMode] = useResearchPreference('matchday_bookmakers', 'both', (value) => ['both', 'allwyn', 'novibet'].includes(value))
+  const bookmakerMode = bookmakerPreference as BookmakerMode
   const selectedBookmakers = useMemo<MatchdayBookmakerCode[]>(
     () => (bookmakerMode === 'both' ? ['allwyn', 'novibet'] : [bookmakerMode]),
     [bookmakerMode],

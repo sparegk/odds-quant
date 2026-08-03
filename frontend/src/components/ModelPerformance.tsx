@@ -1,12 +1,15 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { AlertTriangle, LineChart } from 'lucide-react'
 
 import { formatDateTime, humanizeCode } from '../lib/format'
+import { useResearchPreference } from '../lib/researchPreferences'
 import type { DashboardData, EvaluationRun } from '../types'
 import { ModelOperations } from './ModelOperations'
 
 export function ModelPerformance({ dashboard, onChanged }: { dashboard: DashboardData; onChanged?: () => Promise<void> | void }) {
-  const [selectedId, setSelectedId] = useState<number | null>(dashboard.models[0]?.id ?? null)
+  const [selectedPreference, setSelectedPreference] = useResearchPreference('model_version', dashboard.models[0] ? String(dashboard.models[0].id) : '', (value) => value === '' || /^\d+$/.test(value))
+  const selectedId = selectedPreference ? Number(selectedPreference) : null
+  const setSelectedId = (id: number | null) => setSelectedPreference(id === null ? '' : String(id))
   const selected = dashboard.models.find((model) => model.id === selectedId) ?? dashboard.models[0]
   const evaluations = useMemo(() => selected ? dashboard.evaluations.filter((run) => run.model_version_id === selected.id) : [], [dashboard.evaluations, selected])
   const latest = evaluations[0]

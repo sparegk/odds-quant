@@ -1,17 +1,19 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { AlertTriangle, Filter, TrendingUp } from 'lucide-react'
 
 import { formatDateTime, humanizeCode } from '../lib/format'
+import { useResearchPreference } from '../lib/researchPreferences'
 import type { DashboardData, ResearchValueCandidate, ValueSignal } from '../types'
 
 type ValueSort = 'LOWER_EV' | 'EDGE' | 'CONFIDENCE' | 'FRESHNESS'
 
 export function ValueOpportunities({ dashboard, onOpenEvent }: { dashboard: DashboardData; onOpenEvent: (eventId: number) => void }) {
-  const [competition, setCompetition] = useState('ALL')
-  const [market, setMarket] = useState('ALL')
-  const [minimumLowerEv, setMinimumLowerEv] = useState('0')
-  const [minimumConfidence, setMinimumConfidence] = useState('0')
-  const [sort, setSort] = useState<ValueSort>('LOWER_EV')
+  const [competition, setCompetition] = useResearchPreference('value_competition', 'ALL')
+  const [market, setMarket] = useResearchPreference('value_market', 'ALL')
+  const [minimumLowerEv, setMinimumLowerEv] = useResearchPreference('value_min_ev', '0')
+  const [minimumConfidence, setMinimumConfidence] = useResearchPreference('value_min_confidence', '0')
+  const [sortPreference, setSort] = useResearchPreference('value_sort', 'LOWER_EV', (value) => ['LOWER_EV', 'EDGE', 'CONFIDENCE', 'FRESHNESS'].includes(value))
+  const sort = sortPreference as ValueSort
   const events = useMemo(() => new Map(dashboard.events.map((event) => [event.id, event])), [dashboard.events])
   const researchCandidates = dashboard.research_candidates ?? []
   const competitions = unique(dashboard.signals.map((signal) => events.get(signal.event_id)?.competition))
@@ -50,7 +52,7 @@ export function ValueOpportunities({ dashboard, onOpenEvent }: { dashboard: Dash
         <Select label="Market" value={market} onChange={setMarket} options={[["ALL", "All markets"], ...markets.map((value) => [value, humanizeCode(value)])]} />
         <NumberFilter label="Minimum lower EV (%)" value={minimumLowerEv} onChange={setMinimumLowerEv} />
         <NumberFilter label="Minimum confidence (%)" value={minimumConfidence} onChange={setMinimumConfidence} max="100" />
-        <Select label="Rank by" value={sort} onChange={(value) => setSort(value as ValueSort)} options={[["LOWER_EV", "Conservative EV"], ["EDGE", "Probability edge"], ["CONFIDENCE", "Confidence"], ["FRESHNESS", "Freshest price"]]} />
+        <Select label="Rank by" value={sort} onChange={setSort} options={[["LOWER_EV", "Conservative EV"], ["EDGE", "Probability edge"], ["CONFIDENCE", "Confidence"], ["FRESHNESS", "Freshest price"]]} />
       </div></section>
       {filtered.length ? <div className="space-y-4">{filtered.map((signal, index) => <ValueCard key={signal.id} event={events.get(signal.event_id)} rank={index + 1} signal={signal} onOpenEvent={onOpenEvent} />)}</div> : <EmptyValue title="No opportunities match these filters" detail="Reduce the conservative EV or confidence threshold, or choose a broader competition and market." />}
     </> : <EmptyValue title="No qualified VALUE recommendations yet" detail="The watchlist above remains visible while calibration, sample, uncertainty, freshness, and market-coverage gates are unresolved." />}

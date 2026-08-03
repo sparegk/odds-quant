@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { AlertTriangle, Filter, ScanSearch } from 'lucide-react'
 
 import { formatDateTime, humanizeCode } from '../lib/format'
+import { useResearchPreference } from '../lib/researchPreferences'
 import type { DashboardData, ValueSignal } from '../types'
 
 type SideFilter = 'ALL' | 'HOME' | 'AWAY'
@@ -13,15 +14,17 @@ interface UnderdogScannerProps {
 }
 
 export function UnderdogScanner({ dashboard, onOpenEvent }: UnderdogScannerProps) {
-  const [competition, setCompetition] = useState('ALL')
-  const [side, setSide] = useState<SideFilter>('ALL')
-  const [minimumOdds, setMinimumOdds] = useState('2')
-  const [minimumLowerEv, setMinimumLowerEv] = useState('0')
-  const [minimumConfidence, setMinimumConfidence] = useState('0')
-  const [minimumBookmakers, setMinimumBookmakers] = useState('1')
-  const [maximumOddsAge, setMaximumOddsAge] = useState('60')
-  const [maximumCalibrationError, setMaximumCalibrationError] = useState('100')
-  const [sort, setSort] = useState<SortKey>('LOWER_EV')
+  const [competition, setCompetition] = useResearchPreference('underdog_competition', 'ALL')
+  const [sidePreference, setSide] = useResearchPreference('underdog_side', 'ALL', (value) => ['ALL', 'HOME', 'AWAY'].includes(value))
+  const [minimumOdds, setMinimumOdds] = useResearchPreference('underdog_min_odds', '2')
+  const [minimumLowerEv, setMinimumLowerEv] = useResearchPreference('underdog_min_ev', '0')
+  const [minimumConfidence, setMinimumConfidence] = useResearchPreference('underdog_min_confidence', '0')
+  const [minimumBookmakers, setMinimumBookmakers] = useResearchPreference('underdog_min_books', '1')
+  const [maximumOddsAge, setMaximumOddsAge] = useResearchPreference('underdog_max_age', '60')
+  const [maximumCalibrationError, setMaximumCalibrationError] = useResearchPreference('underdog_max_calibration', '100')
+  const [sortPreference, setSort] = useResearchPreference('underdog_sort', 'LOWER_EV', (value) => ['LOWER_EV', 'EDGE', 'ODDS', 'CONFIDENCE'].includes(value))
+  const side = sidePreference as SideFilter
+  const sort = sortPreference as SortKey
 
   const eventById = useMemo(() => new Map(dashboard.events.map((event) => [event.id, event])), [dashboard.events])
   const competitions = useMemo(
@@ -77,14 +80,14 @@ export function UnderdogScanner({ dashboard, onOpenEvent }: UnderdogScannerProps
         <div className="mb-4 flex items-center gap-2 text-sm font-bold"><Filter aria-hidden="true" size={16} />Scanner controls</div>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-9">
           <FilterSelect label="Competition" value={competition} onChange={setCompetition} options={[['ALL', 'All competitions'], ...competitions.map((item) => [item, item])]}/>
-          <FilterSelect label="Side" value={side} onChange={(value) => setSide(value as SideFilter)} options={[["ALL", "Home or away"], ["HOME", "Home underdog"], ["AWAY", "Away underdog"]]}/>
+          <FilterSelect label="Side" value={side} onChange={setSide} options={[["ALL", "Home or away"], ["HOME", "Home underdog"], ["AWAY", "Away underdog"]]}/>
           <FilterNumber label="Minimum odds" value={minimumOdds} onChange={setMinimumOdds} min="2" step="0.1" />
           <FilterNumber label="Minimum lower EV (%)" value={minimumLowerEv} onChange={setMinimumLowerEv} step="0.5" />
           <FilterNumber label="Minimum confidence (%)" value={minimumConfidence} onChange={setMinimumConfidence} min="0" max="100" step="5" />
           <FilterNumber label="Minimum compatible books" value={minimumBookmakers} onChange={setMinimumBookmakers} min="1" step="1" />
           <FilterNumber label="Maximum odds age (minutes)" value={maximumOddsAge} onChange={setMaximumOddsAge} min="0" step="1" />
           <FilterNumber label="Maximum calibration error (%)" value={maximumCalibrationError} onChange={setMaximumCalibrationError} min="0" max="100" step="0.5" />
-          <FilterSelect label="Rank by" value={sort} onChange={(value) => setSort(value as SortKey)} options={[["LOWER_EV", "Conservative EV"], ["EDGE", "Probability edge"], ["CONFIDENCE", "Confidence"], ["ODDS", "Offered odds"]]}/>
+          <FilterSelect label="Rank by" value={sort} onChange={setSort} options={[["LOWER_EV", "Conservative EV"], ["EDGE", "Probability edge"], ["CONFIDENCE", "Confidence"], ["ODDS", "Offered odds"]]}/>
         </div>
       </section>
 
