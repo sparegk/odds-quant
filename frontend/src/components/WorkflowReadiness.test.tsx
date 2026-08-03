@@ -24,4 +24,14 @@ describe('WorkflowReadiness', () => {
     render(<WorkflowReadiness dashboard={{ ...dashboard, readiness: { ...zero, predictions: 2 } }} view="builder" onNavigate={() => undefined} />)
     expect(screen.getByText('Workflow prerequisites available')).toBeInTheDocument()
   })
+
+  it('guides the overview to the first incomplete research stage', () => {
+    const navigate = vi.fn()
+    render(<WorkflowReadiness dashboard={dashboard} view="overview" onNavigate={navigate} />)
+    expect(screen.getByText('Research workflow')).toBeInTheDocument()
+    expect(screen.getByText('Import fixtures and odds')).toBeInTheDocument()
+    const next = screen.getByRole('button', { name: 'Next: Evaluate calibration' })
+    fireEvent.click(next)
+    expect(navigate).toHaveBeenCalledWith('models')
+  })
 })
