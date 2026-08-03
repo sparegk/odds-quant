@@ -73,6 +73,7 @@ describe('DataOperations', () => {
     expect(screen.getByRole('link', { name: 'Odds CSV template' })).toHaveAttribute('href', '/templates/odds.csv')
     expect(screen.getByText('REJECTED')).toBeInTheDocument()
     expect(screen.getByText(/snapshot outcome set is incomplete/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Download report' })).toHaveAttribute('download', 'import-9-rejections.json')
   })
 
   it('shows a healthy consecutive collection baseline', () => {

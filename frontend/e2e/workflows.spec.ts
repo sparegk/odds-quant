@@ -173,7 +173,10 @@ test('isolates a resource failure and recovers on desktop refresh', async ({ pag
 
 test('imports odds and completes the model-to-signal workflow', async ({ page }) => {
   await page.getByRole('button', { name: 'Data operations' }).click()
-  await page.getByLabel('Odds snapshots CSV file').setInputFiles({ name: 'odds.csv', mimeType: 'text/csv', buffer: Buffer.from('event,price\n7,1.8') })
+  const oddsHeader = 'provider_event_key,competition,country,season,kickoff_at,home_team,away_team,bookmaker,market_type,selection_code,selection_name,decimal_odds,observed_at,line,source_updated_at,period,currency,settlement_rule_key,is_closing'
+  const oddsRow = 'e2e-7,Test League,GB,2025/26,2026-08-01T18:00:00Z,North FC,South FC,Beacon,moneyline_3way,HOME,North FC,1.8,2026-07-01T12:00:00Z,,2026-07-01T12:00:00Z,full_time,EUR,standard,false'
+  await page.getByLabel('Odds snapshots CSV file').setInputFiles({ name: 'odds.csv', mimeType: 'text/csv', buffer: Buffer.from(`${oddsHeader}\n${oddsRow}`) })
+  await expect(page.getByText('Preflight passed', { exact: true }).first()).toBeVisible()
   await page.getByRole('button', { name: 'Import odds' }).click()
   await expect(page.getByText('Job #51 completed')).toBeVisible()
 
