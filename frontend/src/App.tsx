@@ -12,16 +12,7 @@ import type { FormEvent } from 'react'
 
 import { calculateArbitrage, loadComparison, loadDashboard, runSignalBacktest } from './api/client'
 import { FreshnessBadge } from './components/FreshnessBadge'
-import { BetBuilderLab } from './components/BetBuilderLab'
-import { BankrollResearch } from './components/BankrollResearch'
-import { MatchdayResearch } from './components/MatchdayResearch'
-import { UnderdogScanner } from './components/UnderdogScanner'
-import { ValueOpportunities } from './components/ValueOpportunities'
-import { MatchDetailPage } from './components/MatchDetailPage'
 import { FirstVisitGuide } from './components/FirstVisitGuide'
-import { ModelPerformance } from './components/ModelPerformance'
-import { DataOperations } from './components/DataOperations'
-import { ArbitrageSettings } from './components/ArbitrageSettings'
 import { WorkflowReadiness } from './components/WorkflowReadiness'
 import { QuantPriceTable } from './components/QuantPriceTable'
 import { formatDateTime, humanizeCode } from './lib/format'
@@ -43,6 +34,16 @@ const BestPriceChart = lazy(async () => {
   const module = await import('./components/BestPriceChart')
   return { default: module.BestPriceChart }
 })
+
+const BetBuilderLab = lazy(async () => ({ default: (await import('./components/BetBuilderLab')).BetBuilderLab }))
+const BankrollResearch = lazy(async () => ({ default: (await import('./components/BankrollResearch')).BankrollResearch }))
+const MatchdayResearch = lazy(async () => ({ default: (await import('./components/MatchdayResearch')).MatchdayResearch }))
+const UnderdogScanner = lazy(async () => ({ default: (await import('./components/UnderdogScanner')).UnderdogScanner }))
+const ValueOpportunities = lazy(async () => ({ default: (await import('./components/ValueOpportunities')).ValueOpportunities }))
+const MatchDetailPage = lazy(async () => ({ default: (await import('./components/MatchDetailPage')).MatchDetailPage }))
+const ModelPerformance = lazy(async () => ({ default: (await import('./components/ModelPerformance')).ModelPerformance }))
+const DataOperations = lazy(async () => ({ default: (await import('./components/DataOperations')).DataOperations }))
+const ArbitrageSettings = lazy(async () => ({ default: (await import('./components/ArbitrageSettings')).ArbitrageSettings }))
 
 const DASHBOARD_OPENED_AT = Date.now()
 
@@ -256,7 +257,7 @@ function App() {
             <>
               <ResourceErrors errors={dashboard.resource_errors} />
               {!routeNotFound ? <WorkflowReadiness dashboard={dashboard} view={view} onNavigate={(target) => selectView(target as ViewKey)} /> : null}
-              {routeNotFound ? <NotFound onNavigate={() => selectView('matchday')} /> : <ActiveView
+              {routeNotFound ? <NotFound onNavigate={() => selectView('matchday')} /> : <Suspense fallback={<LoadingState />}><ActiveView
                 comparisonError={comparisonError}
                 comparisonLoading={comparisonLoading}
                 dashboard={dashboard}
@@ -266,7 +267,7 @@ function App() {
                 onRefresh={synchronize}
                 selectedEventId={selectedEventId}
                 view={view}
-              />}
+              /></Suspense>}
             </>
           ) : null}
           {!error && !dashboard ? <LoadingState /> : null}
@@ -672,7 +673,7 @@ export function ArbitrageResearch({ dashboard, onChanged }: { dashboard: Dashboa
   return (
     <div className="space-y-7">
       <SectionHeading eyebrow="Tax and constraint aware" title="Stored arbitrage calculations" />
-      <ArbitrageSettings onChanged={onChanged} />
+      <Suspense fallback={<InlineLoading text="Loading arbitrage settings" />}><ArbitrageSettings onChanged={onChanged} /></Suspense>
       <form className="border-y border-zinc-200 bg-white p-5" onSubmit={(event) => void submitCalculation(event)}>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <label><span className="mb-1.5 block text-xs font-semibold uppercase text-zinc-500">Event</span><select aria-label="Arbitrage event" className="h-10 w-full border border-zinc-300 bg-white px-3 text-sm" required value={eventId} onChange={(event) => setEventId(event.target.value)}><option disabled value="">Select event</option>{dashboard.events.map((item) => <option key={item.id} value={item.id}>{item.home_team} vs {item.away_team}</option>)}</select></label>
