@@ -44,6 +44,7 @@ const MatchDetailPage = lazy(async () => ({ default: (await import('./components
 const ModelPerformance = lazy(async () => ({ default: (await import('./components/ModelPerformance')).ModelPerformance }))
 const DataOperations = lazy(async () => ({ default: (await import('./components/DataOperations')).DataOperations }))
 const ArbitrageSettings = lazy(async () => ({ default: (await import('./components/ArbitrageSettings')).ArbitrageSettings }))
+const ResearchWorkspace = lazy(async () => ({ default: (await import('./components/ResearchWorkspace')).ResearchWorkspace }))
 
 const DASHBOARD_OPENED_AT = Date.now()
 
@@ -331,6 +332,8 @@ function ActiveView(props: ActiveViewProps) {
       return <ArbitrageResearch dashboard={props.dashboard} onChanged={props.onRefresh} />
     case 'builder':
       return <BetBuilderLab events={props.dashboard.events} onSelectEvent={props.onSelectEvent} selectedEventId={props.selectedEventId} />
+    case 'workspace':
+      return <ResearchWorkspace dashboard={props.dashboard} onOpenEvent={props.onOpenEvent} />
     case 'models':
       return <ModelPerformance dashboard={props.dashboard} onChanged={props.onRefresh} />
     case 'backtests':

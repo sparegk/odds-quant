@@ -155,6 +155,7 @@ describe('site navigation', () => {
       'opportunities',
       'underdogs',
       'builder',
+      'workspace',
       'overview',
       'models',
       'backtests',

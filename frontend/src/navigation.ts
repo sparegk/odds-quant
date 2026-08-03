@@ -1,5 +1,6 @@
 import {
   Beaker,
+  Bookmark,
   BookOpen,
   CalendarDays,
   CircleDollarSign,
@@ -23,6 +24,7 @@ export type ViewKey =
   | 'event'
   | 'comparison'
   | 'builder'
+  | 'workspace'
   | 'models'
   | 'backtests'
   | 'bankroll'
@@ -56,6 +58,7 @@ export const navigationGroups: readonly NavigationGroup[] = [
       { key: 'opportunities', label: 'Value opportunities', icon: TrendingUp, path: '/research/value' },
       { key: 'underdogs', label: 'Underdog scanner', icon: ScanSearch, path: '/research/underdogs' },
       { key: 'builder', label: 'Bet Builder Lab', icon: Beaker, path: '/research/builder' },
+      { key: 'workspace', label: 'Research workspace', icon: Bookmark, path: '/research/workspace' },
     ],
   },
   {

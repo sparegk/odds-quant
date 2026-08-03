@@ -1,0 +1,61 @@
+import { useMemo, useState } from 'react'
+import { BookmarkPlus, GitCompareArrows, NotebookPen, Trash2 } from 'lucide-react'
+
+import { formatDateTime } from '../lib/format'
+import type { DashboardData } from '../types'
+
+const storageKey = 'oddsquant:research-workspace:v1'
+
+interface WorkspaceItem {
+  id: string
+  eventId: number
+  title: string
+  subtitle: string
+  kind: 'match' | 'qualified_signal' | 'research_candidate'
+  offeredOdds: number | null
+  modelProbability: number | null
+  marketProbability: number | null
+  edge: number | null
+  evidenceId: string
+  note: string
+  savedAt: string
+}
+
+export function ResearchWorkspace({ dashboard, onOpenEvent }: { dashboard: DashboardData; onOpenEvent: (eventId: number) => void }) {
+  const options = useMemo(() => workspaceOptions(dashboard), [dashboard])
+  const [items, setItems] = useState<WorkspaceItem[]>(readWorkspace)
+  const [selectedOption, setSelectedOption] = useState(options[0]?.id ?? '')
+  const [compared, setCompared] = useState<string[]>([])
+  const persist = (next: WorkspaceItem[]) => { setItems(next); try { localStorage.setItem(storageKey, JSON.stringify(next)) } catch { /* browser storage is optional */ } }
+  const add = () => { const option = options.find((candidate) => candidate.id === selectedOption); if (!option || items.some((item) => item.id === option.id)) return; persist([...items, { ...option, note: '', savedAt: new Date().toISOString() }]) }
+  const updateNote = (id: string, note: string) => persist(items.map((item) => item.id === id ? { ...item, note } : item))
+  const remove = (id: string) => { persist(items.filter((item) => item.id !== id)); setCompared((current) => current.filter((key) => key !== id)) }
+  const toggleCompare = (id: string) => setCompared((current) => current.includes(id) ? current.filter((key) => key !== id) : current.length < 4 ? [...current, id] : current)
+  const comparison = items.filter((item) => compared.includes(item.id))
+
+  return <div className="space-y-7">
+    <div><p className="text-xs font-bold uppercase text-emerald-700">Local desktop notebook</p><h2 className="mt-1 text-lg font-bold">Research workspace</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-zinc-500">Bookmark matches or evidence snapshots, write private browser-local notes, and compare up to four candidates. Workspace entries are not recommendations and do not alter stored signals.</p></div>
+    <section className="border border-zinc-200 bg-white p-5"><div className="flex items-end gap-3"><label className="min-w-0 flex-1"><span className="mb-1.5 block text-xs font-bold uppercase text-zinc-500">Match or candidate</span><select aria-label="Workspace candidate" className="h-10 w-full border border-zinc-300 bg-white px-3 text-sm" value={selectedOption} onChange={(event) => setSelectedOption(event.target.value)}>{options.length ? options.map((option) => <option key={option.id} value={option.id}>{option.title} · {option.subtitle}</option>) : <option value="">No imported matches or candidates</option>}</select></label><button className="inline-flex h-10 items-center gap-2 bg-zinc-900 px-4 text-sm font-bold text-white disabled:opacity-40" disabled={!selectedOption || items.some((item) => item.id === selectedOption)} onClick={add} type="button"><BookmarkPlus aria-hidden="true" size={16} />Save to workspace</button></div><p className="mt-2 text-xs text-zinc-500">Saved evidence is a local display snapshot. Re-open the event to inspect current timestamped records.</p></section>
+    {comparison.length ? <Comparison items={comparison} /> : null}
+    <section><div className="mb-3 flex items-end justify-between"><div><p className="text-xs font-bold uppercase text-sky-700">Notebook</p><h3 className="mt-1 font-bold">Saved research</h3></div><p className="text-xs text-zinc-500">{items.length} saved · {compared.length}/4 selected for comparison</p></div>{items.length ? <div className="space-y-3">{items.map((item) => <article className="border border-zinc-200 bg-white" key={item.id}><div className="grid grid-cols-[auto_minmax(260px,1fr)_repeat(4,minmax(95px,auto))_auto] items-center gap-4 p-4"><input aria-label={`Compare ${item.title}`} checked={compared.includes(item.id)} type="checkbox" onChange={() => toggleCompare(item.id)} /><div><p className="text-[10px] font-bold uppercase text-zinc-500">{labelKind(item.kind)}</p><h4 className="mt-1 font-bold">{item.title}</h4><p className="mt-1 text-xs text-zinc-500">{item.subtitle} · saved {formatDateTime(item.savedAt)}</p></div><Metric label="Offered" value={decimal(item.offeredOdds)} /><Metric label="Model" value={percent(item.modelProbability)} /><Metric label="Market" value={percent(item.marketProbability)} /><Metric label="Edge" value={signedPercent(item.edge)} /><div className="flex gap-2"><button className="border border-zinc-300 px-3 py-2 text-xs font-bold" onClick={() => onOpenEvent(item.eventId)} type="button">Open event</button><button aria-label={`Remove ${item.title}`} className="grid h-9 w-9 place-items-center border border-rose-200 text-rose-700" onClick={() => remove(item.id)} type="button"><Trash2 aria-hidden="true" size={15} /></button></div></div><label className="block border-t border-zinc-200 bg-zinc-50 p-4"><span className="mb-1.5 flex items-center gap-2 text-xs font-bold uppercase text-zinc-500"><NotebookPen aria-hidden="true" size={14} />Research note</span><textarea aria-label={`Note for ${item.title}`} className="min-h-20 w-full resize-y border border-zinc-300 bg-white p-3 text-sm" maxLength={2000} placeholder="Record assumptions, questions, and evidence to revisit…" value={item.note} onChange={(event) => updateNote(item.id, event.target.value)} /></label></article>)}</div> : <div className="border-y border-zinc-200 bg-white px-6 py-14 text-center"><BookmarkPlus aria-hidden="true" className="mx-auto text-zinc-400" size={28} /><h3 className="mt-3 font-bold">No saved research</h3><p className="mt-2 text-sm text-zinc-500">Choose an imported match or evidence candidate above.</p></div>}</section>
+    <div className="border-l-4 border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-950">Workspace notes and comparisons are browser-local organizational aids. They do not qualify evidence, create a signal, or prove value.</div>
+  </div>
+}
+
+function Comparison({ items }: { items: WorkspaceItem[] }) { return <section aria-label="Workspace comparison"><div className="mb-3 flex items-center gap-2"><GitCompareArrows aria-hidden="true" size={17} /><h3 className="font-bold">Candidate comparison</h3></div><div className="grid border border-zinc-200 bg-white" style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}>{items.map((item) => <div className="border-r border-zinc-200 p-4 last:border-r-0" key={item.id}><p className="text-[10px] font-bold uppercase text-zinc-500">{labelKind(item.kind)}</p><p className="mt-1 font-bold">{item.title}</p><dl className="mt-4 grid grid-cols-2 gap-3"><Metric label="Offered" value={decimal(item.offeredOdds)} /><Metric label="Model" value={percent(item.modelProbability)} /><Metric label="Market" value={percent(item.marketProbability)} /><Metric label="Edge" value={signedPercent(item.edge)} /></dl><p className="mt-3 text-xs text-zinc-500">{item.note || 'No note recorded.'}</p></div>)}</div></section> }
+function Metric({ label, value }: { label: string; value: string }) { return <div><dt className="text-[10px] font-bold uppercase text-zinc-400">{label}</dt><dd className="mt-1 font-mono text-sm font-bold">{value}</dd></div> }
+function labelKind(kind: WorkspaceItem['kind']): string { return kind === 'match' ? 'Match bookmark' : kind === 'qualified_signal' ? 'Stored qualified signal' : 'Research-only candidate' }
+function decimal(value: number | null): string { return value === null ? '—' : value.toFixed(2) }
+function percent(value: number | null): string { return value === null ? '—' : `${(value * 100).toFixed(1)}%` }
+function signedPercent(value: number | null): string { return value === null ? '—' : `${value >= 0 ? '+' : ''}${(value * 100).toFixed(1)}%` }
+
+function workspaceOptions(dashboard: DashboardData): Omit<WorkspaceItem, 'note' | 'savedAt'>[] {
+  const events = new Map(dashboard.events.map((event) => [event.id, event]))
+  const matches = dashboard.events.map((event) => ({ id: `match:${event.id}`, eventId: event.id, title: `${event.home_team} vs ${event.away_team}`, subtitle: `${event.competition} · match`, kind: 'match' as const, offeredOdds: null, modelProbability: null, marketProbability: null, edge: null, evidenceId: `event:${event.id}` }))
+  const signals = dashboard.signals.map((signal) => { const event = events.get(signal.event_id); return { id: `signal:${signal.id}`, eventId: signal.event_id, title: event ? `${event.home_team} vs ${event.away_team}` : `Event ${signal.event_id}`, subtitle: `${signal.selection_name} · ${signal.bookmaker}`, kind: 'qualified_signal' as const, offeredOdds: signal.offered_odds, modelProbability: signal.model_probability, marketProbability: signal.market_fair_probability, edge: signal.probability_edge, evidenceId: `signal:${signal.id}` } })
+  const candidates = (dashboard.research_candidates ?? []).map((candidate) => ({ id: `candidate:${candidate.output_id}:${candidate.selection_id}`, eventId: candidate.event_id, title: `${candidate.home_team} vs ${candidate.away_team}`, subtitle: `${candidate.selection_name} · ${candidate.bookmaker}`, kind: 'research_candidate' as const, offeredOdds: candidate.offered_odds, modelProbability: candidate.model_probability, marketProbability: candidate.market_fair_probability, edge: candidate.probability_edge, evidenceId: `prediction:${candidate.prediction_id}:snapshot:${candidate.odds_snapshot_id}` }))
+  return [...matches, ...signals, ...candidates]
+}
+
+function readWorkspace(): WorkspaceItem[] { try { const parsed: unknown = JSON.parse(localStorage.getItem(storageKey) ?? '[]'); return Array.isArray(parsed) ? parsed.filter(validItem) : [] } catch { return [] } }
+function validItem(value: unknown): value is WorkspaceItem { return Boolean(value && typeof value === 'object' && 'id' in value && typeof value.id === 'string' && 'eventId' in value && typeof value.eventId === 'number' && 'note' in value && typeof value.note === 'string') }
