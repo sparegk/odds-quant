@@ -16,6 +16,7 @@ import { FirstVisitGuide } from './components/FirstVisitGuide'
 import { WorkflowReadiness } from './components/WorkflowReadiness'
 import { QuantPriceTable } from './components/QuantPriceTable'
 import { Methodology } from './components/Methodology'
+import { DesktopDataTable, type DesktopColumn } from './components/DesktopDataTable'
 
 export { Methodology }
 import { formatDateTime, humanizeCode } from './lib/format'
@@ -516,22 +517,7 @@ function EvaluationPerformance({ evaluations }: { evaluations: EvaluationRun[] }
 
       <section>
         <SectionHeading eyebrow="Registry" title="Completed evaluation runs" />
-        <div className="overflow-x-auto border-y border-zinc-200 bg-white">
-          <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="bg-zinc-50 text-xs uppercase text-zinc-500"><tr><th className="px-4 py-3">Model</th><th className="px-4 py-3">Window end</th><th className="px-4 py-3">Evidence</th><th className="px-4 py-3 text-right">Brier</th><th className="px-4 py-3">Classification</th></tr></thead>
-            <tbody>
-              {evaluations.map((run) => (
-                <tr key={run.id} className="border-t border-zinc-100">
-                  <td className="px-4 py-3 font-mono text-xs">{run.model_version}</td>
-                  <td className="px-4 py-3">{formatDateTime(run.evaluation_end)}</td>
-                  <td className="px-4 py-3">{run.is_demo ? 'DEMO ONLY' : 'EXTERNAL HISTORY'}</td>
-                  <td className="px-4 py-3 text-right font-mono">{formatScore(metricValue(run.metrics, 'brier_score'))}</td>
-                  <td className="px-4 py-3">{humanizeCode(run.evaluation_status)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DesktopDataTable ariaLabel="Completed evaluation runs" columns={evaluationColumns} filename="model-evaluations.csv" rowKey={(run) => run.id} rows={evaluations} />
       </section>
 
       {latest.is_demo ? (
@@ -542,6 +528,14 @@ function EvaluationPerformance({ evaluations }: { evaluations: EvaluationRun[] }
     </div>
   )
 }
+
+const evaluationColumns: DesktopColumn<EvaluationRun>[] = [
+  { id: 'model', label: 'Model', value: (run) => run.model_version, render: (run) => <span className="font-mono text-xs">{run.model_version}</span> },
+  { id: 'window-end', label: 'Window end', value: (run) => run.evaluation_end, render: (run) => formatDateTime(run.evaluation_end) },
+  { id: 'evidence', label: 'Evidence', value: (run) => run.is_demo ? 'DEMO ONLY' : 'EXTERNAL HISTORY' },
+  { id: 'brier', label: 'Brier', value: (run) => metricValue(run.metrics, 'brier_score') ?? Number.POSITIVE_INFINITY, render: (run) => <span className="font-mono">{formatScore(metricValue(run.metrics, 'brier_score'))}</span>, align: 'right' },
+  { id: 'classification', label: 'Classification', value: (run) => humanizeCode(run.evaluation_status) },
+]
 
 export function SuccessNotice({ message, onDismiss }: { message: string; onDismiss: () => void }) {
   return <div className="fixed right-4 top-20 z-50 flex max-w-sm items-start gap-3 border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950 shadow-lg" role="status"><CheckCircle2 aria-hidden="true" className="mt-0.5 shrink-0" size={18} /><div className="flex-1"><p className="font-bold">Workflow updated</p><p className="mt-1">{message}</p></div><button aria-label="Dismiss notification" onClick={onDismiss} type="button"><X aria-hidden="true" size={17} /></button></div>
@@ -571,7 +565,7 @@ export function BacktestResearch({ dashboard, onChanged }: { dashboard: Dashboar
       <section>
         <SectionHeading eyebrow="Timestamped signal replay" title="Settled strategy backtests" />
         <form className="mb-6 border-y border-zinc-200 bg-white p-5" onSubmit={(event) => void submitBacktest(event)}><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><label><span className="mb-1.5 block text-xs font-semibold uppercase text-zinc-500">Model version</span><select aria-label="Backtest model" className="h-10 w-full border border-zinc-300 bg-white px-3 text-sm" required value={modelId} onChange={(event) => setModelId(event.target.value)}><option disabled value="">Select model</option>{dashboard.models.map((model) => <option key={model.id} value={model.id}>{model.version}</option>)}</select></label><label><span className="mb-1.5 block text-xs font-semibold uppercase text-zinc-500">Evaluation start</span><input aria-label="Evaluation start" className="h-10 w-full border border-zinc-300 px-3 text-sm" required type="datetime-local" value={evaluationStart} onChange={(event) => setEvaluationStart(event.target.value)} /></label><label><span className="mb-1.5 block text-xs font-semibold uppercase text-zinc-500">Evaluation end</span><input aria-label="Evaluation end" className="h-10 w-full border border-zinc-300 px-3 text-sm" required type="datetime-local" value={evaluationEnd} onChange={(event) => setEvaluationEnd(event.target.value)} /></label><fieldset><legend className="mb-1.5 text-xs font-semibold uppercase text-zinc-500">Stored classifications</legend><div className="flex h-10 items-center gap-3">{['VALUE', 'WATCH', 'PASS'].map((item) => <label key={item} className="flex items-center gap-1 text-xs font-semibold"><input checked={signalTypes.includes(item)} onChange={() => toggleSignalType(item)} type="checkbox" />{item}</label>)}</div></fieldset><label><span className="mb-1.5 block text-xs font-semibold uppercase text-zinc-500">Admin key (memory only)</span><input aria-label="Backtest admin key" autoComplete="off" className="h-10 w-full border border-zinc-300 px-3 text-sm" type="password" value={adminKey} onChange={(event) => setAdminKey(event.target.value)} /></label></div><div className="mt-4 flex items-center gap-3"><button className="rounded-[5px] bg-zinc-900 px-4 py-2 text-sm font-bold text-white disabled:opacity-50" disabled={submitting || !modelId || !evaluationStart || !evaluationEnd || !signalTypes.length} type="submit">{submitting ? 'Running replay…' : 'Run signal backtest'}</button><p className="text-xs text-zinc-500">Only predictions, prices, and signals timestamped before kickoff are eligible.</p></div>{runError ? <div className="mt-4 border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900" role="alert">{runError}</div> : null}</form>
-        {runs.length ? <><BacktestEvidenceAudit run={runs[0]!} /><div className="mt-4 space-y-4">{runs.map((run) => <BacktestRunCard key={run.id} run={run} />)}</div></> : <EmptyState title="No settled signal backtests" detail="Stored calibration runs remain below. Strategy returns require timestamp-valid signals and final results known by the evaluation cutoff." />}
+        {runs.length ? <><BacktestEvidenceAudit run={runs[0]!} /><div className="mt-4"><DesktopDataTable ariaLabel="Settled backtest runs" columns={backtestColumns} filename="settled-backtests.csv" rowKey={(run) => run.id} rows={runs} /></div><div className="mt-4 space-y-4">{runs.map((run) => <BacktestRunCard key={run.id} run={run} />)}</div></> : <EmptyState title="No settled signal backtests" detail="Stored calibration runs remain below. Strategy returns require timestamp-valid signals and final results known by the evaluation cutoff." />}
       </section>
       <section>
         <EvaluationPerformance evaluations={dashboard.evaluations} />
@@ -600,6 +594,14 @@ function BacktestRunCard({ run }: { run: DashboardData['backtests'][number] }) {
 }
 
 function BacktestMetric({ label, value }: { label: string; value: string }) { return <div><p className="text-xs font-semibold uppercase text-zinc-500">{label}</p><p className="mt-1 font-mono font-bold">{value}</p></div> }
+const backtestColumns: DesktopColumn<DashboardData['backtests'][number]>[] = [
+  { id: 'run', label: 'Run / model', value: (run) => run.id, render: (run) => <><p className="font-bold">Run #{run.id}</p><p className="text-xs text-zinc-500">{run.model_version}</p><p className="font-mono text-xs text-zinc-400">{run.fingerprint}</p></> },
+  { id: 'window', label: 'Evaluation window', value: (run) => run.evaluation_end, render: (run) => <span className="text-xs">{formatDateTime(run.evaluation_start)} to {formatDateTime(run.evaluation_end)}</span> },
+  { id: 'evidence', label: 'Evidence', value: (run) => run.is_demo ? 'DEMO ONLY' : 'EXTERNAL HISTORY' },
+  { id: 'bets', label: 'Bets', value: (run) => metricValue(run.metrics, 'bet_count') ?? 0, align: 'right' },
+  { id: 'roi', label: 'ROI', value: (run) => metricValue(run.metrics, 'roi') ?? 0, render: (run) => <span className="font-mono">{formatSignedPercent(metricValue(run.metrics, 'roi') ?? 0)}</span>, align: 'right' },
+  { id: 'status', label: 'Status', value: (run) => humanizeCode(run.evaluation_status) },
+]
 function toDateTimeInput(value: string | undefined): string { return value ? new Date(value).toISOString().slice(0, 16) : '' }
 
 export function SignalResearch({ dashboard, mode }: { dashboard: DashboardData; mode: 'value' | 'underdog' }) {
@@ -635,18 +637,7 @@ export function SignalResearch({ dashboard, mode }: { dashboard: DashboardData; 
         <Metric label="Average edge" value={averageEdge === null ? '' : `${(averageEdge * 100).toFixed(1)} pp`} />
       </section>
 
-      <div className="overflow-x-auto border-y border-zinc-200 bg-white">
-        <table className="w-full min-w-[1120px] text-left text-sm">
-          <thead className="bg-zinc-50 text-xs uppercase text-zinc-500">
-            <tr><th className="px-4 py-3">Event / selection</th><th className="px-4 py-3">Classification</th><th className="px-4 py-3">Best price</th><th className="px-4 py-3 text-right">Model</th><th className="px-4 py-3 text-right">Market</th><th className="px-4 py-3 text-right">Edge</th><th className="px-4 py-3 text-right">EV</th><th className="px-4 py-3 text-right">Lower EV</th><th className="px-4 py-3 text-right">Confidence</th><th className="px-4 py-3">Evidence</th></tr>
-          </thead>
-          <tbody>
-            {signals.map((signal) => (
-              <SignalRow key={signal.id} dashboard={dashboard} signal={signal} />
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <DesktopDataTable ariaLabel={title} columns={signalColumns(dashboard)} filename={mode === 'underdog' ? 'underdog-signals.csv' : 'value-signals.csv'} rowKey={(signal) => signal.id} rows={signals} />
 
       <div className="border-l-4 border-sky-500 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950">
         Model edge, line-shopping price improvement, and bookmaker margin are separate quantities. A VALUE label is conditional on the stored price, calibration run, uncertainty bound, freshness, and movement checks.
@@ -718,6 +709,7 @@ export function ArbitrageResearch({ dashboard, onChanged }: { dashboard: Dashboa
 
       <div className="space-y-5">
         {!opportunities.length ? <EmptyState title="No stored arbitrage calculations" detail="Choose an event and run the protected calculation against its complete compatible market snapshots." /> : null}
+        {opportunities.length ? <DesktopDataTable ariaLabel="Arbitrage calculations" columns={arbitrageColumns(dashboard)} filename="arbitrage-calculations.csv" rowKey={(opportunity) => opportunity.id} rows={opportunities} /> : null}
         {opportunities.map((opportunity) => {
           const event = dashboard.events.find((candidate) => candidate.id === opportunity.event_id)
           return (
@@ -801,6 +793,17 @@ function ArbitrageMetric({ label, value }: { label: string; value: string }) {
   return <div className="border-r border-b border-zinc-200 p-4 last:border-r-0 md:border-b-0"><p className="text-xs font-semibold uppercase text-zinc-500">{label}</p><p className="mt-1 font-mono text-base font-bold">{value}</p></div>
 }
 
+function arbitrageColumns(dashboard: DashboardData): DesktopColumn<DashboardData['arbitrage'][number]>[] { return [
+  { id: 'event', label: 'Event', value: (opportunity) => { const event = dashboard.events.find((candidate) => candidate.id === opportunity.event_id); return event ? event.home_team + ' vs ' + event.away_team : 'Event ' + opportunity.event_id } },
+  { id: 'market', label: 'Market', value: (opportunity) => humanizeCode(opportunity.market_type) },
+  { id: 'status', label: 'Status', value: (opportunity) => humanizeCode(opportunity.status) },
+  { id: 'legs', label: 'Legs', value: (opportunity) => opportunity.legs.length, align: 'right' },
+  { id: 'budget', label: 'Budget', value: (opportunity) => opportunity.budget, render: (opportunity) => <span className="font-mono">{formatMoney(opportunity.budget, opportunity.currency)}</span>, align: 'right' },
+  { id: 'profit', label: 'Worst-case profit', value: (opportunity) => opportunity.net_profit, render: (opportunity) => <span className="font-mono">{opportunity.net_profit >= 0 ? '+' : ''}{formatMoney(opportunity.net_profit, opportunity.currency)}</span>, align: 'right' },
+  { id: 'roi', label: 'Net ROI', value: (opportunity) => opportunity.net_roi, render: (opportunity) => <span className="font-mono">{formatSignedPercent(opportunity.net_roi)}</span>, align: 'right' },
+  { id: 'freshness', label: 'Price status', value: (opportunity) => humanizeCode(opportunity.freshness_status) },
+] }
+
 function formatMoney(value: number, currency: string): string {
   return `${currency} ${value.toFixed(2)}`
 }
@@ -811,30 +814,18 @@ function arbitrageStatusClass(status: string): string {
     : 'border-amber-200 bg-amber-50 text-amber-800'
 }
 
-function SignalRow({ dashboard, signal }: { dashboard: DashboardData; signal: ValueSignal }) {
-  const event = dashboard.events.find((candidate) => candidate.id === signal.event_id)
-  return (
-    <tr className="border-t border-zinc-100 align-top">
-      <td className="px-4 py-3">
-        <p className="font-semibold">{event ? `${event.home_team} vs ${event.away_team}` : `Event ${signal.event_id}`}</p>
-        <p className="mt-1 text-xs text-zinc-500">{signal.selection_name} / {humanizeCode(signal.market_type)}</p>
-      </td>
-      <td className="px-4 py-3"><span className={`rounded-[4px] border px-2 py-1 text-xs font-bold ${signalStatusClass(signal.signal_type)}`}>{humanizeCode(signal.signal_type)}</span></td>
-      <td className="px-4 py-3"><p className="font-mono font-semibold">{signal.offered_odds.toFixed(2)}</p><p className="mt-1 text-xs text-zinc-500">{signal.bookmaker}</p></td>
-      <td className="px-4 py-3 text-right font-mono">{(signal.model_probability * 100).toFixed(1)}%</td>
-      <td className="px-4 py-3 text-right font-mono">{(signal.market_fair_probability * 100).toFixed(1)}%</td>
-      <td className="px-4 py-3 text-right font-mono">{formatSignedPercent(signal.probability_edge)}</td>
-      <td className="px-4 py-3 text-right font-mono">{formatSignedPercent(signal.expected_value)}</td>
-      <td className="px-4 py-3 text-right font-mono">{formatSignedPercent(signal.lower_expected_value)}</td>
-      <td className="px-4 py-3 text-right font-mono">{(signal.confidence * 100).toFixed(0)}%</td>
-      <td className="max-w-xs px-4 py-3 text-xs leading-5 text-zinc-600">
-        <p>{signal.reasons[0] ?? 'Stored quantitative classification.'}</p>
-        <p className="mt-1 text-zinc-400">Eval #{signal.evaluation_run_id} / {signal.bookmaker_count} books / {signal.odds_age_minutes.toFixed(0)}m old</p>
-        {signal.risks[0] ? <p className="mt-1 text-amber-700">{signal.risks[0]}</p> : null}
-      </td>
-    </tr>
-  )
-}
+function signalColumns(dashboard: DashboardData): DesktopColumn<ValueSignal>[] { return [
+  { id: 'event', label: 'Event / selection', value: (signal) => { const event = dashboard.events.find((candidate) => candidate.id === signal.event_id); return (event ? event.home_team + ' vs ' + event.away_team : 'Event ' + signal.event_id) + ' ' + signal.selection_name }, render: (signal) => { const event = dashboard.events.find((candidate) => candidate.id === signal.event_id); return <><p className="font-semibold">{event ? `${event.home_team} vs ${event.away_team}` : `Event ${signal.event_id}`}</p><p className="mt-1 text-xs text-zinc-500">{signal.selection_name} / {humanizeCode(signal.market_type)}</p></> } },
+  { id: 'classification', label: 'Classification', value: (signal) => humanizeCode(signal.signal_type), render: (signal) => <span className={`rounded-[4px] border px-2 py-1 text-xs font-bold ${signalStatusClass(signal.signal_type)}`}>{humanizeCode(signal.signal_type)}</span> },
+  { id: 'price', label: 'Best price', value: (signal) => signal.offered_odds, render: (signal) => <><p className="font-mono font-semibold">{signal.offered_odds.toFixed(2)}</p><p className="mt-1 text-xs text-zinc-500">{signal.bookmaker}</p></> },
+  { id: 'model', label: 'Model', value: (signal) => signal.model_probability, render: (signal) => <span className="font-mono">{(signal.model_probability * 100).toFixed(1)}%</span>, align: 'right' },
+  { id: 'market', label: 'Market', value: (signal) => signal.market_fair_probability, render: (signal) => <span className="font-mono">{(signal.market_fair_probability * 100).toFixed(1)}%</span>, align: 'right' },
+  { id: 'edge', label: 'Edge', value: (signal) => signal.probability_edge, render: (signal) => <span className="font-mono">{formatSignedPercent(signal.probability_edge)}</span>, align: 'right' },
+  { id: 'ev', label: 'EV', value: (signal) => signal.expected_value, render: (signal) => <span className="font-mono">{formatSignedPercent(signal.expected_value)}</span>, align: 'right' },
+  { id: 'lower-ev', label: 'Lower EV', value: (signal) => signal.lower_expected_value, render: (signal) => <span className="font-mono">{formatSignedPercent(signal.lower_expected_value)}</span>, align: 'right' },
+  { id: 'confidence', label: 'Confidence', value: (signal) => signal.confidence, render: (signal) => <span className="font-mono">{(signal.confidence * 100).toFixed(0)}%</span>, align: 'right' },
+  { id: 'evidence', label: 'Evidence', value: (signal) => signal.reasons.concat(signal.risks).join(' '), render: (signal) => <><p className="max-w-xs text-xs leading-5 text-zinc-600">{signal.reasons[0] ?? 'Stored quantitative classification.'}</p><p className="mt-1 text-xs text-zinc-400">Eval #{signal.evaluation_run_id} / {signal.bookmaker_count} books / {signal.odds_age_minutes.toFixed(0)}m old</p>{signal.risks[0] ? <p className="mt-1 text-xs text-amber-700">{signal.risks[0]}</p> : null}</> },
+] }
 
 function formatSignedPercent(value: number): string {
   return `${value >= 0 ? '+' : ''}${(value * 100).toFixed(1)}%`
