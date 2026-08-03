@@ -154,6 +154,7 @@ test('renders an explicit not-found page and recovers through desktop navigation
 test('has no serious accessibility violations on the desktop research shell', async ({ page }) => {
   const guide = page.getByRole('region', { name: 'Research guide' })
   if (await guide.isVisible()) await page.getByRole('button', { name: 'Dismiss research guide' }).click()
+  await expect(page.getByRole('button', { name: 'Previous day' })).toBeVisible()
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()
   expect(results.violations.filter((violation) => ['serious', 'critical'].includes(violation.impact ?? ''))).toEqual([])
 })

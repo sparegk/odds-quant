@@ -187,7 +187,7 @@ function App() {
         <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Primary navigation">
           {navigationGroups.map((group) => (
             <div className='mb-5 last:mb-0' key={group.label}>
-              <p className='mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-600'>{group.label}</p>
+              <p className='mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-400'>{group.label}</p>
               {group.items.map((item) => {
                 const Icon = item.icon
                 const active = view === item.key
@@ -209,7 +209,7 @@ function App() {
             </div>
           ))}
         </nav>
-        <div className="border-t border-zinc-800 p-4 text-xs leading-5 text-zinc-500">
+        <div className="border-t border-zinc-800 p-4 text-xs leading-5 text-zinc-400">
           <p className="font-bold uppercase tracking-[0.12em] text-zinc-400">Evidence key</p>
           <div aria-label="Evidence state legend" className="mt-2 grid grid-cols-3 gap-2 text-[10px]">
             <span className="border border-emerald-800 bg-emerald-950/50 px-2 py-1 text-emerald-300">Qualified</span>
@@ -225,7 +225,7 @@ function App() {
         <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/95 backdrop-blur">
           <div className="flex h-16 items-center justify-between gap-4 px-8">
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-400">{routeNotFound ? 'OddsQuant' : navigationContext(view).group}</p>
+              <p className="truncate text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-600">{routeNotFound ? 'OddsQuant' : navigationContext(view).group}</p>
               <h1 className="truncate text-lg font-bold">{routeNotFound ? 'Page not found' : navigation.find((item) => item.key === view)?.label}</h1>
             </div>
             <div className="flex items-center gap-2">
@@ -972,7 +972,7 @@ function EmptyRow({ text }: { text: string }) {
 }
 
 function LoadingState() {
-  return <div className="grid min-h-[420px] place-items-center" role="status"><div className="text-center"><RefreshCw aria-hidden="true" className="mx-auto animate-spin text-emerald-700" size={24} /><p className="mt-3 font-semibold">Loading your research workspace</p><p className="mt-1 text-sm text-zinc-500">Fetching fixtures, timestamped prices, and model evidence.</p></div></div>
+  return <div className="grid min-h-[420px] place-items-center" role="status"><div className="text-center"><RefreshCw aria-hidden="true" className="mx-auto animate-spin text-emerald-700" size={24} /><p className="mt-3 font-semibold">Loading your research workspace</p><p className="mt-1 text-sm text-zinc-600">Fetching fixtures, timestamped prices, and model evidence.</p></div></div>
 }
 
 function ConnectionError({ message, onRetry }: { message: string; onRetry: () => void }) {
