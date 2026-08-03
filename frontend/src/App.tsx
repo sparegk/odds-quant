@@ -45,6 +45,7 @@ const ModelPerformance = lazy(async () => ({ default: (await import('./component
 const DataOperations = lazy(async () => ({ default: (await import('./components/DataOperations')).DataOperations }))
 const ArbitrageSettings = lazy(async () => ({ default: (await import('./components/ArbitrageSettings')).ArbitrageSettings }))
 const ResearchWorkspace = lazy(async () => ({ default: (await import('./components/ResearchWorkspace')).ResearchWorkspace }))
+const OperationsCenter = lazy(async () => ({ default: (await import('./components/OperationsCenter')).OperationsCenter }))
 
 const DASHBOARD_OPENED_AT = Date.now()
 
@@ -322,6 +323,8 @@ function ActiveView(props: ActiveViewProps) {
       return <OddsComparison {...props} />
     case 'data':
       return <DataOperations dashboard={props.dashboard} onChanged={props.onRefresh} />
+    case 'status':
+      return <OperationsCenter dashboard={props.dashboard} onRefresh={props.onRefresh} />
     case 'methodology':
       return <Methodology />
     case 'opportunities':

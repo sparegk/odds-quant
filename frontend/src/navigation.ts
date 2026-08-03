@@ -10,6 +10,7 @@ import {
   GitCompareArrows,
   LineChart,
   ScanSearch,
+  ServerCog,
   ShieldCheck,
   TrendingUp,
 } from 'lucide-react'
@@ -29,6 +30,7 @@ export type ViewKey =
   | 'backtests'
   | 'bankroll'
   | 'data'
+  | 'status'
   | 'methodology'
 
 export interface NavigationItem {
@@ -75,6 +77,7 @@ export const navigationGroups: readonly NavigationGroup[] = [
     items: [
       { key: 'arbitrage', label: 'Arbitrage', icon: ShieldCheck, path: '/admin/arbitrage' },
       { key: 'data', label: 'Data operations', icon: Database, path: '/admin/data' },
+      { key: 'status', label: 'System status', icon: ServerCog, path: '/admin/status' },
     ],
   },
   {

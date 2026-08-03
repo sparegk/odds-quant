@@ -162,6 +162,7 @@ describe('site navigation', () => {
       'bankroll',
       'arbitrage',
       'data',
+      'status',
       'methodology',
     ])
   })
