@@ -4,7 +4,6 @@ import {
   BarChart3,
   CheckCircle2,
   HelpCircle,
-  Menu,
   RefreshCw,
   X,
 } from 'lucide-react'
@@ -60,7 +59,6 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false)
   const [researchGuideOpen, setResearchGuideOpen] = useState(shouldShowResearchGuide)
 
   const refresh = useCallback(async () => {
@@ -150,7 +148,6 @@ function App() {
   const selectView = (next: ViewKey) => {
     navigateToView(next)
     setView(next)
-    setMobileNavigationOpen(false)
   }
 
   const openEvent = (eventId: number) => {
@@ -166,7 +163,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-[#f4f6f5] text-zinc-900">
-      <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 border-r border-zinc-800 bg-[#15191e] text-zinc-100 lg:flex lg:flex-col">
+      <aside className="fixed inset-y-0 left-0 z-20 flex w-64 flex-col border-r border-zinc-800 bg-[#15191e] text-zinc-100">
         <div className="flex h-16 items-center gap-3 border-b border-zinc-800 px-5">
           <span className="grid h-9 w-9 place-items-center rounded-[6px] bg-emerald-400 text-zinc-950">
             <Activity aria-hidden="true" size={21} strokeWidth={2.5} />
@@ -205,25 +202,16 @@ function App() {
         </div>
       </aside>
 
-      <div className="lg:pl-64">
+      <div className="pl-64">
         {notice ? <SuccessNotice message={notice} onDismiss={() => setNotice(null)} /> : null}
         <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/95 backdrop-blur">
-          <div className="flex h-16 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-            <button
-              aria-expanded={mobileNavigationOpen}
-              aria-label={mobileNavigationOpen ? 'Close navigation' : 'Open navigation'}
-              className='grid h-9 w-9 shrink-0 place-items-center border border-zinc-300 text-zinc-700 lg:hidden'
-              onClick={() => setMobileNavigationOpen((open) => !open)}
-              type='button'
-            >
-              {mobileNavigationOpen ? <X aria-hidden='true' size={18} /> : <Menu aria-hidden='true' size={18} />}
-            </button>
+          <div className="flex h-16 items-center justify-between gap-4 px-8">
             <div className="min-w-0 flex-1">
               <h1 className="truncate text-lg font-bold">{navigation.find((item) => item.key === view)?.label}</h1>
               <p className="truncate text-xs text-zinc-500">Point-in-time market and model research</p>
             </div>
             <div className="flex items-center gap-2">
-              <span className="hidden rounded-[4px] border border-sky-200 bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-800 sm:inline-flex">
+              <span className="inline-flex rounded-[4px] border border-sky-200 bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-800">
                 {dashboard?.status.data_mode === 'demo_or_user_supplied' ? 'Demo / user data' : dashboard?.status.data_mode ?? 'Connecting'}
               </span>
               <button
@@ -247,39 +235,11 @@ function App() {
               </button>
             </div>
           </div>
-          {mobileNavigationOpen ? (
-            <nav aria-label='Mobile navigation' className='max-h-[calc(100vh-4rem)] overflow-y-auto border-t border-zinc-200 bg-white px-4 py-4 lg:hidden'>
-              <div className='grid gap-5 sm:grid-cols-2'>
-                {navigationGroups.map((group) => (
-                  <div key={group.label}>
-                    <p className='mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-400'>{group.label}</p>
-                    <div className='grid grid-cols-2 gap-2'>
-                      {group.items.map((item) => {
-                        const Icon = item.icon
-                        return (
-                          <button
-                            aria-current={view === item.key ? 'page' : undefined}
-                            className={`flex min-h-11 items-center gap-2 border px-3 py-2 text-left text-xs font-semibold ${view === item.key ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 text-zinc-700'}`}
-                            key={item.key}
-                            onClick={() => selectView(item.key)}
-                            type='button'
-                          >
-                            <Icon aria-hidden='true' className='shrink-0' size={15} />
-                            {item.label}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </nav>
-          ) : null}
         </header>
 
         {researchGuideOpen ? <FirstVisitGuide onDismiss={() => { rememberResearchGuideDismissal(); setResearchGuideOpen(false) }} /> : null}
 
-        <main className="px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
+        <main className="px-8 py-7">
           {error ? <ConnectionError message={error} onRetry={() => void refresh()} /> : null}
           {!error && dashboard ? (
             <>
@@ -301,7 +261,7 @@ function App() {
           {!error && !dashboard ? <LoadingState /> : null}
         </main>
 
-        <footer className="border-t border-zinc-200 bg-white px-4 py-4 text-xs leading-5 text-zinc-500 sm:px-6 lg:px-8">
+        <footer className="border-t border-zinc-200 bg-white px-8 py-4 text-xs leading-5 text-zinc-500">
           Statistical edges can disappear. Historical results do not ensure future performance. Odds change rapidly. Follow local laws, age restrictions, and bookmaker terms; set strict financial limits and never chase losses.
         </footer>
       </div>

@@ -200,7 +200,7 @@ The repository is in the **Phase 1 research-workflow milestone**. It includes:
 - Per-bookmaker raw probability, overround, margin, proportional/power de-vig, fair-odds, freshness, and best-price responses.
 - A separate APScheduler worker with an explicit permitted-provider registry and persisted provider-job status.
 - A non-root backend image, PostgreSQL Docker Compose stack, Render Blueprint, and GitHub Actions checks.
-- A responsive React/Vite/Tailwind dashboard with a typed API client, quantitative price table, freshness states, best-price chart, accessible navigation, and component tests.
+- A desktop-focused React/Vite/Tailwind dashboard with a typed API client, quantitative price table, freshness states, best-price chart, accessible navigation, and component tests.
 - Frontend Docker, Nginx SPA, Vercel, Render static-site, and CI configuration.
 - Atomic historical-result CSV ingestion with raw provenance, corrections, and strict timestamp ordering.
 - A deterministic 32-match synthetic history generator covering every demo team at home and away.

@@ -115,20 +115,6 @@ test('opens and refreshes a shareable match URL', async ({ page }) => {
   await expect(page.getByLabel('Match')).toHaveValue('7')
 })
 
-test('uses compact grouped navigation on a mobile viewport', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 })
-  await page.getByRole('button', { name: 'Open navigation' }).click()
-  const menu = page.getByRole('navigation', { name: 'Mobile navigation' })
-  await expect(menu).toBeVisible()
-  await expect(menu.getByText('Matches', { exact: true })).toBeVisible()
-  await expect(menu.getByText('Research', { exact: true })).toBeVisible()
-  await menu.getByRole('button', { name: 'Model performance' }).click()
-  await expect(menu).toBeHidden()
-  await expect(page.locator('header h1')).toHaveText('Model performance')
-  await expect(page).toHaveURL(/#models$/)
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-})
-
 test('explains research concepts on first visit and remembers dismissal', async ({ page }) => {
   const guide = page.getByRole('region', { name: 'Research guide' })
   await expect(guide).toBeVisible()

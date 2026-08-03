@@ -13,12 +13,12 @@
 }
 
 html {
-  min-width: 320px;
+  min-width: 1180px;
   background: #f4f6f5;
 }
 
 body {
-  min-width: 320px;
+  min-width: 1180px;
   min-height: 100vh;
   margin: 0;
 }
