@@ -31,6 +31,7 @@ import {
   navigateToEvent,
   navigateToView,
   navigation,
+  navigationContext,
   navigationEventName,
   navigationGroups,
   readRoute,
@@ -51,6 +52,7 @@ function navigateTo(view: ViewKey) {
 
 function App() {
   const [view, setView] = useState<ViewKey>(() => readRoute().view)
+  const [routeNotFound, setRouteNotFound] = useState(() => readRoute().notFound)
   const [dashboard, setDashboard] = useState<DashboardData | null>(null)
   const [selectedEventId, setSelectedEventId] = useState<number | null>(() => readRoute().eventId)
   const [markets, setMarkets] = useState<MarketComparison[]>([])
@@ -103,6 +105,7 @@ function App() {
     const synchronizeRoute = () => {
       const route = readRoute()
       setView(route.view)
+      setRouteNotFound(route.notFound)
       if (route.eventId !== null) setSelectedEventId(route.eventId)
     }
     window.addEventListener('hashchange', synchronizeRoute)
@@ -114,6 +117,11 @@ function App() {
       window.removeEventListener(navigationEventName, synchronizeRoute)
     }
   }, [])
+
+  useEffect(() => {
+    const context = navigationContext(view)
+    document.title = routeNotFound ? 'Page not found | OddsQuant' : `${context.label} | OddsQuant`
+  }, [routeNotFound, view])
 
   useEffect(() => {
     if (selectedEventId === null) {
@@ -148,12 +156,14 @@ function App() {
   const selectView = (next: ViewKey) => {
     navigateToView(next)
     setView(next)
+    setRouteNotFound(false)
   }
 
   const openEvent = (eventId: number) => {
     setSelectedEventId(eventId)
     navigateToEvent(eventId)
     setView('event')
+    setRouteNotFound(false)
   }
 
   const selectEvent = (eventId: number) => {
@@ -182,6 +192,7 @@ function App() {
                 const active = view === item.key
                 return (
               <button
+                aria-current={active ? 'page' : undefined}
                 key={item.key}
                 className={`mb-1 flex h-10 w-full items-center gap-3 rounded-[5px] px-3 text-left text-sm transition-colors ${
                   active ? 'bg-zinc-100 font-semibold text-zinc-950' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'
@@ -207,8 +218,8 @@ function App() {
         <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/95 backdrop-blur">
           <div className="flex h-16 items-center justify-between gap-4 px-8">
             <div className="min-w-0 flex-1">
-              <h1 className="truncate text-lg font-bold">{navigation.find((item) => item.key === view)?.label}</h1>
-              <p className="truncate text-xs text-zinc-500">Point-in-time market and model research</p>
+              <p className="truncate text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-400">{routeNotFound ? 'OddsQuant' : navigationContext(view).group}</p>
+              <h1 className="truncate text-lg font-bold">{routeNotFound ? 'Page not found' : navigation.find((item) => item.key === view)?.label}</h1>
             </div>
             <div className="flex items-center gap-2">
               <span className="inline-flex rounded-[4px] border border-sky-200 bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-800">
@@ -244,8 +255,8 @@ function App() {
           {!error && dashboard ? (
             <>
               <ResourceErrors errors={dashboard.resource_errors} />
-              <WorkflowReadiness dashboard={dashboard} view={view} onNavigate={(target) => selectView(target as ViewKey)} />
-              <ActiveView
+              {!routeNotFound ? <WorkflowReadiness dashboard={dashboard} view={view} onNavigate={(target) => selectView(target as ViewKey)} /> : null}
+              {routeNotFound ? <NotFound onNavigate={() => selectView('matchday')} /> : <ActiveView
                 comparisonError={comparisonError}
                 comparisonLoading={comparisonLoading}
                 dashboard={dashboard}
@@ -255,7 +266,7 @@ function App() {
                 onRefresh={synchronize}
                 selectedEventId={selectedEventId}
                 view={view}
-              />
+              />}
             </>
           ) : null}
           {!error && !dashboard ? <LoadingState /> : null}
@@ -279,6 +290,10 @@ interface ActiveViewProps {
   onOpenEvent: (eventId: number) => void
   onSelectEvent: (eventId: number) => void
   onRefresh: () => Promise<void>
+}
+
+function NotFound({ onNavigate }: { onNavigate: () => void }) {
+  return <section className="grid min-h-[520px] place-items-center border border-zinc-200 bg-white text-center"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-700">404</p><h2 className="mt-2 text-2xl font-bold">This research page does not exist</h2><p className="mt-2 text-sm text-zinc-500">Use the desktop navigation or return to the current matchday.</p><button className="mt-5 bg-zinc-900 px-4 py-2 text-sm font-bold text-white" onClick={onNavigate} type="button">Return to matchday</button></div></section>
 }
 
 function ActiveView(props: ActiveViewProps) {

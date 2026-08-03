@@ -7,11 +7,11 @@ const event = {
 }
 const model = {
   id: 12, name: 'Poisson', version: 'poisson-e2e', kind: 'poisson', training_start: '2025-01-01T00:00:00Z', training_end: now,
-  data_fingerprint: 'model-fingerprint', feature_version: 'team-form-v1', sample_size: 120, evaluation_status: 'calibrated', config: {}, metrics: {}, status: 'trained', is_demo: false, created_at: now,
+  data_fingerprint: 'model-fingerprint', feature_version: 'team-form-v1', sample_size: 120, probability_evaluation_status: 'probability_validated', evaluation_status: 'calibrated', config: {}, metrics: {}, status: 'trained', is_demo: false, created_at: now,
 }
 const evaluation = {
   id: 22, model_version_id: 12, model_version: 'poisson-e2e', evaluation_start: '2026-01-01T00:00:00Z', evaluation_end: now,
-  status: 'completed', fingerprint: 'evaluation-fingerprint', config: {}, policy: {}, evaluation_status: 'calibrated',
+  status: 'completed', fingerprint: 'evaluation-fingerprint', config: {}, policy: {}, probability_evaluation_status: 'probability_validated', evaluation_status: 'calibrated',
   metrics: { evaluated_events: 40, candidate_events: 40, brier_score: 0.18, log_loss: 0.75, expected_calibration_error: 0.04 },
   benchmarks: { dixon_coles: { observations: 40, brier_score: 0.19, log_loss: 0.78, expected_calibration_error: 0.04 }, elo: { observations: 40, brier_score: 0.2, log_loss: 0.8, expected_calibration_error: 0.05 }, uniform: { brier_score: 0.22, log_loss: 1.0986 }, market_consensus: { brier_score: 0.2, log_loss: 0.79 } }, calibration: [], is_demo: false, created_at: now,
 }
@@ -35,6 +35,7 @@ const matchDetail = {
   team_form: [],
   markets: [],
   latest_prediction: null,
+  model_market_comparisons: [],
   signals: [],
   builder_quotes: [],
   suggestions: [],
@@ -137,7 +138,7 @@ test('imports odds and completes the model-to-signal workflow', async ({ page })
   await page.getByRole('button', { name: 'Import odds' }).click()
   await expect(page.getByText('Job #51 completed')).toBeVisible()
 
-  await page.evaluate(() => { window.location.hash = 'models' })
+  await page.goto('/analytics/models')
   await expect(page.locator('header h1')).toHaveText('Model performance')
   await expect(page.getByText('Chronological Elo')).toBeVisible()
   await expect(page.getByRole('cell', { name: 'Dixon-Coles' })).toBeVisible()
@@ -179,14 +180,14 @@ test('stores sourced arbitrage evidence before calculating', async ({ page }) =>
 })
 
 test('runs a settled signal replay and bankroll simulation', async ({ page }) => {
-  await page.evaluate(() => { window.location.hash = 'backtests' })
+  await page.goto('/analytics/backtests')
   await expect(page.locator('header h1')).toHaveText('Backtesting')
   await page.getByLabel('Evaluation start').fill('2026-01-01T00:00')
   await page.getByLabel('Evaluation end').fill('2026-07-01T12:00')
   await page.getByRole('button', { name: 'Run signal backtest' }).click()
   await expect(page.getByText('#42 / poisson-e2e')).toBeVisible()
 
-  await page.evaluate(() => { window.location.hash = 'bankroll' })
+  await page.goto('/analytics/bankroll')
   await expect(page.locator('header h1')).toHaveText('Bankroll research')
   await page.getByRole('button', { name: 'Simulate stored sequence' }).click()
   await expect(page.getByText('flat replay')).toBeVisible()

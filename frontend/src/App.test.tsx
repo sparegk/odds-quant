@@ -128,22 +128,22 @@ const dashboard: DashboardData = {
 
 describe('site navigation', () => {
   it('opens on Matchday and retains explicit destinations', () => {
-    window.location.hash = ''
+    window.history.replaceState(null, '', '/')
     expect(readView()).toBe('matchday')
-    window.location.hash = 'models'
+    window.history.replaceState(null, '', '/analytics/models')
     expect(readView()).toBe('models')
   })
 
   it('restores a selected match from a stable direct URL', () => {
     window.history.replaceState(null, '', '/matches/7')
-    expect(readRoute()).toEqual({ view: 'event', eventId: 7 })
+    expect(readRoute()).toEqual({ view: 'event', eventId: 7, notFound: false })
     expect(readView()).toBe('event')
     expect(eventPath(7)).toBe('/matches/7')
   })
 
   it('rejects malformed match URLs', () => {
     window.history.replaceState(null, '', '/matches/not-a-number')
-    expect(readRoute()).toEqual({ view: 'matchday', eventId: null })
+    expect(readRoute()).toEqual({ view: 'matchday', eventId: null, notFound: true })
   })
 
   it('groups the full site around matches and user intent', () => {
