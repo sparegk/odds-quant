@@ -210,7 +210,13 @@ function App() {
           ))}
         </nav>
         <div className="border-t border-zinc-800 p-4 text-xs leading-5 text-zinc-500">
-          Research only. No automated betting.
+          <p className="font-bold uppercase tracking-[0.12em] text-zinc-400">Evidence key</p>
+          <div aria-label="Evidence state legend" className="mt-2 grid grid-cols-3 gap-2 text-[10px]">
+            <span className="border border-emerald-800 bg-emerald-950/50 px-2 py-1 text-emerald-300">Qualified</span>
+            <span className="border border-amber-800 bg-amber-950/40 px-2 py-1 text-amber-300">Blocked</span>
+            <span className="border border-sky-800 bg-sky-950/40 px-2 py-1 text-sky-300">Demo</span>
+          </div>
+          <p className="mt-3">Desktop research only. No automated betting.</p>
         </div>
       </aside>
 
@@ -223,9 +229,7 @@ function App() {
               <h1 className="truncate text-lg font-bold">{routeNotFound ? 'Page not found' : navigation.find((item) => item.key === view)?.label}</h1>
             </div>
             <div className="flex items-center gap-2">
-              <span className="inline-flex rounded-[4px] border border-sky-200 bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-800">
-                {dashboard?.status.data_mode === 'demo_or_user_supplied' ? 'Demo / user data' : dashboard?.status.data_mode ?? 'Connecting'}
-              </span>
+              <DataModeBadge mode={dashboard?.status.data_mode} />
               <button
                 aria-label='Open research guide'
                 className='grid h-9 w-9 place-items-center rounded-[5px] border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50'
@@ -295,6 +299,14 @@ interface ActiveViewProps {
 
 function NotFound({ onNavigate }: { onNavigate: () => void }) {
   return <section className="grid min-h-[520px] place-items-center border border-zinc-200 bg-white text-center"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-700">404</p><h2 className="mt-2 text-2xl font-bold">This research page does not exist</h2><p className="mt-2 text-sm text-zinc-500">Use the desktop navigation or return to the current matchday.</p><button className="mt-5 bg-zinc-900 px-4 py-2 text-sm font-bold text-white" onClick={onNavigate} type="button">Return to matchday</button></div></section>
+}
+
+function DataModeBadge({ mode }: { mode: string | undefined }) {
+  const demo = mode === 'demo_or_user_supplied' || mode === 'demo'
+  const external = mode === 'external' || mode === 'user_supplied'
+  const label = demo ? 'Demo / user data' : external ? mode === 'external' ? 'External data' : 'User-supplied data' : mode ? humanizeCode(mode) : 'Connecting'
+  const tone = demo ? 'border-sky-300 bg-sky-50 text-sky-900' : external ? 'border-emerald-300 bg-emerald-50 text-emerald-900' : 'border-zinc-300 bg-zinc-50 text-zinc-700'
+  return <span className={`inline-flex items-center gap-2 rounded-[4px] border px-2.5 py-1 text-xs font-bold ${tone}`}><span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${demo ? 'bg-sky-600' : external ? 'bg-emerald-600' : 'bg-zinc-500'}`} />{label}</span>
 }
 
 function ActiveView(props: ActiveViewProps) {
