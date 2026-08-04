@@ -30,6 +30,7 @@ Completed slices: Alembic schema lifecycle, labelled demo odds and results, atom
 - Completed: reproducible scoreline-based bet-builder quote APIs with correlated joint probability, uncertainty, manual offered-price provenance, and immutable prediction/model fingerprints.
 - Completed: expanding-window probability replay plus timestamp-valid stored-signal return backtests and flat, percentage, and capped fractional-Kelly bankroll simulation with exposure limits.
 - Remaining: adequate permitted signal/result history, timestamped closing prices for CLV coverage, richer benchmarks, and independently validated staking/confidence thresholds. Demo backtests remain software evidence only.
+- Probability evidence checkpoint: the examined 2025/26 Premier League window is development evidence for the v6 calibration/selection/ensemble specifications. `PROBABILITY_EVIDENCE_EXPANSION.md` records that no stored exact competition family currently supplies a fresh 200-match training plus 200-match untouched validation split.
 - Connected React dashboard, Docker Compose, CI, and deployment configuration.
 - Completed: Playwright Chromium workflows for ingestion-to-signals, sourced arbitrage calculation, and backtest-to-bankroll, alongside the Vitest component/API suite.
 - Completed: timestamp-valid same-market/bookmaker/provider closing-price provenance, per-observation CLV, aggregate coverage/mean/median reporting, and explicit exclusion of post-kickoff closing evidence from retrospective metrics.

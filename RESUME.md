@@ -584,3 +584,14 @@ infer closing flags, or enable player props before their independent validation 
   `1.034874` to `1.037277`, and ECE `0.049211` to `0.065760`. The run therefore remains
   `probability_validation_failed`, model `6` remains `unvalidated`, and zero Elo outputs or
   signals exist. All 263 backend tests, Ruff, formatting, and Mypy passed.
+
+### Probability evidence expansion checkpoint (2026-08-04)
+
+- [x] Audit stored permitted final-result depth before running the new calibration, nested-selection,
+  or ensemble specifications on historical outcomes. The already-examined 2025/26 Premier League
+  holdout is development evidence and cannot be relabelled as untouched validation. Premier League
+  history ends before the existing 2026-05-27 evaluation cutoff, leaving zero later final events.
+  Every other exact competition family has fewer than the 400 results needed for a fixed 200-match
+  training floor plus a separate 200-observation holdout. No new evaluation or promotion was
+  authorized. `PROBABILITY_EVIDENCE_EXPANSION.md` stores the aggregate counts, audit contract, and
+  explicit exit criteria without pooling distinct UEFA identities or weakening thresholds.
