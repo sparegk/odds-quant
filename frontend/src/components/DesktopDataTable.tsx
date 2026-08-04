@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Download, Search, SlidersHorizontal } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -13,19 +13,24 @@ export interface DesktopColumn<Row> {
 
 export function DesktopDataTable<Row>({ ariaLabel, columns, filename, rowKey, rows }: { ariaLabel: string; columns: DesktopColumn<Row>[]; filename: string; rowKey: (row: Row) => string | number; rows: Row[] }) {
   const [query, setQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
   const [sortId, setSortId] = useState(columns[0]?.id ?? '')
   const [descending, setDescending] = useState(false)
   const [pageSize, setPageSize] = useState(10)
   const [page, setPage] = useState(1)
   const [visibleIds, setVisibleIds] = useState(() => new Set(columns.filter((column) => column.defaultVisible !== false).map((column) => column.id)))
   const visible = columns.filter((column) => visibleIds.has(column.id))
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query), 150)
+    return () => window.clearTimeout(timer)
+  }, [query])
   const processed = useMemo(() => {
-    const normalized = query.trim().toLowerCase()
+    const normalized = debouncedQuery.trim().toLowerCase()
     const filtered = normalized ? rows.filter((row) => columns.some((column) => String(column.value(row)).toLowerCase().includes(normalized))) : rows
     const sortColumn = columns.find((column) => column.id === sortId)
     if (!sortColumn) return filtered
     return [...filtered].sort((left, right) => compare(sortColumn.value(left), sortColumn.value(right)) * (descending ? -1 : 1))
-  }, [columns, descending, query, rows, sortId])
+  }, [columns, debouncedQuery, descending, rows, sortId])
   const pages = Math.max(1, Math.ceil(processed.length / pageSize))
   const currentPage = Math.min(page, pages)
   const displayed = processed.slice((currentPage - 1) * pageSize, currentPage * pageSize)

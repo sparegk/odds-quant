@@ -91,6 +91,21 @@ describe('API client', () => {
     )
   })
 
+  it('caches repeated comparison reads and forwards cancellation signals', async () => {
+    const fetchMock = vi.fn(() => Promise.resolve(new Response('[]', { status: 200 })))
+    vi.stubGlobal('fetch', fetchMock)
+    const controller = new AbortController()
+
+    await loadComparison(4242, controller.signal)
+    await loadComparison(4242, controller.signal)
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('event_id=4242'),
+      expect.objectContaining({ signal: controller.signal }),
+    )
+  })
+
   it('raises a typed error for failed API responses', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response('{}', { status: 503 }))))
     await expect(loadComparison(1)).rejects.toMatchObject({ status: 503 })

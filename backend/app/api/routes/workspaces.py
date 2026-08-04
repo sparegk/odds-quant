@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_admin_key
@@ -19,8 +19,12 @@ Database = Annotated[Session, Depends(get_db)]
 
 
 @router.get("", response_model=list[WorkspaceView])
-def index(database: Database) -> list[WorkspaceView]:
-    return list_workspaces(database)
+def index(
+    database: Database,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+) -> list[WorkspaceView]:
+    return list_workspaces(database, limit=limit, offset=offset)
 
 
 @router.put("", response_model=WorkspaceView)

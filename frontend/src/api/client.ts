@@ -36,6 +36,8 @@ import { reportApiFailure } from '../lib/observability'
 
 const configuredApiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '')
 const API_BASE_URL = configuredApiBaseUrl ?? (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '')
+const getCache = new Map<string, { expiresAt: number; value: unknown }>()
+const GET_CACHE_MS = 15_000
 
 export class ApiError extends Error {
   constructor(
@@ -47,6 +49,12 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const method = init?.method?.toUpperCase() ?? 'GET'
+  const cacheablePath = path.startsWith('/api/v1/odds/comparison') || path.startsWith('/api/v1/matchdays/events/')
+  const cacheable = method === 'GET' && cacheablePath && !new Headers(init?.headers).has('X-Admin-Key')
+  const cached = cacheable ? getCache.get(path) : undefined
+  if (cached && cached.expiresAt > Date.now()) return cached.value as T
+  if (method !== 'GET') getCache.clear()
   const startedAt = performance.now()
   let response: Response
   try {
@@ -55,7 +63,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       headers: { Accept: 'application/json', ...init?.headers },
     })
   } catch (caught) {
-    reportApiFailure(path, caught instanceof Error ? caught.name : 'NetworkError', undefined, performance.now() - startedAt)
+    if (!(caught instanceof DOMException && caught.name === 'AbortError')) reportApiFailure(path, caught instanceof Error ? caught.name : 'NetworkError', undefined, performance.now() - startedAt)
     throw caught
   }
   if (!response.ok) {
@@ -71,7 +79,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(`API request failed: ${response.status}${detail}`, response.status)
   }
   if (response.status === 204) return undefined as T
-  return (await response.json()) as T
+  const value = (await response.json()) as T
+  if (cacheable) getCache.set(path, { expiresAt: Date.now() + GET_CACHE_MS, value })
+  return value
 }
 
 function apiProblemMessage(body: unknown): string | null {
@@ -154,8 +164,8 @@ export async function loadDashboard(): Promise<DashboardData> {
   }
 }
 
-export function loadComparison(eventId: number): Promise<MarketComparison[]> {
-  return request<MarketComparison[]>(`/api/v1/odds/comparison?event_id=${eventId}`)
+export function loadComparison(eventId: number, signal?: AbortSignal): Promise<MarketComparison[]> {
+  return request<MarketComparison[]>(`/api/v1/odds/comparison?event_id=${eventId}`, { signal })
 }
 
 export function loadDataCoverage(): Promise<DataCoverage> {

@@ -134,6 +134,7 @@ function App() {
     if (selectedEventId === null) {
       return
     }
+    const controller = new AbortController()
     let active = true
     void Promise.resolve()
       .then(() => {
@@ -141,7 +142,7 @@ function App() {
           setComparisonLoading(true)
           setComparisonError(null)
         }
-        return loadComparison(selectedEventId)
+        return loadComparison(selectedEventId, controller.signal)
       })
       .then((result) => {
         if (active) setMarkets(result)
@@ -157,6 +158,7 @@ function App() {
       })
     return () => {
       active = false
+      controller.abort()
     }
   }, [selectedEventId])
 

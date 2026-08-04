@@ -61,6 +61,7 @@ def test_named_workspace_round_trip_and_delete(api: TestClient) -> None:
     assert updated.status_code == 200
     assert updated.json()["id"] == workspace_id
     assert api.get("/api/v1/workspaces").json()[0]["items"][0]["note"] == "Updated note."
+    assert api.get("/api/v1/workspaces?limit=1&offset=1").json() == []
 
     assert api.delete(f"/api/v1/workspaces/{workspace_id}").status_code == 204
     assert api.get("/api/v1/workspaces").json() == []

@@ -9,11 +9,12 @@ from app.db.models import ResearchWorkspace
 from app.schemas.workspaces import WorkspaceView, WorkspaceWrite
 
 
-def list_workspaces(database: Session) -> list[WorkspaceView]:
+def list_workspaces(database: Session, *, limit: int = 50, offset: int = 0) -> list[WorkspaceView]:
     records = database.scalars(
-        select(ResearchWorkspace).order_by(
-            ResearchWorkspace.updated_at.desc(), ResearchWorkspace.name
-        )
+        select(ResearchWorkspace)
+        .order_by(ResearchWorkspace.updated_at.desc(), ResearchWorkspace.name)
+        .offset(offset)
+        .limit(limit)
     ).all()
     return [_view(record) for record in records]
 
