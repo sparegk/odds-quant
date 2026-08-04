@@ -629,3 +629,12 @@ infer closing flags, or enable player props before their independent validation 
   challenger was promoted and the probability and market/value gates remain unchanged. All 275
   backend tests, 76 frontend tests, Ruff, formatting, Mypy, ESLint, TypeScript compilation, and the
   production build passed.
+
+### Bundesliga external-validation selection checkpoint (2026-08-04)
+
+- [x] Identify a permitted exact competition family before inspecting new model scores.
+  `BUNDESLIGA_EXTERNAL_VALIDATION.md` pins CC0 OpenFootball commits and blobs for two complete
+  Bundesliga training seasons (612 results) and the 2024/25 holdout source. The locked window from
+  `2024-09-20T00:00:00Z` contains 279 final candidates, exceeding the 200-event requirement before
+  eligibility checks. No raw source file, database change, holdout metric, promotion, or signal is
+  included in this checkpoint.
