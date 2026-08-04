@@ -26,6 +26,8 @@ import type {
   ProviderSummary,
   ReadinessCounts,
   ResearchValueCandidate,
+  ResearchWorkspaceRecord,
+  WorkspaceItem,
   SignalBacktest,
   SignalBatch,
   ValueSignal,
@@ -59,6 +61,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
     throw new ApiError(`API request failed: ${response.status}${detail}`, response.status)
   }
+  if (response.status === 204) return undefined as T
   return (await response.json()) as T
 }
 
@@ -289,6 +292,18 @@ export function runSignalBacktest(payload: {
     headers: { 'Content-Type': 'application/json', ...(adminKey ? { 'X-Admin-Key': adminKey } : {}) },
     body: JSON.stringify(payload),
   })
+}
+
+export function loadResearchWorkspaces(adminKey?: string): Promise<ResearchWorkspaceRecord[]> {
+  return request<ResearchWorkspaceRecord[]>('/api/v1/workspaces', { headers: adminKey ? { 'X-Admin-Key': adminKey } : undefined })
+}
+
+export function saveResearchWorkspace(name: string, items: WorkspaceItem[], adminKey?: string): Promise<ResearchWorkspaceRecord> {
+  return request<ResearchWorkspaceRecord>('/api/v1/workspaces', { method: 'PUT', headers: adminJson(adminKey), body: JSON.stringify({ name, items }) })
+}
+
+export function deleteResearchWorkspace(id: number, adminKey?: string): Promise<void> {
+  return request<void>(`/api/v1/workspaces/${id}`, { method: 'DELETE', headers: adminKey ? { 'X-Admin-Key': adminKey } : undefined })
 }
 
 export { API_BASE_URL }

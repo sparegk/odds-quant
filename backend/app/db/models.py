@@ -28,6 +28,16 @@ class TimestampMixin:
     )
 
 
+class ResearchWorkspace(Base, TimestampMixin):
+    __tablename__ = "research_workspaces"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), unique=True)
+    items: Mapped[list[dict[str, object]]] = mapped_column(JSON, default=list)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+
+
 class Sport(Base):
     __tablename__ = "sports"
     id: Mapped[int] = mapped_column(primary_key=True)

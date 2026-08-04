@@ -79,6 +79,29 @@ export interface CollectionAlert {
   detail: string
 }
 
+export interface WorkspaceItem {
+  id: string
+  eventId: number
+  title: string
+  subtitle: string
+  kind: 'match' | 'qualified_signal' | 'research_candidate'
+  offeredOdds: number | null
+  modelProbability: number | null
+  marketProbability: number | null
+  edge: number | null
+  evidenceId: string
+  note: string
+  savedAt: string
+}
+
+export interface ResearchWorkspaceRecord {
+  id: number
+  name: string
+  items: WorkspaceItem[]
+  created_at: string
+  updated_at: string
+}
+
 export interface PredictionRefreshMonitoring {
   provider_job_id: number
   provider_slug: string
