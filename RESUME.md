@@ -643,3 +643,30 @@ infer closing flags, or enable player props before their independent validation 
   content hashes plus their exact publication timestamps. The configured database now has 918
   final non-demo Bundesliga results and exactly 279 events in the locked holdout. All 16
   OpenFootball and result-import tests passed. No model score has been calculated yet.
+- [x] Freeze the complete experiment before replay. The machine-readable
+  `backend/config/bundesliga_external_validation_v1.json` pins the Poisson primary, training and
+  evaluation boundaries, v6 probability policy, calibration partitions, bootstrap rules, nested
+  grid, ensemble grid, benchmark versions, and fail-closed decision rules to implementation commit
+  `28ce95e`. A deterministic test fails if those quantitative constants drift. No holdout metric
+  was inspected while selecting this specification.
+
+### Pause checkpoint: Bundesliga replay ready (2026-08-04)
+
+- The repository should be clean on `main` after the commit containing this section. Dataset
+  selection commit `0cef05a` and atomic import receipt commit `28ce95e` are already pushed.
+- The configured local database retains Bundesliga competition IDs `23` (2022/23), `24`
+  (2023/24), and `25` (2024/25), plus completed import jobs `158` through `160`.
+- The frozen manifest test passes; full Ruff checking, Ruff format checking, and Mypy pass across
+  132 Python source files. No Bundesliga model has been trained and no holdout metric inspected.
+- Resume from `backend` by first running `git status -sb` and
+  `py -m pytest tests/test_external_validation_spec.py`. Then train the frozen primary exactly:
+
+  `py -m app.cli train-poisson 25 2022-08-01T00:00:00+00:00 2024-09-20T00:00:00+00:00 --minimum-matches 200 --minimum-team-matches 8 --shrinkage-matches 5`
+
+- Retain the returned model ID. Only then run the pre-registered replay exactly:
+
+  `py -m app.cli evaluate-model MODEL_ID 2024-09-20T00:00:00+00:00 2025-05-18T00:00:00+00:00 --prediction-lead-minutes 60 --minimum-training-matches 200 --calibration-bins 10`
+
+- After the immutable run is stored, audit every probability gate and record the outcome without
+  retuning. Do not start market, signal, staking, or player-feature work unless its prerequisite
+  gate explicitly passes.

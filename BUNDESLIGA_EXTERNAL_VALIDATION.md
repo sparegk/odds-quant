@@ -48,3 +48,16 @@ remain outside the repository and the database remains unversioned.
 A post-import database audit confirmed 918 final non-demo Bundesliga results, the exact source
 observation timestamps listed above, and 279 final candidates in the locked holdout. All 16
 OpenFootball and atomic result-import tests passed.
+
+## Frozen experiment receipt
+
+`backend/config/bundesliga_external_validation_v1.json` is the machine-readable pre-replay
+contract. It freezes a Poisson primary trained from `2022-08-01T00:00:00Z` through the locked
+boundary with a 200-match floor, eight venue-specific matches per team, and shrinkage 5. The
+evaluation uses the existing v6 policy, 60-minute lead, 10 calibration bins, 2,000-sample 95%
+moving-block bootstrap, development-selected calibration with identity fallback, six-candidate
+nested grid, and 12-member Poisson/Elo/Dixon-Coles ensemble grid.
+
+A deterministic test binds the manifest to the implementation constants. The implementation
+commit is `28ce95ebc2a5c51ef89a2ea6dfef6ef37382e658`. Any specification change requires a new manifest
+and a new untouched dataset; it cannot be justified from this holdout's metrics.

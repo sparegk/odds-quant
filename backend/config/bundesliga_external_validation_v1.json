@@ -1,0 +1,102 @@
+{
+  "schema_version": "external-probability-validation-v1",
+  "experiment_id": "bundesliga-2024-25-v6-poisson-primary",
+  "frozen_at": "2026-08-04T00:00:00Z",
+  "implementation_commit": "28ce95ebc2a5c51ef89a2ea6dfef6ef37382e658",
+  "competition": {
+    "sport": "football",
+    "name": "Bundesliga",
+    "country": "Germany",
+    "family_scope": "same_sport_name_country_all_seasons"
+  },
+  "primary_model": {
+    "kind": "poisson_scoreline",
+    "training_start": "2022-08-01T00:00:00Z",
+    "training_end": "2024-09-20T00:00:00Z",
+    "minimum_matches": 200,
+    "minimum_team_matches": 8,
+    "shrinkage_matches": 5.0,
+    "feature_version": "final-score-home-away-v3-bootstrap-uncertainty"
+  },
+  "evaluation": {
+    "method_version": "expanding-window-block-bootstrap-v6-ensemble",
+    "start": "2024-09-20T00:00:00Z",
+    "end_exclusive": "2025-05-18T00:00:00Z",
+    "prediction_lead_minutes": 60,
+    "minimum_training_matches": 200,
+    "calibration_bins": 10,
+    "candidate_events_before_eligibility": 279
+  },
+  "probability_policy": {
+    "version": "separated-probability-market-v6",
+    "minimum_observations": 200,
+    "minimum_coverage": 0.9,
+    "maximum_expected_calibration_error": 0.08,
+    "require_uniform_brier_upper_difference_below_zero": true,
+    "require_uniform_log_loss_upper_difference_below_zero": true,
+    "require_chronological_recalibration_acceptance": true,
+    "demo_data_eligible": false
+  },
+  "bootstrap": {
+    "method": "moving_block_bootstrap",
+    "confidence_level": 0.95,
+    "resamples": 2000,
+    "block_length_rule": "round_cube_root_sample_size_minimum_1",
+    "seed_derivation": "sha256_seed_material_and_metric_namespace"
+  },
+  "recalibration": {
+    "version": "development-selected-calibration-v2",
+    "candidates": ["scalar_temperature_scaling", "identity"],
+    "minimum_history": 60,
+    "minimum_evaluation_observations": 100,
+    "minimum_validation_observations": 50,
+    "selection_partition": "earlier_half_of_walk_forward_observations",
+    "validation_partition": "later_untouched_half_of_walk_forward_observations",
+    "selection_minimum_improvement": 0.0001,
+    "activation_rule": "selected_method_must_not_degrade_untouched_validation"
+  },
+  "nested_selection": {
+    "version": "chronological-candidate-selection-v1",
+    "minimum_history": 60,
+    "poisson_shrinkage_matches": [3.0, 5.0, 8.0],
+    "elo_k_factors": [10.0, 20.0, 30.0],
+    "selection_objective": "mean_log_loss_then_brier_then_candidate_name",
+    "uses_only_prior_held_out_forecasts": true
+  },
+  "ensemble": {
+    "version": "chronological-simplex-ensemble-v1",
+    "models": ["poisson", "elo", "dixon_coles"],
+    "minimum_history": 60,
+    "weight_step": 0.25,
+    "weight_grid": [
+      [0.0, 0.25, 0.75],
+      [0.0, 0.5, 0.5],
+      [0.0, 0.75, 0.25],
+      [0.25, 0.0, 0.75],
+      [0.25, 0.25, 0.5],
+      [0.25, 0.5, 0.25],
+      [0.25, 0.75, 0.0],
+      [0.5, 0.0, 0.5],
+      [0.5, 0.25, 0.25],
+      [0.5, 0.5, 0.0],
+      [0.75, 0.0, 0.25],
+      [0.75, 0.25, 0.0]
+    ],
+    "selection_objective": "mean_log_loss_then_brier_then_weights",
+    "requires_multiple_positive_weights": true,
+    "uses_only_prior_held_out_forecasts": true
+  },
+  "benchmarks": {
+    "uniform": true,
+    "elo_version": "davidson-elo-v1",
+    "dixon_coles_version": "time-decayed-dixon-coles-v1",
+    "dixon_coles_decay_rate": 0.0018,
+    "dixon_coles_rho_bounds": [-0.2, 0.2]
+  },
+  "decision_rules": {
+    "primary_model_may_promote_only_if_probability_policy_passes": true,
+    "challenger_point_estimates_do_not_select_or_promote": true,
+    "market_value_signals_require_separate_market_validation": true,
+    "no_retuning_after_holdout_inspection": true
+  }
+}
