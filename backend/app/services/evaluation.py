@@ -31,6 +31,13 @@ from app.quant.calibration import (
 )
 from app.quant.dixon_coles import DixonColesMatch, fit_dixon_coles
 from app.quant.elo import EloConfig, EloMatchResult, elo_probabilities_as_of
+from app.quant.ensemble import (
+    ENSEMBLE_MODELS,
+    ENSEMBLE_VERSION,
+    ENSEMBLE_WEIGHT_GRID,
+    ENSEMBLE_WEIGHT_STEP,
+    walk_forward_ensemble,
+)
 from app.quant.evaluation import (
     OUTCOMES,
     CalibrationBucket,
@@ -58,8 +65,8 @@ MARKET_BENCHMARK_MAX_AGE = timedelta(hours=24)
 MAXIMUM_PROMOTION_ECE = 0.08
 BOOTSTRAP_CONFIDENCE_LEVEL = 0.95
 BOOTSTRAP_RESAMPLES = 2000
-EVALUATION_METHOD_VERSION = "expanding-window-block-bootstrap-v5-nested-selection"
-ELO_EVALUATION_METHOD_VERSION = "expanding-window-block-bootstrap-v5-elo-nested-selection"
+EVALUATION_METHOD_VERSION = "expanding-window-block-bootstrap-v6-ensemble"
+ELO_EVALUATION_METHOD_VERSION = "expanding-window-block-bootstrap-v6-elo-ensemble"
 MINIMUM_RECALIBRATION_HISTORY = 60
 MINIMUM_RECALIBRATION_EVALUATION_OBSERVATIONS = 100
 MINIMUM_RECALIBRATION_VALIDATION_OBSERVATIONS = 50
@@ -67,6 +74,7 @@ CALIBRATION_SELECTION_MINIMUM_IMPROVEMENT = 1e-4
 NESTED_SELECTION_MINIMUM_HISTORY = 60
 NESTED_POISSON_SHRINKAGES = (3.0, 5.0, 8.0)
 NESTED_ELO_K_FACTORS = (10.0, 20.0, 30.0)
+ENSEMBLE_MINIMUM_HISTORY = 60
 
 
 PROMOTION_POLICY: dict[str, object] = {
@@ -242,14 +250,10 @@ def evaluate_model(
             config=elo_config,
         ).probabilities
         probabilities = elo_probabilities if primary_benchmark == "elo" else poisson_probabilities
-        dixon_coles_probabilities = (
-            fit_dixon_coles(
-                dixon_coles_history,
-                as_of=predicted_at,
-            ).probabilities(event.home_team_id, event.away_team_id)
-            if primary_benchmark == "poisson"
-            else None
-        )
+        dixon_coles_probabilities = fit_dixon_coles(
+            dixon_coles_history,
+            as_of=predicted_at,
+        ).probabilities(event.home_team_id, event.away_team_id)
         nested_candidate_probabilities = _nested_candidate_probabilities(
             scores,
             elo_history,
@@ -440,6 +444,63 @@ def evaluate_model(
             }
         )
         benchmark_metrics["nested_selected"] = nested_metrics
+    ensemble_inputs = [
+        (
+            {
+                "poisson": observation.poisson_probabilities,
+                "elo": observation.elo_probabilities,
+                "dixon_coles": observation.dixon_coles_probabilities,
+            },
+            observation.actual_outcome,
+        )
+        for observation in replayed
+        if observation.dixon_coles_probabilities is not None
+    ]
+    ensemble_forecasts = walk_forward_ensemble(
+        ensemble_inputs,
+        minimum_history=ENSEMBLE_MINIMUM_HISTORY,
+    )
+    if ensemble_forecasts:
+        ensemble_rows = [
+            (forecast.probabilities, ensemble_inputs[forecast.index][1])
+            for forecast in ensemble_forecasts
+        ]
+        ensemble_primary_rows = [
+            (replayed[forecast.index].probabilities, ensemble_inputs[forecast.index][1])
+            for forecast in ensemble_forecasts
+        ]
+        ensemble_metrics, _ = summarize_probabilities(ensemble_rows, bins=request.calibration_bins)
+        _attach_score_intervals(
+            ensemble_metrics,
+            ensemble_rows,
+            seed_material=bootstrap_seed_material,
+            namespace="chronological_ensemble",
+        )
+        _attach_paired_loss_difference(
+            ensemble_metrics,
+            ensemble_primary_rows,
+            ensemble_rows,
+            seed_material=bootstrap_seed_material,
+            namespace="chronological_ensemble",
+            primary_name=primary_benchmark,
+        )
+        weight_counts: dict[str, int] = {}
+        for forecast in ensemble_forecasts:
+            key = "|".join(f"{model}={forecast.weights[model]:g}" for model in ENSEMBLE_MODELS)
+            _increment(weight_counts, key)
+        ensemble_metrics.update(
+            {
+                "version": ENSEMBLE_VERSION,
+                "minimum_history": ENSEMBLE_MINIMUM_HISTORY,
+                "selection_objective": "mean_log_loss_then_brier_then_weights",
+                "weight_step": ENSEMBLE_WEIGHT_STEP,
+                "weight_grid": [list(weights) for weights in ENSEMBLE_WEIGHT_GRID],
+                "weight_counts": weight_counts,
+                "first_history_fingerprint": ensemble_forecasts[0].history_fingerprint,
+                "last_history_fingerprint": ensemble_forecasts[-1].history_fingerprint,
+            }
+        )
+        benchmark_metrics["chronological_ensemble"] = ensemble_metrics
     market_pairs = [
         (
             observation.probabilities,
@@ -539,6 +600,16 @@ def evaluate_model(
             "minimum_history": NESTED_SELECTION_MINIMUM_HISTORY,
             "candidate_grid": _nested_candidate_grid(),
             "selection_objective": "mean_log_loss_then_brier_then_candidate_name",
+            "uses_only_prior_held_out_forecasts": True,
+        },
+        "chronological_ensemble": {
+            "version": ENSEMBLE_VERSION,
+            "models": list(ENSEMBLE_MODELS),
+            "minimum_history": ENSEMBLE_MINIMUM_HISTORY,
+            "selection_objective": "mean_log_loss_then_brier_then_weights",
+            "weight_step": ENSEMBLE_WEIGHT_STEP,
+            "weight_grid": [list(weights) for weights in ENSEMBLE_WEIGHT_GRID],
+            "requires_multiple_positive_weights": True,
             "uses_only_prior_held_out_forecasts": True,
         },
         "elo_benchmark": {

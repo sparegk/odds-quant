@@ -20,6 +20,7 @@ Completed slices: Alembic schema lifecycle, labelled demo odds and results, atom
 - Completed: point-in-time Davidson-style Elo forecasts and a persisted Poisson-versus-Elo proper-score comparison exposed in Model Performance.
 - Completed: time-decayed Dixon–Coles fitting with bounded low-score correction, chronological held-out replay, persisted proper scores, and dashboard comparison.
 - Completed: nested chronological model selection across a pre-registered Poisson-shrinkage and Elo-update grid, using only earlier held-out forecasts and persisting exact selection provenance as a research benchmark.
+- Completed: a pre-registered walk-forward Poisson/Elo/Dixon–Coles ensemble with multi-model simplex weights selected only from earlier held-out forecasts and persisted as a non-promoting research benchmark.
 - Completed: gated explainable value signals, best-price selection, compatible market consensus, lower-bound EV, freshness and movement checks, immutable calibration provenance, and positive-EV team-underdog ranking.
 - Remaining: separate probability-validation evidence from market/value validation so chronological model research can proceed without odds while signals remain fail-closed. Import adequate licensed or user-supplied market and closing-price history only before market-relative, CLV, staking, ROI, or profitability validation.
 - Recency-weighted player and lineup strength, coach-regime handling, tactical matchup features, scenario sensitivity, and walk-forward ablation tests.

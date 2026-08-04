@@ -172,10 +172,19 @@ def test_walk_forward_evaluation_persists_immutable_demo_evidence(
         "selection_objective": "mean_log_loss_then_brier_then_candidate_name",
         "uses_only_prior_held_out_forecasts": True,
     }
+    ensemble_config = run.config["chronological_ensemble"]
+    assert isinstance(ensemble_config, dict)
+    assert ensemble_config["version"] == "chronological-simplex-ensemble-v1"
+    assert ensemble_config["models"] == ["poisson", "elo", "dixon_coles"]
+    assert ensemble_config["minimum_history"] == 60
+    assert ensemble_config["weight_step"] == pytest.approx(0.25)
+    assert len(ensemble_config["weight_grid"]) == 12
+    assert ensemble_config["requires_multiple_positive_weights"] is True
+    assert ensemble_config["uses_only_prior_held_out_forecasts"] is True
     bootstrap_config = run.config["bootstrap"]
     assert isinstance(bootstrap_config, dict)
     assert run.config["evaluation_method_version"] == (
-        "expanding-window-block-bootstrap-v5-nested-selection"
+        "expanding-window-block-bootstrap-v6-ensemble"
     )
     assert bootstrap_config["method"] == "moving_block_bootstrap"
     assert bootstrap_config["confidence_level"] == pytest.approx(0.95)
@@ -215,7 +224,7 @@ def test_walk_forward_evaluation_persists_immutable_demo_evidence(
     )
 
 
-def test_elo_primary_evaluation_matches_aligned_benchmark_and_skips_dixon_coles(
+def test_elo_primary_evaluation_matches_aligned_benchmark(
     session: Session,
 ) -> None:
     poisson_run = evaluate_model(session, _model(session).id, _request(), now=AS_OF)
@@ -228,7 +237,7 @@ def test_elo_primary_evaluation_matches_aligned_benchmark_and_skips_dixon_coles(
     assert elo_run.config["primary_benchmark"] == "elo"
     assert elo_run.config["primary_model_kind"] == "davidson_elo"
     assert elo_run.config["evaluation_method_version"] == (
-        "expanding-window-block-bootstrap-v5-elo-nested-selection"
+        "expanding-window-block-bootstrap-v6-elo-ensemble"
     )
     assert elo_run.metrics["observations"] == 8
     assert elo_run.metrics["brier_score"] == pytest.approx(

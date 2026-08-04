@@ -41,6 +41,8 @@ These are explicit fail-closed policies, not claims that the thresholds are univ
 
 Model and hyperparameter comparisons use a nested chronological selector. Each outer replay forecast first produces a fixed candidate grid of Poisson models with 3, 5, and 8 prior-match shrinkage strengths and Davidson Elo models with K-factors 10, 20, and 30 while retaining the model's other Elo settings. After at least 60 earlier held-out forecasts, the selector ranks candidates by mean log loss, then Brier score, then a deterministic candidate name tie-break. Only earlier held-out outcomes can select the candidate for the next event. The selected forecast, candidate counts, grid, and first/last history fingerprints are stored as the `nested_selected` research benchmark. It cannot promote a production model or authorize signals by itself.
 
+A separate chronological ensemble blends Poisson, Elo, and Dixon–Coles 1X2 probabilities. Its pre-registered weight grid uses 0.25 increments, sums to one, and requires at least two models to have positive weight. For every forecast after 60 earlier held-out observations, weights are selected by prior mean log loss, then Brier score, then a deterministic weight tie-break. The next event alone receives those weights. Evaluation stores the complete grid, weight-selection counts, and first/last history fingerprints as the `chronological_ensemble` benchmark. Ensemble evidence remains a challenger comparison; it cannot alter production predictions or unlock signals without a separately trained, versioned, and validated model path.
+
 ## Value And Confidence
 
 For model probability `p` and offered decimal odds `o`:
