@@ -617,3 +617,15 @@ infer closing flags, or enable player props before their independent validation 
   stored runs cannot make either stage appear qualified. Match research also exposes the persisted
   player/tactical feature gate and its blockers. All 275 backend tests, 76 frontend tests, Ruff,
   formatting, Mypy, ESLint, TypeScript compilation, and the production build passed.
+
+### Aligned model experiment checkpoint (2026-08-04)
+
+- [x] Add an exact-window experiment matrix to Model Performance. It compares aligned primary
+  Poisson/Elo runs and stored Dixon-Coles, nested-selection, and chronological-ensemble benchmarks
+  without mixing demo provenance or evaluation windows. The table exposes proper-score point
+  estimates, calibration error, observation alignment, exact configuration or selection counts,
+  and paired uncertainty verdicts. Reference attribution follows the actual primary model, so an
+  Elo-primary run cannot mislabel Poisson as the reference. This is comparison evidence only: no
+  challenger was promoted and the probability and market/value gates remain unchanged. All 275
+  backend tests, 76 frontend tests, Ruff, formatting, Mypy, ESLint, TypeScript compilation, and the
+  production build passed.

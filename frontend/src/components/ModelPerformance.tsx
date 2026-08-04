@@ -24,6 +24,7 @@ export function ModelPerformance({ dashboard, onChanged }: { dashboard: Dashboar
       <div className="min-w-0 space-y-7">
         <section className="border border-zinc-200 bg-white"><div className="flex flex-wrap items-start justify-between gap-4 p-5"><div><p className="text-xs font-bold uppercase text-emerald-700">{selected.name}</p><h3 className="mt-1 text-xl font-bold">{selected.version}</h3><p className="mt-1 text-sm text-zinc-500">{selected.is_demo ? 'DEMO TRAINING DATA' : 'PERMITTED EXTERNAL HISTORY'}</p></div><ValidationStatuses probability={selected.probability_evaluation_status} market={selected.evaluation_status} /></div><div className="grid grid-cols-2 border-t border-zinc-200 md:grid-cols-4"><Metric label="Training matches" value={selected.sample_size.toString()} /><Metric label="Feature version" value={selected.feature_version} /><Metric label="Evaluations" value={evaluations.length.toString()} /><Metric label="Registry status" value={humanizeCode(selected.status)} /></div><div className="grid gap-2 border-t border-zinc-200 px-5 py-4 text-xs text-zinc-500 sm:grid-cols-2"><p>Training window: {formatDateTime(selected.training_start)} to {formatDateTime(selected.training_end)}</p><p>Created: {formatDateTime(selected.created_at)}</p><p className="font-mono">Data fingerprint: {selected.data_fingerprint}</p><p>Model ID #{selected.id}</p></div></section>
         <EvaluationSummary run={latest} />
+        <ExperimentComparison anchor={latest} evaluations={dashboard.evaluations} />
         <PromotionReadiness run={latest} />
         <EvaluationDiagnosis run={latest} />
         <Calibration run={latest} />
@@ -39,11 +40,48 @@ function EvaluationSummary({ run }: { run: EvaluationRun | undefined }) {
   return <section><Heading eyebrow="Latest chronological replay" title="Proper-score performance" /><div className="grid grid-cols-2 border border-zinc-200 bg-white md:grid-cols-4"><Metric label="1X2 Brier" value={formatScoreInterval(run.metrics, 'brier_score')} /><Metric label="Log loss" value={formatScoreInterval(run.metrics, 'log_loss')} /><Metric label="Calibration error" value={percent(value(run, 'expected_calibration_error'))} /><Metric label="Coverage" value={`${numberMetric(run, 'evaluated_events', 0)} / ${numberMetric(run, 'candidate_events', 0)}`} /></div><BenchmarkComparison run={run} /></section>
 }
 
+interface ExperimentRow {
+  key: string
+  label: string
+  source: string
+  metrics: Record<string, unknown>
+  configuration: string
+  evidence: ComparisonEvidence
+}
+
+function ExperimentComparison({ anchor, evaluations }: { anchor: EvaluationRun | undefined; evaluations: EvaluationRun[] }) {
+  if (!anchor) return null
+  const alignedRuns = evaluations.filter((run) => run.evaluation_start === anchor.evaluation_start && run.evaluation_end === anchor.evaluation_end && run.is_demo === anchor.is_demo)
+  const represented = new Set<string>()
+  const benchmarkLabels: Record<string, string> = { poisson: 'Poisson', elo: 'Chronological Elo', dixon_coles: 'Dixon-Coles', nested_selected: 'Nested selected', chronological_ensemble: 'Chronological ensemble' }
+  const rows: ExperimentRow[] = alignedRuns.map((run) => {
+    const primary = primaryBenchmark(run)
+    represented.add(primary)
+    return { key: `run:${run.id}`, label: benchmarkLabels[primary] ?? humanizeCode(primary), source: `Primary run #${run.id} / ${run.model_version}`, metrics: run.metrics, configuration: experimentConfiguration(primary, run.metrics, run), evidence: run.id === anchor.id ? 'REFERENCE' : 'NO INTERVAL' }
+  })
+  for (const [key, label] of Object.entries(benchmarkLabels)) {
+    const metrics = anchor.benchmarks[key]
+    if (!metrics || represented.has(key)) continue
+    rows.push({ key: `benchmark:${key}`, label, source: `Aligned benchmark in run #${anchor.id}`, metrics, configuration: experimentConfiguration(key, metrics, anchor), evidence: comparisonEvidence(metrics) })
+  }
+  if (rows.length < 2) return null
+  const observationCounts = new Set(rows.map((row) => recordValue(row.metrics, 'observations')).filter((value) => value !== null))
+  const aligned = observationCounts.size <= 1
+  return <section aria-labelledby="experiment-comparison-title">
+    <Heading eyebrow="Aligned experiments" title="Model and configuration comparison" />
+    <div className="border border-zinc-200 bg-white">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-200 p-4"><div><h4 className="font-bold" id="experiment-comparison-title">Identical evaluation window</h4><p className="mt-1 text-xs text-zinc-500">{formatDateTime(anchor.evaluation_start)} to {formatDateTime(anchor.evaluation_end)} · only exact-window evidence is included.</p></div><span className={`border px-2 py-1 text-xs font-bold ${aligned ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>{aligned ? 'OBSERVATIONS ALIGNED' : 'CHECK COVERAGE'}</span></div>
+      <div className="overflow-x-auto"><table className="w-full min-w-[1080px] text-left text-sm"><thead className="bg-zinc-50 text-xs uppercase text-zinc-500"><tr><th className="px-4 py-3">Experiment</th><th className="px-4 py-3">Source</th><th className="px-4 py-3 text-right">Brier</th><th className="px-4 py-3 text-right">Log loss</th><th className="px-4 py-3 text-right">ECE</th><th className="px-4 py-3 text-right">Observations</th><th className="px-4 py-3">Configuration / selections</th><th className="px-4 py-3">Evidence</th></tr></thead><tbody>{rows.map((row) => <tr className="border-t border-zinc-100 align-top" key={row.key}><td className="px-4 py-3 font-bold">{row.label}</td><td className="px-4 py-3 text-xs text-zinc-600">{row.source}</td><td className="px-4 py-3 text-right font-mono">{format(recordValue(row.metrics, 'brier_score'))}</td><td className="px-4 py-3 text-right font-mono">{format(recordValue(row.metrics, 'log_loss'))}</td><td className="px-4 py-3 text-right font-mono">{percent(recordValue(row.metrics, 'expected_calibration_error'))}</td><td className="px-4 py-3 text-right font-mono">{formatCount(recordValue(row.metrics, 'observations'))}</td><td className="max-w-sm px-4 py-3 text-xs leading-5 text-zinc-600">{row.configuration}</td><td className="px-4 py-3"><span className={`rounded-[4px] border px-2 py-1 text-xs font-bold ${comparisonClass(row.evidence)}`}>{row.evidence}</span></td></tr>)}</tbody></table></div>
+      <p className="border-t border-zinc-200 px-4 py-3 text-xs leading-5 text-zinc-500">This matrix compares predictive evidence only. A point estimate or selected configuration does not promote a challenger unless its paired uncertainty and the independent probability policy pass on untouched outcomes.</p>
+    </div>
+  </section>
+}
+
 function PromotionReadiness({ run }: { run: EvaluationRun | undefined }) {
   if (!run) return null
   const evaluated = numberMetric(run, 'evaluated_events', 0)
   const candidates = numberMetric(run, 'candidate_events', 0)
-  const uniformEvidence = comparisonEvidence('Uniform', run.benchmarks.uniform)
+  const uniformEvidence = comparisonEvidence(run.benchmarks.uniform)
   const probabilityReady = run.probability_evaluation_status === 'probability_validated'
   const marketReady = run.evaluation_status === 'calibrated'
   const gates = [
@@ -88,13 +126,19 @@ function EvaluationDiagnosis({ run }: { run: EvaluationRun | undefined }) {
 }
 
 function BenchmarkComparison({ run }: { run: EvaluationRun }) {
-  const rows: Array<[string, Record<string, unknown> | undefined]> = [
-    ['Poisson', run.metrics],
-    ['Dixon-Coles', run.benchmarks.dixon_coles],
-    ['Chronological Elo', run.benchmarks.elo],
-    ['Uniform', run.benchmarks.uniform],
-    ['Market consensus', run.benchmarks.market_consensus],
+  const primary = primaryBenchmark(run)
+  const labels: Record<string, string> = { poisson: 'Poisson', elo: 'Chronological Elo' }
+  const benchmarkRows: Array<[string, Record<string, unknown> | undefined, boolean]> = [
+    [labels[primary] ?? humanizeCode(primary), run.metrics, true],
+    ['Poisson', run.benchmarks.poisson, false],
+    ['Dixon-Coles', run.benchmarks.dixon_coles, false],
+    ['Chronological Elo', run.benchmarks.elo, false],
+    ['Nested selected', run.benchmarks.nested_selected, false],
+    ['Chronological ensemble', run.benchmarks.chronological_ensemble, false],
+    ['Uniform', run.benchmarks.uniform, false],
+    ['Market consensus', run.benchmarks.market_consensus, false],
   ]
+  const rows = benchmarkRows.filter(([label, , reference]) => reference || label !== (labels[primary] ?? humanizeCode(primary)))
   return <div className="mt-4 overflow-x-auto border border-zinc-200 bg-white">
     <table className="w-full min-w-[1040px] text-left text-sm">
       <thead className="bg-zinc-50 text-xs uppercase text-zinc-500"><tr>
@@ -106,8 +150,8 @@ function BenchmarkComparison({ run }: { run: EvaluationRun }) {
         <th className="px-4 py-3 text-right">Observations</th>
         <th className="px-4 py-3">Poisson evidence</th>
       </tr></thead>
-      <tbody>{rows.map(([label, metrics]) => {
-        const evidence = comparisonEvidence(label, metrics)
+      <tbody>{rows.map(([label, metrics, reference]) => {
+        const evidence = comparisonEvidence(metrics, reference)
         return <tr key={label} className="border-t border-zinc-100">
           <td className="px-4 py-3 font-semibold">{label}</td>
           <td className="px-4 py-3 text-right font-mono text-xs">{formatScoreInterval(metrics, 'brier_score')}</td>
@@ -144,8 +188,8 @@ type NumericInterval = {
   observations: number
 }
 
-function comparisonEvidence(label: string, metrics: Record<string, unknown> | undefined): ComparisonEvidence {
-  if (label === 'Poisson') return 'REFERENCE'
+function comparisonEvidence(metrics: Record<string, unknown> | undefined, reference = false): ComparisonEvidence {
+  if (reference) return 'REFERENCE'
   const brier = pairedInterval(metrics, 'brier_score')
   const logLoss = pairedInterval(metrics, 'log_loss')
   if (!brier || !logLoss) return 'NO INTERVAL'
@@ -200,6 +244,30 @@ function recordObject(values: Record<string, unknown> | undefined, key: string):
 
 function finiteNumber(item: unknown): number | null {
   return typeof item === 'number' && Number.isFinite(item) ? item : null
+}
+
+function primaryBenchmark(run: EvaluationRun): string {
+  const configured = textValue(run.config, 'primary_benchmark')
+  if (configured) return configured
+  return run.model_version.toLowerCase().includes('elo') ? 'elo' : 'poisson'
+}
+
+function experimentConfiguration(key: string, metrics: Record<string, unknown>, run: EvaluationRun): string {
+  if (key === 'nested_selected') {
+    const counts = recordObject(metrics, 'selection_counts')
+    return counts ? `Selections: ${Object.entries(counts).map(([name, count]) => `${humanizeCode(name)} ${String(count)}`).join(' · ')}` : 'Pre-registered nested candidate grid.'
+  }
+  if (key === 'chronological_ensemble') {
+    const counts = recordObject(metrics, 'weight_counts')
+    return counts ? `Weights: ${Object.entries(counts).map(([name, count]) => `${name} (${String(count)})`).join(' · ')}` : 'Pre-registered multi-model simplex grid.'
+  }
+  if (key === 'dixon_coles') {
+    const config = recordObject(run.config, 'dixon_coles_benchmark')
+    return `Decay ${format(recordValue(config ?? undefined, 'decay_rate'))} · ${textValue(metrics, 'version') ?? 'time-decayed benchmark'}`
+  }
+  if (key === 'elo') return 'Point-in-time Davidson Elo benchmark.'
+  if (key === 'poisson') return textValue(run.config, 'evaluation_method_version') ?? 'Venue-specific shrunk Poisson benchmark.'
+  return textValue(metrics, 'version') ?? 'Stored aligned benchmark specification.'
 }
 
 function textValue(values: Record<string, unknown> | undefined, key: string): string | null {
