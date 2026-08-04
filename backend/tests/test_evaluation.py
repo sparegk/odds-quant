@@ -156,10 +156,26 @@ def test_walk_forward_evaluation_persists_immutable_demo_evidence(
         "decay_rate": 0.0018,
         "low_score_rho_bounds": [-0.2, 0.2],
     }
+    assert run.config["nested_model_selection"] == {
+        "version": "chronological-candidate-selection-v1",
+        "minimum_history": 60,
+        "candidate_grid": {
+            "poisson_shrinkage_matches": [3.0, 5.0, 8.0],
+            "elo_k_factors": [10.0, 20.0, 30.0],
+            "fixed_elo_parameters": {
+                "initial_rating": "model_or_default",
+                "scale": "model_or_default",
+                "home_advantage": "model_or_default",
+                "draw_probability_at_even_strength": "model_or_default",
+            },
+        },
+        "selection_objective": "mean_log_loss_then_brier_then_candidate_name",
+        "uses_only_prior_held_out_forecasts": True,
+    }
     bootstrap_config = run.config["bootstrap"]
     assert isinstance(bootstrap_config, dict)
     assert run.config["evaluation_method_version"] == (
-        "expanding-window-block-bootstrap-v3-recalibrated"
+        "expanding-window-block-bootstrap-v5-nested-selection"
     )
     assert bootstrap_config["method"] == "moving_block_bootstrap"
     assert bootstrap_config["confidence_level"] == pytest.approx(0.95)
@@ -212,7 +228,7 @@ def test_elo_primary_evaluation_matches_aligned_benchmark_and_skips_dixon_coles(
     assert elo_run.config["primary_benchmark"] == "elo"
     assert elo_run.config["primary_model_kind"] == "davidson_elo"
     assert elo_run.config["evaluation_method_version"] == (
-        "expanding-window-block-bootstrap-v4-elo-primary"
+        "expanding-window-block-bootstrap-v5-elo-nested-selection"
     )
     assert elo_run.metrics["observations"] == 8
     assert elo_run.metrics["brier_score"] == pytest.approx(

@@ -39,6 +39,10 @@ from app.quant.evaluation import (
     multiclass_log_loss,
     summarize_probabilities,
 )
+from app.quant.model_selection import (
+    NESTED_SELECTION_VERSION,
+    walk_forward_candidate_selection,
+)
 from app.quant.odds import devig_proportional
 from app.quant.poisson import derive_market, score_matrix
 from app.quant.team_strength import HistoricalScore, fit_poisson_team_strength
@@ -54,12 +58,15 @@ MARKET_BENCHMARK_MAX_AGE = timedelta(hours=24)
 MAXIMUM_PROMOTION_ECE = 0.08
 BOOTSTRAP_CONFIDENCE_LEVEL = 0.95
 BOOTSTRAP_RESAMPLES = 2000
-EVALUATION_METHOD_VERSION = "expanding-window-block-bootstrap-v3-recalibrated"
-ELO_EVALUATION_METHOD_VERSION = "expanding-window-block-bootstrap-v4-elo-primary"
+EVALUATION_METHOD_VERSION = "expanding-window-block-bootstrap-v5-nested-selection"
+ELO_EVALUATION_METHOD_VERSION = "expanding-window-block-bootstrap-v5-elo-nested-selection"
 MINIMUM_RECALIBRATION_HISTORY = 60
 MINIMUM_RECALIBRATION_EVALUATION_OBSERVATIONS = 100
 MINIMUM_RECALIBRATION_VALIDATION_OBSERVATIONS = 50
 CALIBRATION_SELECTION_MINIMUM_IMPROVEMENT = 1e-4
+NESTED_SELECTION_MINIMUM_HISTORY = 60
+NESTED_POISSON_SHRINKAGES = (3.0, 5.0, 8.0)
+NESTED_ELO_K_FACTORS = (10.0, 20.0, 30.0)
 
 
 PROMOTION_POLICY: dict[str, object] = {
@@ -110,6 +117,7 @@ class _ReplayObservation:
     poisson_probabilities: dict[str, float]
     elo_probabilities: dict[str, float]
     dixon_coles_probabilities: dict[str, float] | None
+    nested_candidate_probabilities: dict[str, dict[str, float]]
     market_snapshot_ids: list[int]
     market_probabilities: dict[str, float] | None
     market_brier_score: float | None
@@ -242,6 +250,14 @@ def evaluate_model(
             if primary_benchmark == "poisson"
             else None
         )
+        nested_candidate_probabilities = _nested_candidate_probabilities(
+            scores,
+            elo_history,
+            home_team_id=event.home_team_id,
+            away_team_id=event.away_team_id,
+            predicted_at=predicted_at,
+            elo_config=elo_config,
+        )
         actual_outcome = _actual_outcome(result)
         market_snapshot_ids, market_probabilities = _market_consensus(
             session, event.id, predicted_at
@@ -260,6 +276,7 @@ def evaluate_model(
                 poisson_probabilities=poisson_probabilities,
                 elo_probabilities=elo_probabilities,
                 dixon_coles_probabilities=dixon_coles_probabilities,
+                nested_candidate_probabilities=nested_candidate_probabilities,
                 market_snapshot_ids=market_snapshot_ids,
                 market_probabilities=market_probabilities,
                 market_brier_score=(
@@ -376,6 +393,53 @@ def evaluate_model(
             primary_name=primary_benchmark,
         )
         benchmark_metrics["poisson"] = poisson_metrics
+    nested_inputs = [
+        (observation.nested_candidate_probabilities, observation.actual_outcome)
+        for observation in replayed
+    ]
+    nested_selected = walk_forward_candidate_selection(
+        nested_inputs,
+        minimum_history=NESTED_SELECTION_MINIMUM_HISTORY,
+    )
+    if nested_selected:
+        nested_rows = [
+            (selected.probabilities, replayed[selected.index].actual_outcome)
+            for selected in nested_selected
+        ]
+        nested_primary_rows = [
+            (replayed[selected.index].probabilities, replayed[selected.index].actual_outcome)
+            for selected in nested_selected
+        ]
+        nested_metrics, _ = summarize_probabilities(nested_rows, bins=request.calibration_bins)
+        _attach_score_intervals(
+            nested_metrics,
+            nested_rows,
+            seed_material=bootstrap_seed_material,
+            namespace="nested_selected",
+        )
+        _attach_paired_loss_difference(
+            nested_metrics,
+            nested_primary_rows,
+            nested_rows,
+            seed_material=bootstrap_seed_material,
+            namespace="nested_selected",
+            primary_name=primary_benchmark,
+        )
+        selection_counts: dict[str, int] = {}
+        for selected in nested_selected:
+            _increment(selection_counts, selected.candidate)
+        nested_metrics.update(
+            {
+                "version": NESTED_SELECTION_VERSION,
+                "selection_objective": "mean_log_loss_then_brier_then_candidate_name",
+                "minimum_history": NESTED_SELECTION_MINIMUM_HISTORY,
+                "candidate_grid": _nested_candidate_grid(),
+                "selection_counts": selection_counts,
+                "first_history_fingerprint": nested_selected[0].history_fingerprint,
+                "last_history_fingerprint": nested_selected[-1].history_fingerprint,
+            }
+        )
+        benchmark_metrics["nested_selected"] = nested_metrics
     market_pairs = [
         (
             observation.probabilities,
@@ -469,6 +533,13 @@ def evaluate_model(
             "selection_partition": "earlier_half_of_walk_forward_observations",
             "validation_partition": "later_untouched_half_of_walk_forward_observations",
             "activation_rule": "selected_method_must_not_degrade_untouched_validation",
+        },
+        "nested_model_selection": {
+            "version": NESTED_SELECTION_VERSION,
+            "minimum_history": NESTED_SELECTION_MINIMUM_HISTORY,
+            "candidate_grid": _nested_candidate_grid(),
+            "selection_objective": "mean_log_loss_then_brier_then_candidate_name",
+            "uses_only_prior_held_out_forecasts": True,
         },
         "elo_benchmark": {
             "version": "davidson-elo-v1",
@@ -936,6 +1007,7 @@ def _bootstrap_seed_material(
             ),
             "elo": observation.elo_probabilities,
             "dixon_coles": observation.dixon_coles_probabilities,
+            "nested_candidates": observation.nested_candidate_probabilities,
             "market_snapshot_ids": observation.market_snapshot_ids,
             "market": observation.market_probabilities,
         }
@@ -1184,6 +1256,7 @@ def _evaluation_fingerprint(
                 "probabilities": row.probabilities,
                 "elo_probabilities": row.elo_probabilities,
                 "dixon_coles_probabilities": row.dixon_coles_probabilities,
+                "nested_candidate_probabilities": row.nested_candidate_probabilities,
                 "market_snapshot_ids": row.market_snapshot_ids,
                 **(
                     {"poisson_probabilities": row.poisson_probabilities}
@@ -1196,6 +1269,53 @@ def _evaluation_fingerprint(
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _nested_candidate_probabilities(
+    scores: list[HistoricalScore],
+    elo_history: list[EloMatchResult],
+    *,
+    home_team_id: int,
+    away_team_id: int,
+    predicted_at: datetime,
+    elo_config: EloConfig,
+) -> dict[str, dict[str, float]]:
+    candidates: dict[str, dict[str, float]] = {}
+    for shrinkage in NESTED_POISSON_SHRINKAGES:
+        fitted = fit_poisson_team_strength(scores, shrinkage_matches=shrinkage)
+        home_lambda, away_lambda = fitted.expected_goals(home_team_id, away_team_id)
+        candidates[f"poisson_shrinkage_{shrinkage:g}"] = derive_market(
+            score_matrix(home_lambda, away_lambda), "MATCH_RESULT"
+        )
+    for k_factor in NESTED_ELO_K_FACTORS:
+        config = EloConfig(
+            initial_rating=elo_config.initial_rating,
+            k_factor=k_factor,
+            scale=elo_config.scale,
+            home_advantage=elo_config.home_advantage,
+            draw_probability_at_even_strength=elo_config.draw_probability_at_even_strength,
+        )
+        candidates[f"elo_k_{k_factor:g}"] = elo_probabilities_as_of(
+            elo_history,
+            home_team_id=home_team_id,
+            away_team_id=away_team_id,
+            as_of=predicted_at,
+            config=config,
+        ).probabilities
+    return candidates
+
+
+def _nested_candidate_grid() -> dict[str, object]:
+    return {
+        "poisson_shrinkage_matches": list(NESTED_POISSON_SHRINKAGES),
+        "elo_k_factors": list(NESTED_ELO_K_FACTORS),
+        "fixed_elo_parameters": {
+            "initial_rating": "model_or_default",
+            "scale": "model_or_default",
+            "home_advantage": "model_or_default",
+            "draw_probability_at_even_strength": "model_or_default",
+        },
+    }
 
 
 def _training_fingerprint(rows: list[tuple[MatchResult, Event]]) -> str:

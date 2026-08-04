@@ -39,6 +39,8 @@ The same replay fits scalar temperature scaling only from earlier held-out forec
 
 These are explicit fail-closed policies, not claims that the thresholds are universally optimal. Demo-contaminated runs are always `demo_only`; absent market evidence, insufficient recalibration evidence, rejected recalibration, or other failed checks cannot unlock value signals.
 
+Model and hyperparameter comparisons use a nested chronological selector. Each outer replay forecast first produces a fixed candidate grid of Poisson models with 3, 5, and 8 prior-match shrinkage strengths and Davidson Elo models with K-factors 10, 20, and 30 while retaining the model's other Elo settings. After at least 60 earlier held-out forecasts, the selector ranks candidates by mean log loss, then Brier score, then a deterministic candidate name tie-break. Only earlier held-out outcomes can select the candidate for the next event. The selected forecast, candidate counts, grid, and first/last history fingerprints are stored as the `nested_selected` research benchmark. It cannot promote a production model or authorize signals by itself.
+
 ## Value And Confidence
 
 For model probability `p` and offered decimal odds `o`:
