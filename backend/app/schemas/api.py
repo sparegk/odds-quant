@@ -40,6 +40,7 @@ class ReadinessCounts(BaseModel):
     final_results: int
     model_versions: int
     predictions: int
+    non_demo_probability_validated_evaluations: int
     non_demo_calibrated_evaluations: int
     signals: int
     signal_backtests: int

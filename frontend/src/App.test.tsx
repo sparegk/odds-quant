@@ -174,10 +174,11 @@ describe('Research overview', () => {
     render(<Overview dashboard={dashboard} onNavigate={navigate} onSelectEvent={() => undefined} />)
 
     expect(screen.getByRole('heading', { name: 'Priority actions' })).toBeInTheDocument()
-    expect(screen.getByText('5 OPEN')).toBeInTheDocument()
+    expect(screen.getByText('6 OPEN')).toBeInTheDocument()
     expect(screen.getByText('Resolve collection monitoring')).toBeInTheDocument()
     expect(screen.getByText('Train a leakage-safe baseline')).toBeInTheDocument()
-    expect(screen.getByText('Establish non-demo calibration')).toBeInTheDocument()
+    expect(screen.getByText('Validate probability research')).toBeInTheDocument()
+    expect(screen.getByText('Establish market/value validation')).toBeInTheDocument()
     expect(screen.getByText('Run a settled signal replay')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Data operations' }))

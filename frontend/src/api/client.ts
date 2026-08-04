@@ -137,7 +137,7 @@ export async function loadDashboard(): Promise<DashboardData> {
     loadResource<SignalBacktest[]>('backtests', '/api/v1/backtests', []),
     loadResource<ReadinessCounts>('readiness', '/api/v1/readiness', {
       events: 0, odds_snapshots: 0, final_results: 0, model_versions: 0, predictions: 0,
-      non_demo_calibrated_evaluations: 0, signals: 0, signal_backtests: 0,
+      non_demo_probability_validated_evaluations: 0, non_demo_calibrated_evaluations: 0, signals: 0, signal_backtests: 0,
       bookmaker_tax_mappings: 0, bookmaker_constraints: 0, intelligence_records: 0,
     }),
   ])

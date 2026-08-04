@@ -606,3 +606,14 @@ infer closing flags, or enable player props before their independent validation 
   evidence only and deterministic tests prove their expected goals equal the team baseline. The
   configured database upgraded to the single Alembic head, all 275 backend tests passed, and Ruff,
   formatting, and Mypy passed. No player adjustment, tactical adjustment, or player prop was enabled.
+
+### Evaluation diagnosis and readiness checkpoint (2026-08-04)
+
+- [x] Make evaluation failure evidence actionable in the desktop site. Model Performance now lists
+  every stored promotion gate with its exact threshold or interval evidence, explains the next
+  valid research action, and compares raw versus selected calibration metrics on the untouched
+  partition with method, cutoff, sample, and fingerprint provenance. Backend and frontend readiness
+  contracts now count non-demo probability-validated and market-validated evaluations separately;
+  stored runs cannot make either stage appear qualified. Match research also exposes the persisted
+  player/tactical feature gate and its blockers. All 275 backend tests, 76 frontend tests, Ruff,
+  formatting, Mypy, ESLint, TypeScript compilation, and the production build passed.

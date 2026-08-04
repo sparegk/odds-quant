@@ -27,12 +27,17 @@ describe('ModelPerformance', () => {
     const interval = (estimate: number, lower: number, upper: number) => ({ method: 'moving_block_bootstrap', estimate, lower, upper, confidence_level: 0.95, resamples: 2000, block_length: 3, observations: 40, seed: 17 })
     const paired = (brier: [number, number, number], logLoss: [number, number, number]) => ({ definition: 'poisson_loss_minus_benchmark_loss', negative_values_favor: 'poisson', brier_score: interval(...brier), log_loss: interval(...logLoss) })
     const evaluation = {
-      id: 8, model_version_id: 3, model_version: 'poisson-v1', status: 'completed', evaluation_start: '2026-03-01T00:00:00Z', evaluation_end: '2026-06-01T00:00:00Z', fingerprint: 'evaluation-fingerprint', config: {}, policy: {}, probability_evaluation_status: 'probability_validated', evaluation_status: 'insufficient_market_evidence', is_demo: false,
+      id: 8, model_version_id: 3, model_version: 'poisson-v1', status: 'completed', evaluation_start: '2026-03-01T00:00:00Z', evaluation_end: '2026-06-01T00:00:00Z', fingerprint: 'evaluation-fingerprint', config: {}, policy: {
+        version: 'separated-probability-market-v6', minimum_observations: 40, minimum_coverage: 0.9, maximum_expected_calibration_error: 0.08, minimum_market_observations: 20, minimum_market_coverage: 0.8,
+        probability_checks: { non_demo_data: true, minimum_observations: true, minimum_coverage: true, maximum_expected_calibration_error: true, uniform_brier_upper_difference_below_zero: true, uniform_log_loss_upper_difference_below_zero: true, chronological_recalibration_accepted: true },
+        checks: { non_demo_data: true, minimum_observations: true, minimum_coverage: true, maximum_expected_calibration_error: true, uniform_brier_upper_difference_below_zero: true, uniform_log_loss_upper_difference_below_zero: true, chronological_recalibration_accepted: true, market_benchmark_available: false, minimum_market_observations: false, minimum_market_coverage: false, market_brier_upper_difference_below_zero: false, market_log_loss_upper_difference_below_zero: false },
+      }, probability_evaluation_status: 'probability_validated', evaluation_status: 'insufficient_market_evidence', is_demo: false,
       metrics: { brier_score: 0.5, log_loss: 0.8, expected_calibration_error: 0.04, evaluated_events: 40, candidate_events: 40, observations: 40, score_intervals: { brier_score: interval(0.5, 0.47, 0.53), log_loss: interval(0.8, 0.75, 0.85) } },
       benchmarks: {
         dixon_coles: { brier_score: 0.52, log_loss: 0.82, observations: 40, score_intervals: { brier_score: interval(0.52, 0.49, 0.55), log_loss: interval(0.82, 0.77, 0.87) }, paired_loss_difference: paired([-0.02, -0.04, -0.005], [-0.02, -0.04, -0.003]) },
         elo: { brier_score: 0.51, log_loss: 0.81, observations: 40, score_intervals: { brier_score: interval(0.51, 0.48, 0.54), log_loss: interval(0.81, 0.76, 0.86) }, paired_loss_difference: paired([-0.01, -0.03, 0.01], [-0.01, -0.03, -0.001]) },
         uniform: { brier_score: 0.45, log_loss: 0.7, observations: 40, score_intervals: { brier_score: interval(0.45, 0.43, 0.47), log_loss: interval(0.7, 0.67, 0.73) }, paired_loss_difference: paired([0.05, 0.02, 0.08], [0.1, 0.05, 0.15]) },
+        temperature_scaled: { method: 'identity', activation_status: 'accepted', development_observations: 60, validation_observations: 60, brier_score: 0.49, log_loss: 0.79, expected_calibration_error: 0.04, raw_subset_metrics: { brier_score: 0.49, log_loss: 0.79, expected_calibration_error: 0.04 }, final_calibrator: { fit_through: '2026-06-01T00:00:00Z', sample_size: 120, input_fingerprint: 'calibrator-fingerprint' } },
       },
       calibration: [], created_at: '2026-06-01T02:00:00Z',
     }
@@ -56,5 +61,11 @@ describe('ModelPerformance', () => {
     expect(screen.getAllByText('Insufficient Market Evidence').length).toBeGreaterThan(0)
     expect(screen.getByText('Paired interval verdict: BENCHMARK BETTER.')).toBeInTheDocument()
     expect(screen.getByText(/value signals remain blocked unless it is calibrated/)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Why this evaluation is blocked' })).toBeInTheDocument()
+    expect(screen.getByText('Evaluation #8 / Probability Validated')).toBeInTheDocument()
+    expect(screen.getByText('Calibration decision')).toBeInTheDocument()
+    expect(screen.getByText('Identity')).toBeInTheDocument()
+    expect(screen.getByText(/Import compatible timestamped historical bookmaker/)).toBeInTheDocument()
+    expect(screen.getByText(/Calibrator fingerprint: calibrator-fingerprint/)).toBeInTheDocument()
   })
 })

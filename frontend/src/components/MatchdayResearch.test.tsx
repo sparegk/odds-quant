@@ -201,6 +201,14 @@ const detail: MatchdayEventDetail = {
       fit_through: '2026-07-20T00:00:00Z',
       evaluation_run_id: 8,
     },
+    feature_activation: {
+      version: 'player-tactical-feature-gate-v1',
+      status: 'blocked',
+      probabilities_adjusted: false,
+      requested_contexts: [],
+      applied_features: [],
+      blockers: ['no_validated_player_feature_version', 'missing_chronological_ablation_evidence'],
+    },
     score_matrix: [],
     derived_probabilities: {},
     predictions: [
@@ -499,6 +507,10 @@ describe('MatchdayResearch', () => {
         ...detail.latest_prediction!,
         evidence_class: 'confirmed_lineup_context_unadjusted',
         lineup_snapshot_ids: [71, 72],
+        feature_activation: {
+          ...detail.latest_prediction!.feature_activation,
+          requested_contexts: ['confirmed_lineups'],
+        },
       },
     }} />)
 
@@ -506,6 +518,8 @@ describe('MatchdayResearch', () => {
     expect(screen.getByText(/Probabilities remain team-baseline values/)).toBeInTheDocument()
     expect(screen.getByText('CONTEXT ONLY')).toBeInTheDocument()
     expect(screen.getByText('#71, #72')).toBeInTheDocument()
+    expect(screen.getByText('Blocked / probabilities unchanged')).toBeInTheDocument()
+    expect(screen.getByText('Player and tactical activation blockers')).toBeInTheDocument()
   })
 
   it('explains why model-versus-market arithmetic is blocked', () => {

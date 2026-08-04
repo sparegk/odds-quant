@@ -203,6 +203,14 @@ export interface ModelOutput {
     fit_through: string | null
     evaluation_run_id: number | null
   }
+  feature_activation: {
+    version: string
+    status: string
+    probabilities_adjusted: boolean
+    requested_contexts: string[]
+    applied_features: string[]
+    blockers: string[]
+  }
   score_matrix: number[][]
   derived_probabilities: Record<string, Record<string, number>>
   predictions: SelectionPrediction[]
@@ -343,6 +351,7 @@ export interface ReadinessCounts {
   final_results: number
   model_versions: number
   predictions: number
+  non_demo_probability_validated_evaluations: number
   non_demo_calibrated_evaluations: number
   signals: number
   signal_backtests: number

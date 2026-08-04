@@ -26,6 +26,7 @@ Completed slices: Alembic schema lifecycle, labelled demo odds and results, atom
 - Recency-weighted player and lineup strength, coach-regime handling, tactical matchup features, scenario sensitivity, and walk-forward ablation tests.
 - Completed safety boundary: every prediction persists versioned fail-closed player/tactical feature-activation evidence; contextual records cannot alter probabilities until the remaining licensed-data and ablation requirements pass.
 - Completed: value, underdog, arbitrage, bet-builder, backtesting, and bankroll dashboard pages with typed API integration and partial-resource failure states.
+- Completed: gate-by-gate evaluation diagnosis with exact thresholds, paired intervals, raw-versus-selected calibration evidence, next-action guidance, and separate probability-qualified versus market-qualified workflow readiness.
 - Completed: protected model operations for training, evaluation, prediction, and signal generation; sourced tax/constraint management; per-tab readiness; automatic post-write synchronization; preserved event context; and success notifications.
 - Completed: Matchday API and dashboard with featured-league grouping, timezone-correct day boundaries, pre-cutoff team form, selection-specific best prices, model/signal separation, and fail-closed player and builder states.
 - Completed: reproducible scoreline-based bet-builder quote APIs with correlated joint probability, uncertainty, manual offered-price provenance, and immutable prediction/model fingerprints.

@@ -492,7 +492,9 @@ function PredictionEvidence({ detail }: { detail: MatchdayEventDetail }) {
         <PredictionMetric label="Lineup snapshots" value={prediction.lineup_snapshot_ids.length ? prediction.lineup_snapshot_ids.map((id) => `#${id}`).join(', ') : 'None applied'} />
         <PredictionMetric label="Uncertainty" value={`${humanizeCode(prediction.probability_uncertainty.version.replaceAll('-', '_'))} / ${prediction.probability_uncertainty.successful_refits || 'legacy'} refits`} />
         <PredictionMetric label="Calibration" value={prediction.probability_calibration.applied ? `${humanizeCode(prediction.probability_calibration.version.replaceAll('-', '_'))} / T ${prediction.probability_calibration.temperature?.toFixed(3)}` : 'Raw probabilities / no accepted calibrator'} />
+        <PredictionMetric label="Feature activation" value={`${humanizeCode(prediction.feature_activation.status)} / ${prediction.feature_activation.probabilities_adjusted ? 'probabilities adjusted' : 'probabilities unchanged'}`} />
       </dl>
+      {prediction.feature_activation.blockers.length ? <details className="mt-4 border-t border-zinc-200 pt-3 text-xs text-zinc-600"><summary className="cursor-pointer font-bold text-zinc-800">Player and tactical activation blockers</summary><ul className="mt-2 list-disc space-y-1 pl-5">{prediction.feature_activation.blockers.map((blocker) => <li key={blocker}>{humanizeCode(blocker)}</li>)}</ul><p className="mt-2 font-mono">Gate {prediction.feature_activation.version}</p></details> : null}
     </div>
   </section>
 }

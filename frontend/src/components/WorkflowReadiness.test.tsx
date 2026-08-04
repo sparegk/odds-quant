@@ -6,17 +6,17 @@ import { WorkflowReadiness } from './WorkflowReadiness'
 
 afterEach(cleanup)
 
-const zero: ReadinessCounts = { events: 1, odds_snapshots: 4, final_results: 20, model_versions: 1, predictions: 0, non_demo_calibrated_evaluations: 0, signals: 0, signal_backtests: 0, bookmaker_tax_mappings: 0, bookmaker_constraints: 0, intelligence_records: 0 }
+const zero: ReadinessCounts = { events: 1, odds_snapshots: 4, final_results: 20, model_versions: 1, predictions: 0, non_demo_probability_validated_evaluations: 0, non_demo_calibrated_evaluations: 0, signals: 0, signal_backtests: 0, bookmaker_tax_mappings: 0, bookmaker_constraints: 0, intelligence_records: 0 }
 const dashboard: DashboardData = { status: { phase: 'model_baseline', sports: ['football'], data_mode: 'user_supplied', automated_betting: false }, events: [], providers: [], imports: [], jobs: [], models: [], evaluations: [], signals: [], underdogs: [], arbitrage: [], backtests: [], readiness: zero, resource_errors: {} }
 
 describe('WorkflowReadiness', () => {
   it('shows exact missing signal layers and routes to the responsible tab', () => {
     const navigate = vi.fn()
     render(<WorkflowReadiness dashboard={dashboard} view="opportunities" onNavigate={navigate} />)
-    expect(screen.getByText('3 prerequisites missing')).toBeInTheDocument()
-    expect(screen.getByText('Run a qualifying evaluation')).toBeInTheDocument()
+    expect(screen.getByText('4 prerequisites missing')).toBeInTheDocument()
+    expect(screen.getByText('Run a qualifying probability evaluation')).toBeInTheDocument()
     expect(screen.getByText('Persist pre-kickoff predictions')).toBeInTheDocument()
-    fireEvent.click(screen.getByLabelText('Go to Run a qualifying evaluation'))
+    fireEvent.click(screen.getByLabelText('Go to Run a qualifying probability evaluation'))
     expect(navigate).toHaveBeenCalledWith('models')
   })
 
@@ -30,7 +30,7 @@ describe('WorkflowReadiness', () => {
     render(<WorkflowReadiness dashboard={dashboard} view="overview" onNavigate={navigate} />)
     expect(screen.getByText('Research workflow')).toBeInTheDocument()
     expect(screen.getByText('Import fixtures and odds')).toBeInTheDocument()
-    const next = screen.getByRole('button', { name: 'Next: Evaluate calibration' })
+    const next = screen.getByRole('button', { name: 'Next: Validate probabilities' })
     fireEvent.click(next)
     expect(navigate).toHaveBeenCalledWith('models')
   })

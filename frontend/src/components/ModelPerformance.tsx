@@ -25,6 +25,7 @@ export function ModelPerformance({ dashboard, onChanged }: { dashboard: Dashboar
         <section className="border border-zinc-200 bg-white"><div className="flex flex-wrap items-start justify-between gap-4 p-5"><div><p className="text-xs font-bold uppercase text-emerald-700">{selected.name}</p><h3 className="mt-1 text-xl font-bold">{selected.version}</h3><p className="mt-1 text-sm text-zinc-500">{selected.is_demo ? 'DEMO TRAINING DATA' : 'PERMITTED EXTERNAL HISTORY'}</p></div><ValidationStatuses probability={selected.probability_evaluation_status} market={selected.evaluation_status} /></div><div className="grid grid-cols-2 border-t border-zinc-200 md:grid-cols-4"><Metric label="Training matches" value={selected.sample_size.toString()} /><Metric label="Feature version" value={selected.feature_version} /><Metric label="Evaluations" value={evaluations.length.toString()} /><Metric label="Registry status" value={humanizeCode(selected.status)} /></div><div className="grid gap-2 border-t border-zinc-200 px-5 py-4 text-xs text-zinc-500 sm:grid-cols-2"><p>Training window: {formatDateTime(selected.training_start)} to {formatDateTime(selected.training_end)}</p><p>Created: {formatDateTime(selected.created_at)}</p><p className="font-mono">Data fingerprint: {selected.data_fingerprint}</p><p>Model ID #{selected.id}</p></div></section>
         <EvaluationSummary run={latest} />
         <PromotionReadiness run={latest} />
+        <EvaluationDiagnosis run={latest} />
         <Calibration run={latest} />
         <section><Heading eyebrow="Immutable history" title="Evaluation runs" />{evaluations.length ? <div className="overflow-x-auto border-y border-zinc-200 bg-white"><table className="w-full min-w-[900px] text-left text-sm"><thead className="bg-zinc-50 text-xs uppercase text-zinc-500"><tr><th className="px-4 py-3">Window end</th><th className="px-4 py-3">Evidence</th><th className="px-4 py-3 text-right">Matches</th><th className="px-4 py-3 text-right">Brier</th><th className="px-4 py-3 text-right">Log loss</th><th className="px-4 py-3">Probability</th><th className="px-4 py-3">Market / value</th><th className="px-4 py-3">Fingerprint</th></tr></thead><tbody>{evaluations.map((run) => <tr key={run.id} className="border-t border-zinc-100"><td className="px-4 py-3">{formatDateTime(run.evaluation_end)}</td><td className="px-4 py-3">{run.is_demo ? 'DEMO ONLY' : 'EXTERNAL HISTORY'}</td><td className="px-4 py-3 text-right font-mono">{numberMetric(run, 'evaluated_events', 0)}</td><td className="px-4 py-3 text-right font-mono">{score(run, 'brier_score')}</td><td className="px-4 py-3 text-right font-mono">{score(run, 'log_loss')}</td><td className="px-4 py-3"><Status status={run.probability_evaluation_status} /></td><td className="px-4 py-3"><Status status={run.evaluation_status} /></td><td className="px-4 py-3 font-mono text-xs">{run.fingerprint.slice(0, 12)}</td></tr>)}</tbody></table></div> : <ModelEmpty title="No linked chronological evaluations" detail="Evaluate this exact model version with expanding-window cutoffs before interpreting its forecasts." />}</section>
       </div>
@@ -53,6 +54,37 @@ function PromotionReadiness({ run }: { run: EvaluationRun | undefined }) {
     ['Uniform benchmark', uniformEvidence === 'POISSON BETTER', `Paired interval verdict: ${uniformEvidence}.`],
   ] as const
   return <section><Heading eyebrow="Independent evidence tracks" title="Validation readiness" /><div className={`border-l-4 p-4 ${probabilityReady ? 'border-emerald-500 bg-emerald-50' : 'border-amber-400 bg-amber-50'}`}><div className="flex items-center justify-between gap-3"><p className="font-bold">{probabilityReady ? 'Probability research validated' : 'Probability validation blocked'}</p><span className="border border-black/10 bg-white px-2 py-1 text-xs font-bold">{probabilityReady ? 'RESEARCH READY' : 'BLOCKED'}</span></div><div className="mt-3 grid gap-2 md:grid-cols-2">{gates.map(([label, passed, detail]) => <div className="border border-black/10 bg-white/70 p-3 text-xs" key={label}><div className="flex items-center justify-between gap-2"><p className="font-bold">{label}</p><span className={passed ? 'text-emerald-700' : 'text-amber-800'}>{passed ? 'PASS' : 'BLOCKED'}</span></div><p className="mt-1 text-zinc-600">{detail}</p></div>)}</div><p className="mt-3 text-xs leading-5">Probability validation authorizes model research only. Market/value status is {humanizeCode(run.evaluation_status)}; value signals remain blocked unless it is calibrated, and neither track proves profitability.</p></div></section>
+}
+
+function EvaluationDiagnosis({ run }: { run: EvaluationRun | undefined }) {
+  if (!run) return null
+  const probabilityChecks = recordObject(run.policy, 'probability_checks')
+  const allChecks = recordObject(run.policy, 'checks')
+  const checks = allChecks ?? probabilityChecks
+  const gates = Object.entries(checks ?? {}).filter((entry): entry is [string, boolean] => typeof entry[1] === 'boolean')
+  const recalibration = run.benchmarks.temperature_scaled
+  const raw = recordObject(recalibration, 'raw_subset_metrics')
+  const finalCalibrator = recordObject(recalibration, 'final_calibrator')
+  const development = recordObject(recalibration, 'development_selection')
+  const selectedMethod = textValue(recalibration, 'method') ?? textValue(development ?? undefined, 'selected_method')
+  const failedProbability = Object.entries(probabilityChecks ?? {}).filter(([, passed]) => passed === false).map(([key]) => key)
+  const failedAll = gates.filter(([, passed]) => !passed).map(([key]) => key)
+  const nextAction = diagnosisNextAction(run, failedProbability, failedAll)
+  return <section aria-labelledby="evaluation-diagnosis-title">
+    <Heading eyebrow="Run diagnosis" title="Why this evaluation is blocked" />
+    <div className="border border-zinc-200 bg-white">
+      <div className="grid gap-4 border-b border-zinc-200 p-5 lg:grid-cols-[1fr_auto]">
+        <div><h4 className="font-bold" id="evaluation-diagnosis-title">Evaluation #{run.id} / {humanizeCode(run.probability_evaluation_status)}</h4><p className="mt-1 text-sm leading-6 text-zinc-600">Every stored promotion gate is shown below. A persisted run is evidence, but only all passing probability gates make it research-qualified.</p></div>
+        <div className="text-right text-xs text-zinc-500"><p>Policy {textValue(run.policy, 'version') ?? 'unknown'}</p><p className="mt-1 font-mono">{run.fingerprint.slice(0, 16)}</p></div>
+      </div>
+      {gates.length ? <div className="grid gap-px bg-zinc-200 sm:grid-cols-2 xl:grid-cols-3">{gates.map(([key, passed]) => <div className="bg-white p-4 text-xs" key={key}><div className="flex items-start justify-between gap-3"><p className="font-bold">{humanizeCode(key)}</p><span className={passed ? 'font-bold text-emerald-700' : 'font-bold text-amber-800'}>{passed ? 'PASS' : 'BLOCKED'}</span></div><p className="mt-2 leading-5 text-zinc-600">{gateEvidence(run, key)}</p></div>)}</div> : <p className="p-5 text-sm text-amber-800">This legacy run has no typed gate-level policy evidence.</p>}
+      <div className="border-t border-zinc-200 bg-amber-50 p-4 text-sm text-amber-950"><p className="font-bold">Next valid action</p><p className="mt-1 leading-6">{nextAction}</p></div>
+    </div>
+    <div className="mt-4 border border-zinc-200 bg-white">
+      <div className="border-b border-zinc-200 p-4"><p className="font-bold">Calibration decision</p><p className="mt-1 text-xs text-zinc-500">Development chooses the transform; the later untouched partition verifies non-degradation.</p></div>
+      {recalibration ? <><div className="grid grid-cols-2 border-b border-zinc-200 md:grid-cols-4"><Metric label="Selected method" value={selectedMethod ? humanizeCode(selectedMethod) : 'Unknown'} /><Metric label="Development rows" value={formatCount(recordValue(recalibration, 'development_observations'))} /><Metric label="Untouched rows" value={formatCount(recordValue(recalibration, 'validation_observations'))} /><Metric label="Activation" value={humanizeCode(textValue(recalibration, 'activation_status') ?? 'unknown')} /></div><div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left text-sm"><thead className="bg-zinc-50 text-xs uppercase text-zinc-500"><tr><th className="px-4 py-3">Metric</th><th className="px-4 py-3 text-right">Raw untouched</th><th className="px-4 py-3 text-right">Selected method</th><th className="px-4 py-3 text-right">Delta</th></tr></thead><tbody>{(['brier_score', 'log_loss', 'expected_calibration_error'] as const).map((key) => { const rawValue = recordValue(raw ?? undefined, key); const selectedValue = recordValue(recalibration, key); return <tr className="border-t border-zinc-100" key={key}><td className="px-4 py-3 font-semibold">{humanizeCode(key)}</td><td className="px-4 py-3 text-right font-mono">{format(rawValue)}</td><td className="px-4 py-3 text-right font-mono">{format(selectedValue)}</td><td className="px-4 py-3 text-right font-mono">{rawValue === null || selectedValue === null ? '—' : formatSigned(selectedValue - rawValue)}</td></tr> })}</tbody></table></div><div className="grid gap-2 border-t border-zinc-200 bg-zinc-50 p-4 text-xs text-zinc-600 sm:grid-cols-2"><p>Fit through: {formatOptionalDateTime(textValue(finalCalibrator ?? undefined, 'fit_through'))}</p><p>Sample: {formatCount(recordValue(finalCalibrator ?? undefined, 'sample_size'))}</p><p className="font-mono sm:col-span-2">Calibrator fingerprint: {textValue(finalCalibrator ?? undefined, 'input_fingerprint') ?? '—'}</p></div></> : <p className="p-5 text-sm text-amber-800">No adequate chronological recalibration evidence is stored for this run.</p>}
+    </div>
+  </section>
 }
 
 function BenchmarkComparison({ run }: { run: EvaluationRun }) {
@@ -168,6 +200,41 @@ function recordObject(values: Record<string, unknown> | undefined, key: string):
 
 function finiteNumber(item: unknown): number | null {
   return typeof item === 'number' && Number.isFinite(item) ? item : null
+}
+
+function textValue(values: Record<string, unknown> | undefined, key: string): string | null {
+  const item = values?.[key]
+  return typeof item === 'string' && item ? item : null
+}
+
+function formatOptionalDateTime(value: string | null): string {
+  return value ? formatDateTime(value) : '—'
+}
+
+function gateEvidence(run: EvaluationRun, key: string): string {
+  const market = run.benchmarks.market_consensus
+  const recalibration = run.benchmarks.temperature_scaled
+  if (key === 'non_demo_data') return run.is_demo ? 'Run contains demo evidence.' : 'Permitted non-demo evidence retained.'
+  if (key === 'minimum_observations') return `${formatCount(recordValue(run.metrics, 'observations'))} observed / ${formatCount(recordValue(run.policy, 'minimum_observations'))} required.`
+  if (key === 'minimum_coverage') return `${percent(recordValue(run.metrics, 'coverage'))} coverage / ${percent(recordValue(run.policy, 'minimum_coverage'))} required.`
+  if (key === 'maximum_expected_calibration_error') return `${percent(recordValue(run.metrics, 'expected_calibration_error'))} ECE / ${percent(recordValue(run.policy, 'maximum_expected_calibration_error'))} maximum.`
+  if (key === 'uniform_brier_upper_difference_below_zero') return `Upper paired Brier difference ${format(pairedInterval(run.benchmarks.uniform, 'brier_score')?.upper ?? null)}; must be below zero.`
+  if (key === 'uniform_log_loss_upper_difference_below_zero') return `Upper paired log-loss difference ${format(pairedInterval(run.benchmarks.uniform, 'log_loss')?.upper ?? null)}; must be below zero.`
+  if (key === 'chronological_recalibration_accepted') return `Stored recalibration activation: ${humanizeCode(textValue(recalibration, 'activation_status') ?? 'missing')}.`
+  if (key === 'market_benchmark_available') return market ? 'Compatible market benchmark is stored.' : 'No compatible historical market benchmark is stored.'
+  if (key === 'minimum_market_observations') return `${formatCount(recordValue(market, 'observations'))} market observations / ${formatCount(recordValue(run.policy, 'minimum_market_observations'))} required.`
+  if (key === 'minimum_market_coverage') return `${percent(recordValue(market, 'coverage'))} market coverage / ${percent(recordValue(run.policy, 'minimum_market_coverage'))} required.`
+  if (key === 'market_brier_upper_difference_below_zero') return `Upper paired market Brier difference ${format(pairedInterval(market, 'brier_score')?.upper ?? null)}; must be below zero.`
+  if (key === 'market_log_loss_upper_difference_below_zero') return `Upper paired market log-loss difference ${format(pairedInterval(market, 'log_loss')?.upper ?? null)}; must be below zero.`
+  return 'Stored boolean policy decision.'
+}
+
+function diagnosisNextAction(run: EvaluationRun, failedProbability: string[], failedAll: string[]): string {
+  if (run.is_demo) return 'Import permitted timestamped final results and run a non-demo chronological replay.'
+  if (failedProbability.includes('chronological_recalibration_accepted')) return 'Wait for a genuinely new untouched result window, then verify the frozen calibration rule; do not retune on this examined holdout.'
+  if (failedProbability.length) return `Acquire new untouched chronological results and re-evaluate the frozen model specification. Failed probability gates: ${failedProbability.map(humanizeCode).join(', ')}.`
+  if (failedAll.some((key) => key.startsWith('market_') || key.includes('market'))) return 'Import compatible timestamped historical bookmaker and closing-price evidence before market/value validation.'
+  return 'No blocking gate is stored. Inspect the immutable run provenance before using it for research.'
 }
 
 function formatSigned(item: number): string {

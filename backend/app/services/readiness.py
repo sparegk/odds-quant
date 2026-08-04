@@ -46,12 +46,23 @@ def readiness_counts(session: Session) -> ReadinessCounts:
         )
         or 0
     )
+    probability_validated = (
+        session.scalar(
+            select(func.count(BacktestRun.id)).where(
+                BacktestRun.status == "completed",
+                BacktestRun.probability_evaluation_status == "probability_validated",
+                BacktestRun.is_demo.is_(False),
+            )
+        )
+        or 0
+    )
     return ReadinessCounts(
         events=_count(session, Event),
         odds_snapshots=_count(session, OddsSnapshot),
         final_results=_count(session, MatchResult),
         model_versions=_count(session, ModelVersion),
         predictions=_count(session, ModelEventOutput),
+        non_demo_probability_validated_evaluations=probability_validated,
         non_demo_calibrated_evaluations=calibrated,
         signals=_count(session, ValueSignal),
         signal_backtests=signal_backtests,
