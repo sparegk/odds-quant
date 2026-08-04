@@ -31,6 +31,7 @@ from app.quant.calibration import (
 )
 from app.quant.elo import EloConfig
 from app.quant.evaluation import OUTCOMES
+from app.quant.feature_activation import blocked_feature_activation
 from app.quant.odds import fair_odds
 from app.quant.poisson import derive_market, score_matrix, selection_probability
 from app.quant.team_strength import (
@@ -44,6 +45,7 @@ from app.quant.uncertainty import (
     chronological_block_bootstrap_expected_goals,
 )
 from app.schemas.models import (
+    FeatureActivationView,
     ModelOutputView,
     ModelVersionView,
     PredictEventRequest,
@@ -313,6 +315,9 @@ def predict_event(
         lineup_snapshot_ids=lineup_snapshot_ids,
     )
     evidence_class = "confirmed_lineup_context_unadjusted" if confirmed_lineups else "team_baseline"
+    feature_activation = blocked_feature_activation(
+        requested_contexts=["confirmed_lineups"] if confirmed_lineups else []
+    )
 
     existing = session.scalar(
         select(ModelEventOutput).where(
@@ -363,6 +368,7 @@ def predict_event(
         sample_size=model.sample_size,
         probability_uncertainty=uncertainty,
         probability_calibration=calibration,
+        feature_activation=feature_activation,
     )
     session.add(output)
     session.flush()
@@ -656,6 +662,7 @@ def _output_view(
         sample_size=output.sample_size,
         probability_uncertainty=_uncertainty_view(output, model),
         probability_calibration=_calibration_view(output),
+        feature_activation=_feature_activation_view(output),
         score_matrix=[[float(value) for value in row] for row in matrix],
         derived_probabilities=_derived_probabilities(
             matrix,
@@ -869,6 +876,17 @@ def _prediction_calibration(
         },
         None,
     )
+
+
+def _feature_activation_view(output: ModelEventOutput) -> FeatureActivationView:
+    values = output.feature_activation or blocked_feature_activation(
+        requested_contexts=(
+            ["confirmed_lineups"]
+            if output.evidence_class == "confirmed_lineup_context_unadjusted"
+            else []
+        )
+    )
+    return FeatureActivationView.model_validate(values)
 
 
 def _calibration_view(output: ModelEventOutput) -> ProbabilityCalibrationView:

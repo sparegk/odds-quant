@@ -76,6 +76,14 @@ def prediction_output() -> ModelOutputView:
             "fit_through": None,
             "evaluation_run_id": None,
         },
+        feature_activation={
+            "version": "player-tactical-feature-gate-v1",
+            "status": "blocked",
+            "probabilities_adjusted": False,
+            "requested_contexts": [],
+            "applied_features": [],
+            "blockers": ["no_validated_player_feature_version"],
+        },
         score_matrix=[[1.0]],
         derived_probabilities={},
         predictions=[

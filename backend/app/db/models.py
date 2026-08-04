@@ -547,6 +547,7 @@ class ModelEventOutput(Base):
     sample_size: Mapped[int] = mapped_column(Integer)
     probability_uncertainty: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
     probability_calibration: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+    feature_activation: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
     __table_args__ = (
         UniqueConstraint(
             "event_id",

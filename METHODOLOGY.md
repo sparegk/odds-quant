@@ -43,6 +43,8 @@ Model and hyperparameter comparisons use a nested chronological selector. Each o
 
 A separate chronological ensemble blends Poisson, Elo, and Dixon–Coles 1X2 probabilities. Its pre-registered weight grid uses 0.25 increments, sums to one, and requires at least two models to have positive weight. For every forecast after 60 earlier held-out observations, weights are selected by prior mean log loss, then Brier score, then a deterministic weight tie-break. The next event alone receives those weights. Evaluation stores the complete grid, weight-selection counts, and first/last history fingerprints as the `chronological_ensemble` benchmark. Ensemble evidence remains a challenger comparison; it cannot alter production predictions or unlock signals without a separately trained, versioned, and validated model path.
 
+Every stored prediction now retains a versioned `feature_activation` decision. Team baselines and confirmed-lineup context both persist `probabilities_adjusted=false`, an empty applied-feature list, requested context labels, and fixed blocker codes. Merely importing players, lineups, availability, coaches, or tactics cannot activate an adjustment. Activation requires a separately versioned implementation with licensed timestamped history, position-appropriate minimum-minute and shrinkage rules, chronological ablation evidence, and an independent demonstration that team, player, coach, and tactical effects are not double counted.
+
 ## Value And Confidence
 
 For model probability `p` and offered decimal odds `o`:

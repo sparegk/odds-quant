@@ -151,6 +151,15 @@ class ProbabilityCalibrationView(BaseModel):
     evaluation_run_id: int | None
 
 
+class FeatureActivationView(BaseModel):
+    version: str
+    status: str
+    probabilities_adjusted: bool
+    requested_contexts: list[str]
+    applied_features: list[str]
+    blockers: list[str]
+
+
 class ModelOutputView(BaseModel):
     id: int
     event_id: int
@@ -165,6 +174,7 @@ class ModelOutputView(BaseModel):
     sample_size: int
     probability_uncertainty: ProbabilityUncertaintyView
     probability_calibration: ProbabilityCalibrationView
+    feature_activation: FeatureActivationView
     score_matrix: list[list[float]]
     derived_probabilities: dict[str, dict[str, float]]
     predictions: list[SelectionPredictionView]

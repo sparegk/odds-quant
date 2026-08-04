@@ -348,8 +348,17 @@ def test_confirmed_lineups_create_a_separate_unadjusted_context_version(
 
     assert baseline.evidence_class == "team_baseline"
     assert baseline.lineup_snapshot_ids == []
+    assert baseline.feature_activation.status == "blocked"
+    assert baseline.feature_activation.probabilities_adjusted is False
+    assert baseline.feature_activation.requested_contexts == []
+    assert baseline.feature_activation.applied_features == []
     assert confirmed.evidence_class == "confirmed_lineup_context_unadjusted"
     assert confirmed.lineup_snapshot_ids == sorted(lineup_ids)
+    assert confirmed.feature_activation.status == "blocked"
+    assert confirmed.feature_activation.probabilities_adjusted is False
+    assert confirmed.feature_activation.requested_contexts == ["confirmed_lineups"]
+    assert confirmed.feature_activation.applied_features == []
+    assert "missing_chronological_ablation_evidence" in confirmed.feature_activation.blockers
     assert repeated.id == confirmed.id
     assert confirmed.home_lambda == baseline.home_lambda
     assert confirmed.away_lambda == baseline.away_lambda

@@ -595,3 +595,14 @@ infer closing flags, or enable player props before their independent validation 
   training floor plus a separate 200-observation holdout. No new evaluation or promotion was
   authorized. `PROBABILITY_EVIDENCE_EXPANSION.md` stores the aggregate counts, audit contract, and
   explicit exit criteria without pooling distinct UEFA identities or weakening thresholds.
+
+### Player and tactical feature activation checkpoint (2026-08-04)
+
+- [x] Persist a machine-readable fail-closed feature decision on every new model output. Migration
+  `b9c0d1e2f3a4` adds non-null JSON provenance; team baselines and confirmed-lineup context both
+  retain `probabilities_adjusted=false`, no applied features, requested context labels, and fixed
+  blocker codes for the absent validated feature version, licensed timestamped player history,
+  chronological ablation evidence, and double-counting exclusion. Confirmed lineups remain linked
+  evidence only and deterministic tests prove their expected goals equal the team baseline. The
+  configured database upgraded to the single Alembic head, all 275 backend tests passed, and Ruff,
+  formatting, and Mypy passed. No player adjustment, tactical adjustment, or player prop was enabled.
