@@ -9,8 +9,8 @@ from scipy.optimize import minimize_scalar  # type: ignore[import-untyped]
 
 from app.quant.evaluation import OUTCOMES, multiclass_log_loss
 
-RECALIBRATION_VERSION = "walk-forward-temperature-scaling-v1"
-PROMOTION_POLICY_VERSION = "separated-probability-market-v5"
+RECALIBRATION_VERSION = "development-selected-calibration-v2"
+PROMOTION_POLICY_VERSION = "separated-probability-market-v6"
 
 
 @dataclass(frozen=True)

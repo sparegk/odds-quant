@@ -110,7 +110,7 @@ def _prepared_backtest(session: Session) -> tuple[ModelVersion, Event, RunSignal
         fingerprint=f"backtest-calibration-{model.id:043d}",
         config={"evaluation_kind": "expanding_window_match_result"},
         policy={
-            "version": "separated-probability-market-v5",
+            "version": "separated-probability-market-v6",
             "probability_decision": "probability_validated",
             "market_decision": "calibrated",
             "decision": "calibrated",
@@ -131,7 +131,7 @@ def _prepared_backtest(session: Session) -> tuple[ModelVersion, Event, RunSignal
     session.flush()
     output.probability_calibration = {
         "method": "scalar_temperature_scaling",
-        "version": "walk-forward-temperature-scaling-v1",
+        "version": "development-selected-calibration-v2",
         "applied": True,
         "temperature": 1.0,
         "sample_size": 250,

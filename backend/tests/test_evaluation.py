@@ -165,7 +165,7 @@ def test_walk_forward_evaluation_persists_immutable_demo_evidence(
     assert bootstrap_config["confidence_level"] == pytest.approx(0.95)
     assert bootstrap_config["resamples"] == 2000
     assert len(str(bootstrap_config["seed_material_sha256"])) == 64
-    assert run.policy["version"] == "separated-probability-market-v5"
+    assert run.policy["version"] == "separated-probability-market-v6"
     checks = run.policy["checks"]
     assert isinstance(checks, dict)
     paired_log_loss = paired["log_loss"]
@@ -504,8 +504,11 @@ def test_walk_forward_recalibration_persists_activation_evidence() -> None:
     )
 
     assert metrics is not None
-    assert metrics["version"] == "walk-forward-temperature-scaling-v1"
+    assert metrics["version"] == "development-selected-calibration-v2"
     assert metrics["walk_forward_observations"] == 120
+    assert metrics["development_observations"] == 60
+    assert metrics["validation_observations"] == 60
+    assert metrics["method"] == "scalar_temperature_scaling"
     assert metrics["activation_status"] == "accepted"
     checks = metrics["activation_checks"]
     assert isinstance(checks, dict) and all(checks.values())
@@ -515,6 +518,32 @@ def test_walk_forward_recalibration_persists_activation_evidence() -> None:
     assert final["sample_size"] == 180
     assert len(str(final["input_fingerprint"])) == 64
     assert final["fit_through"] == AS_OF.isoformat()
+
+
+def test_walk_forward_recalibration_selects_identity_on_development_data() -> None:
+    probabilities = {"HOME": 0.6, "DRAW": 0.3, "AWAY": 0.1}
+    actuals = ("HOME",) * 6 + ("DRAW",) * 3 + ("AWAY",)
+    rows = [(probabilities, actuals[index % 10]) for index in range(180)]
+
+    metrics = _temperature_recalibration_metrics(
+        rows,
+        bins=5,
+        seed_material="identity-calibration-test",
+        fit_through=AS_OF,
+    )
+
+    assert metrics is not None
+    assert metrics["method"] == "identity"
+    assert metrics["activation_status"] == "accepted"
+    selection = metrics["development_selection"]
+    assert isinstance(selection, dict)
+    assert selection["selected_method"] == "identity"
+    final = metrics["final_calibrator"]
+    assert isinstance(final, dict)
+    assert final["method"] == "identity"
+    assert final["temperature"] == 1.0
+    checks = metrics["activation_checks"]
+    assert isinstance(checks, dict) and all(checks.values())
 
 
 def test_promotion_fails_closed_without_adequate_market_coverage() -> None:

@@ -1,5 +1,6 @@
 import logging
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -20,7 +21,9 @@ def test_versioned_status_is_responsible() -> None:
     assert response.json()["automated_betting"] is False
 
 
-def test_request_observability_uses_route_templates_without_sensitive_values(caplog) -> None:
+def test_request_observability_uses_route_templates_without_sensitive_values(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     caplog.set_level(logging.INFO, logger="oddsquant.api")
     response = client.get(
         "/api/v1/status?note=private-value",

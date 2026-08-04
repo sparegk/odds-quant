@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Generator, Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -31,7 +32,7 @@ def api(tmp_path: Path) -> Iterator[TestClient]:
 
 
 def test_named_workspace_round_trip_and_delete(api: TestClient) -> None:
-    payload = {
+    payload: dict[str, Any] = {
         "name": "Tuesday review",
         "items": [
             {

@@ -840,9 +840,12 @@ def _prediction_calibration(
         temperature = _setting_float(final, "temperature")
         if temperature <= 0:
             raise ModelingError("accepted probability calibrator has invalid temperature")
+        method = _setting_string(final, "method")
+        if method not in {"scalar_temperature_scaling", "identity"}:
+            raise ModelingError("accepted probability calibrator has invalid method")
         return (
             {
-                "method": "scalar_temperature_scaling",
+                "method": method,
                 "version": _setting_string(final, "version"),
                 "applied": True,
                 "temperature": temperature,

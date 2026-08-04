@@ -251,7 +251,7 @@ def test_prediction_applies_only_an_accepted_pre_cutoff_calibrator(
         fingerprint="accepted-temperature-calibration-run",
         config={"evaluation_kind": "expanding_window_match_result"},
         policy={
-            "version": "separated-probability-market-v5",
+            "version": "separated-probability-market-v6",
             "probability_decision": "probability_validated",
             "market_decision": "insufficient_market_evidence",
             "probability_checks": {"chronological_recalibration_accepted": True},
@@ -271,7 +271,8 @@ def test_prediction_applies_only_an_accepted_pre_cutoff_calibrator(
             metrics={
                 "activation_status": "accepted",
                 "final_calibrator": {
-                    "version": "walk-forward-temperature-scaling-v1",
+                    "version": "development-selected-calibration-v2",
+                    "method": "scalar_temperature_scaling",
                     "temperature": 2.0,
                     "sample_size": 240,
                     "input_fingerprint": "a" * 64,

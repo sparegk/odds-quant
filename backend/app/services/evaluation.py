@@ -58,6 +58,8 @@ EVALUATION_METHOD_VERSION = "expanding-window-block-bootstrap-v3-recalibrated"
 ELO_EVALUATION_METHOD_VERSION = "expanding-window-block-bootstrap-v4-elo-primary"
 MINIMUM_RECALIBRATION_HISTORY = 60
 MINIMUM_RECALIBRATION_EVALUATION_OBSERVATIONS = 100
+MINIMUM_RECALIBRATION_VALIDATION_OBSERVATIONS = 50
+CALIBRATION_SELECTION_MINIMUM_IMPROVEMENT = 1e-4
 
 
 PROMOTION_POLICY: dict[str, object] = {
@@ -79,6 +81,12 @@ PROMOTION_POLICY: dict[str, object] = {
     "minimum_recalibration_evaluation_observations": (
         MINIMUM_RECALIBRATION_EVALUATION_OBSERVATIONS
     ),
+    "minimum_recalibration_validation_observations": (
+        MINIMUM_RECALIBRATION_VALIDATION_OBSERVATIONS
+    ),
+    "recalibration_selection": "earlier_development_partition",
+    "recalibration_identity_fallback": True,
+    "recalibration_selection_minimum_improvement": CALIBRATION_SELECTION_MINIMUM_IMPROVEMENT,
     "require_chronological_recalibration_acceptance": True,
     "demo_data_eligible": False,
 }
@@ -455,10 +463,12 @@ def evaluate_model(
         "market_benchmark": "mean_proportional_devig_of_latest_compatible_snapshot_per_bookmaker",
         "probability_recalibration": {
             "version": RECALIBRATION_VERSION,
-            "method": "scalar_temperature_scaling",
+            "candidates": ["scalar_temperature_scaling", "identity"],
             "minimum_history": MINIMUM_RECALIBRATION_HISTORY,
             "fit_schedule": "expanding_window_refit_before_each_held_out_prediction",
-            "activation_rule": "held_out_brier_log_loss_and_ece_must_improve",
+            "selection_partition": "earlier_half_of_walk_forward_observations",
+            "validation_partition": "later_untouched_half_of_walk_forward_observations",
+            "activation_rule": "selected_method_must_not_degrade_untouched_validation",
         },
         "elo_benchmark": {
             "version": "davidson-elo-v1",
@@ -798,26 +808,65 @@ def _temperature_recalibration_metrics(
     if len(walk_forward) < MINIMUM_RECALIBRATION_EVALUATION_OBSERVATIONS:
         return None
     raw_rows = [probability_rows[item.index] for item in walk_forward]
-    calibrated_rows = [
+    temperature_rows = [
         (item.probabilities, probability_rows[item.index][1]) for item in walk_forward
     ]
-    calibrated_metrics, _ = summarize_probabilities(calibrated_rows, bins=bins)
-    raw_subset_metrics, _ = summarize_probabilities(raw_rows, bins=bins)
-    calibrated_metrics["coverage"] = len(calibrated_rows) / len(probability_rows)
+    development_size = len(walk_forward) // 2
+    validation_size = len(walk_forward) - development_size
+    if validation_size < MINIMUM_RECALIBRATION_VALIDATION_OBSERVATIONS:
+        return None
+
+    raw_development_rows = raw_rows[:development_size]
+    temperature_development_rows = temperature_rows[:development_size]
+    raw_development_metrics, _ = summarize_probabilities(raw_development_rows, bins=bins)
+    temperature_development_metrics, _ = summarize_probabilities(
+        temperature_development_rows, bins=bins
+    )
+    development_checks = {
+        "brier_improved": (
+            _metric_number(temperature_development_metrics, "brier_score")
+            <= _metric_number(raw_development_metrics, "brier_score")
+            - CALIBRATION_SELECTION_MINIMUM_IMPROVEMENT
+        ),
+        "log_loss_improved": (
+            _metric_number(temperature_development_metrics, "log_loss")
+            <= _metric_number(raw_development_metrics, "log_loss")
+            - CALIBRATION_SELECTION_MINIMUM_IMPROVEMENT
+        ),
+        "ece_not_worse": (
+            _metric_number(temperature_development_metrics, "expected_calibration_error")
+            <= _metric_number(raw_development_metrics, "expected_calibration_error")
+        ),
+    }
+    selected_method = (
+        "scalar_temperature_scaling" if all(development_checks.values()) else "identity"
+    )
+
+    raw_validation_rows = raw_rows[development_size:]
+    selected_validation_rows = (
+        temperature_rows[development_size:]
+        if selected_method == "scalar_temperature_scaling"
+        else raw_validation_rows
+    )
+    calibrated_metrics, _ = summarize_probabilities(selected_validation_rows, bins=bins)
+    raw_subset_metrics, _ = summarize_probabilities(raw_validation_rows, bins=bins)
+    calibrated_metrics["coverage"] = len(selected_validation_rows) / len(probability_rows)
     calibrated_metrics["minimum_history"] = MINIMUM_RECALIBRATION_HISTORY
-    calibrated_metrics["walk_forward_observations"] = len(calibrated_rows)
+    calibrated_metrics["walk_forward_observations"] = len(walk_forward)
+    calibrated_metrics["development_observations"] = development_size
+    calibrated_metrics["validation_observations"] = validation_size
     _attach_score_intervals(
         calibrated_metrics,
-        calibrated_rows,
+        selected_validation_rows,
         seed_material=seed_material,
-        namespace="temperature_scaled",
+        namespace=f"selected_calibration:{selected_method}",
     )
     _attach_paired_loss_difference(
         calibrated_metrics,
-        raw_rows,
-        calibrated_rows,
+        raw_validation_rows,
+        selected_validation_rows,
         seed_material=seed_material,
-        namespace="temperature_scaled",
+        namespace=f"selected_calibration:{selected_method}",
         primary_name=primary_name,
     )
     paired = calibrated_metrics["paired_loss_difference"]
@@ -826,30 +875,41 @@ def _temperature_recalibration_metrics(
     log_loss_difference = paired["log_loss"]
     assert isinstance(brier_difference, dict) and isinstance(log_loss_difference, dict)
     checks = {
-        "minimum_walk_forward_observations": (
-            len(calibrated_rows) >= MINIMUM_RECALIBRATION_EVALUATION_OBSERVATIONS
+        "minimum_untouched_validation_observations": (
+            validation_size >= MINIMUM_RECALIBRATION_VALIDATION_OBSERVATIONS
         ),
-        "held_out_brier_improved": _metric_number(brier_difference, "estimate") > 0,
-        "held_out_log_loss_improved": _metric_number(log_loss_difference, "estimate") > 0,
-        "held_out_ece_not_worse": (
+        "untouched_brier_not_worse": _metric_number(brier_difference, "lower") >= 0,
+        "untouched_log_loss_not_worse": _metric_number(log_loss_difference, "lower") >= 0,
+        "untouched_ece_not_worse": (
             _metric_number(calibrated_metrics, "expected_calibration_error")
             <= _metric_number(raw_subset_metrics, "expected_calibration_error")
         ),
     }
     accepted = all(checks.values())
-    final_calibrator = fit_temperature_calibrator(probability_rows)
+    fitted_temperature = fit_temperature_calibrator(probability_rows)
+    final_temperature = (
+        fitted_temperature.temperature if selected_method == "scalar_temperature_scaling" else 1.0
+    )
     calibrated_metrics.update(
         {
             "version": RECALIBRATION_VERSION,
-            "method": "scalar_temperature_scaling",
+            "method": selected_method,
+            "selection_method": "earlier_development_partition",
+            "development_selection": {
+                "selected_method": selected_method,
+                "checks": development_checks,
+                "raw_metrics": raw_development_metrics,
+                "temperature_scaled_metrics": temperature_development_metrics,
+            },
             "activation_status": "accepted" if accepted else "rejected",
             "activation_checks": checks,
             "raw_subset_metrics": raw_subset_metrics,
             "final_calibrator": {
                 "version": RECALIBRATION_VERSION,
-                "temperature": final_calibrator.temperature,
-                "sample_size": final_calibrator.sample_size,
-                "input_fingerprint": final_calibrator.input_fingerprint,
+                "method": selected_method,
+                "temperature": final_temperature,
+                "sample_size": fitted_temperature.sample_size,
+                "input_fingerprint": fitted_temperature.input_fingerprint,
                 "fit_through": fit_through.isoformat(),
                 "accepted": accepted,
             },

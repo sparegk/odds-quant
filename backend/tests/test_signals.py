@@ -110,7 +110,7 @@ def _make_live_and_calibrated(
         fingerprint=f"signal-evaluation-{model.id:044d}",
         config={"kind": "test"},
         policy={
-            "version": "separated-probability-market-v5",
+            "version": "separated-probability-market-v6",
             "probability_decision": "probability_validated",
             "market_decision": "calibrated",
             "decision": "calibrated",
@@ -131,7 +131,7 @@ def _make_live_and_calibrated(
     session.flush()
     output.probability_calibration = {
         "method": "scalar_temperature_scaling",
-        "version": "walk-forward-temperature-scaling-v1",
+        "version": "development-selected-calibration-v2",
         "applied": True,
         "temperature": 1.0,
         "sample_size": 250,
