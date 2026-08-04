@@ -1,0 +1,37 @@
+name: Desktop deployment smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      web_url:
+        description: Deployed desktop web origin (HTTPS)
+        required: true
+        type: string
+      api_url:
+        description: Deployed API origin (HTTPS)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  desktop-smoke:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      DEPLOYMENT_WEB_URL: ${{ inputs.web_url }}
+      DEPLOYMENT_API_URL: ${{ inputs.api_url }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Verify deployed Desktop Chrome workflow
+        run: npm run test:deployment

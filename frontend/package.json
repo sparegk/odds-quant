@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:deployment": "playwright test deployment-smoke.spec.ts --project=chromium",
     "test:watch": "vitest"
   },
   "dependencies": {
