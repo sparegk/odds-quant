@@ -34,3 +34,17 @@ country, and `Europe/Berlin` timezone.
 This checkpoint authorizes local atomic import and eligibility auditing only. It does not promote
 a model or authorize value signals, CLV, staking, ROI, or profitability claims.
 
+## Import receipt
+
+The configured local database imported all three pinned files atomically on 2026-08-04. Raw files
+remain outside the repository and the database remains unversioned.
+
+| Import job | Season | Received | Imported | Created | Stored raw SHA-256 |
+| ---: | --- | ---: | ---: | ---: | --- |
+| 158 | 2022/23 | 306 | 306 | 306 | `cf914cd9cecb7bcd02caa542cd2501d02e28b39d5629f8f963e700ec9fb10190` |
+| 159 | 2023/24 | 306 | 306 | 306 | `4bcc9688cea2652f99d55c030791ce172cf1bc434ffc951f7c1186e79992c067` |
+| 160 | 2024/25 | 306 | 306 | 306 | `27267088236f322f77f06cbf06c89e23e3b0bc713542552d6a714d3ac1afbae0` |
+
+A post-import database audit confirmed 918 final non-demo Bundesliga results, the exact source
+observation timestamps listed above, and 279 final candidates in the locked holdout. All 16
+OpenFootball and atomic result-import tests passed.

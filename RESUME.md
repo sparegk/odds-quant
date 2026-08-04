@@ -638,3 +638,8 @@ infer closing flags, or enable player props before their independent validation 
   `2024-09-20T00:00:00Z` contains 279 final candidates, exceeding the 200-event requirement before
   eligibility checks. No raw source file, database change, holdout metric, promotion, or signal is
   included in this checkpoint.
+- [x] Import and audit the three pinned files without committing raw data or the local database.
+  Atomic jobs `158`, `159`, and `160` each created 306 final results and retained distinct raw
+  content hashes plus their exact publication timestamps. The configured database now has 918
+  final non-demo Bundesliga results and exactly 279 events in the locked holdout. All 16
+  OpenFootball and result-import tests passed. No model score has been calculated yet.
