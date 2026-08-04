@@ -8,6 +8,7 @@ from app.api.routes.imports import router as imports_router
 from app.api.routes.matchday import router as matchday_router
 from app.api.routes.models import router as models_router
 from app.api.routes.signals import router as signals_router
+from app.api.routes.telemetry import router as telemetry_router
 from app.api.routes.workspaces import router as workspaces_router
 
 router = APIRouter(prefix="/api/v1")
@@ -19,6 +20,7 @@ router.include_router(imports_router)
 router.include_router(matchday_router)
 router.include_router(models_router)
 router.include_router(signals_router)
+router.include_router(telemetry_router)
 router.include_router(workspaces_router)
 
 

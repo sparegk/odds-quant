@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     api_football_poll_seconds: int = Field(default=1800, ge=300)
     matchday_timezone: str = "Europe/Athens"
     matchday_form_matches: int = Field(default=5, ge=1, le=20)
+    slow_request_ms: int = Field(default=1000, ge=50, le=60000)
 
     @field_validator("admin_api_key", "odds_api_io_key", "api_football_key", mode="before")
     @classmethod
