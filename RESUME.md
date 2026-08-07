@@ -735,3 +735,31 @@ infer closing flags, or enable player props before their independent validation 
   0.62910/1.04955/0.08225; the shared 219 forecasts were exactly identical to strict Poisson. The
   candidate remains development-only because ECE still misses 0.08 and no new untouched evidence
   has tested it.
+
+### Final fail-closed and collection handoff (2026-08-07)
+
+- [x] Audit the post-development database state. Model `7` remains `unvalidated` on both tracks,
+  has zero stored outputs, and runs `5` and `6` both remain `insufficient_evidence`. The store has
+  zero value signals and zero explicit closing snapshots. It also has zero players, registrations,
+  appearances, player statistics, availability reports, or lineups; stored markets remain only
+  `MATCH_RESULT` and `TOTAL_CORNERS`.
+- [x] Re-run the fail-closed signal, feature-activation, and arbitrage maintenance tests. All 35
+  targeted tests passed. The complete verification after the cold-start implementation passed with
+  281 backend tests, 76 frontend tests, Ruff, formatting, Mypy, ESLint, TypeScript, and the
+  production build.
+- [x] Restore the expired-cooldown scheduler without issuing a separate provider probe or bypassing
+  its cadence. Hidden PID `10312` completed fresh API-Football job `233` and consecutive Odds jobs
+  `234` and `235`. Both providers have no current blockers, permitted odds coverage reached 11,663
+  snapshots, and the expected warning for older Odds failures remains until those jobs age out of
+  the recent window. Closing snapshots remain zero.
+
+## Next resume action
+
+Keep the scheduler on its configured cadence and use `py -m app.cli monitor-collection
+--fail-on-alerts`; do not accelerate requests merely to clear the aging warning. Probability work
+must next select a genuinely new exact competition family, freeze the cold-start uncertainty and
+calibration specification before inspecting its outcomes, and then run a new untouched replay.
+Do not reuse Bundesliga 2024/25 as validation. Historical market acquisition remains unchecked
+until the owner supplies permitted timestamped odds or approves a source/account after probability
+validation passes. Player adjustments, player props, market signals, CLV, staking, ROI, and
+profitability claims remain blocked.
