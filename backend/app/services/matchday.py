@@ -355,6 +355,13 @@ def list_matchday(
     utc_start = local_start.astimezone(UTC)
     utc_end = local_end.astimezone(UTC)
 
+    previous_kickoff = session.scalar(
+        select(func.max(Event.kickoff_at)).where(Event.kickoff_at < utc_start)
+    )
+    next_kickoff = session.scalar(
+        select(func.min(Event.kickoff_at)).where(Event.kickoff_at >= utc_end)
+    )
+
     home = aliased(Team)
     away = aliased(Team)
     rows = session.execute(
@@ -452,6 +459,14 @@ def list_matchday(
         local_end=local_end,
         as_of=reference,
         total_events=sum(len(item.events) for item in schedule),
+        previous_event_date=(
+            _utc(previous_kickoff).astimezone(zone).date()
+            if previous_kickoff is not None
+            else None
+        ),
+        next_event_date=(
+            _utc(next_kickoff).astimezone(zone).date() if next_kickoff is not None else None
+        ),
         competitions=schedule,
         data_note=(
             "Only imported, timestamped fixtures are shown. Odds, predictions, and signals are "

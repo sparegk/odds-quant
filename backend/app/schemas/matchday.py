@@ -39,6 +39,8 @@ class MatchdayView(BaseModel):
     local_end: datetime
     as_of: datetime
     total_events: int
+    previous_event_date: date | None
+    next_event_date: date | None
     competitions: list[MatchdayCompetitionView]
     data_note: str
 

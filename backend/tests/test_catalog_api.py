@@ -443,6 +443,8 @@ def test_matchday_groups_a_local_calendar_day_and_rejects_unknown_timezones(
     }
     assert target.id in event_ids
     assert payload["total_events"] == len(event_ids)
+    assert "previous_event_date" in payload
+    assert "next_event_date" in payload
     assert (
         client.get("/api/v1/matchdays", params={"timezone": "Mars/Olympus_Mons"}).status_code == 422
     )

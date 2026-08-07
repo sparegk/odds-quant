@@ -651,6 +651,8 @@ export interface Matchday {
   local_end: string
   as_of: string
   total_events: number
+  previous_event_date: string | null
+  next_event_date: string | null
   competitions: MatchdayCompetition[]
   data_note: string
 }

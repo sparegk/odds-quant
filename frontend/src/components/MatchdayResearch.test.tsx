@@ -14,6 +14,8 @@ vi.mock('../api/client', () => apiMocks)
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  window.localStorage.clear()
+  window.history.replaceState(null, '', '/')
 })
 
 const event = {
@@ -37,6 +39,8 @@ const schedule: Matchday = {
   local_end: '2026-07-21T21:00:00Z',
   as_of: '2026-07-21T12:05:00Z',
   total_events: 1,
+  previous_event_date: '2026-07-20',
+  next_event_date: '2026-07-22',
   competitions: [
     {
       competition_id: 3,
@@ -416,6 +420,26 @@ const detail: MatchdayEventDetail = {
 }
 
 describe('MatchdayResearch', () => {
+  it('recovers an empty landing date by opening the next stored matchday', async () => {
+    apiMocks.loadMatchday
+      .mockResolvedValueOnce({
+        ...schedule,
+        date: '2026-08-07',
+        total_events: 0,
+        competitions: [],
+        next_event_date: '2099-01-02',
+      })
+      .mockResolvedValueOnce(schedule)
+    apiMocks.loadMatchdayEvent.mockResolvedValue(detail)
+
+    render(<MatchdayResearch onSelectEvent={() => undefined} />)
+
+    await waitFor(() => {
+      expect(apiMocks.loadMatchday).toHaveBeenCalledWith('2099-01-02', expect.any(String))
+    })
+    expect(await screen.findByRole('heading', { name: /Northbridge FC vs Riverside Athletic/ })).toBeInTheDocument()
+  })
+
   it('opens the first fixture with stored bookmaker odds', async () => {
     apiMocks.loadMatchday.mockResolvedValue(scheduleWithUnpricedFirst)
     apiMocks.loadMatchdayEvent.mockResolvedValue(detail)
@@ -495,7 +519,7 @@ describe('MatchdayResearch', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Champions League' }))
     expect(screen.getByText('No timestamped fixtures for this view')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Try next day' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Next games: 2026-07-22' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Show all tracked' }))
     expect(screen.queryByText('No timestamped fixtures for this view')).not.toBeInTheDocument()
   })

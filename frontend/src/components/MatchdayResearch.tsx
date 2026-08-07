@@ -10,7 +10,7 @@ import {
   Sparkles,
   Users,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { loadMatchday, loadMatchdayEvent } from '../api/client'
 import { formatDateTime, humanizeCode } from '../lib/format'
@@ -47,6 +47,10 @@ const competitionFilters = [
   { key: 'top-cups', label: 'Top cups' },
   { key: 'major-events', label: 'Major events' },
 ] as const
+
+const isDatePreference = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value)
+const isCompetitionPreference = (value: string) => competitionFilters.some((item) => item.key === value)
+const isBookmakerPreference = (value: string) => ['both', 'allwyn', 'novibet'].includes(value)
 
 function localDateString(date: Date): string {
   const year = date.getFullYear()
@@ -95,8 +99,8 @@ export function MatchdayResearch({
     () => nextGoodMatchdayDate(events, timezone),
     [events, timezone],
   )
-  const [date, setDate] = useResearchPreference('matchday_date', nextGoodMatchdayDate(events, timezone) ?? localDateString(new Date()), (value) => /^\d{4}-\d{2}-\d{2}$/.test(value))
-  const [filterPreference, setFilter] = useResearchPreference('matchday_competition', 'all', (value) => competitionFilters.some((item) => item.key === value))
+  const [date, setDate] = useResearchPreference('matchday_date', nextGoodMatchdayDate(events, timezone) ?? localDateString(new Date()), isDatePreference)
+  const [filterPreference, setFilter] = useResearchPreference('matchday_competition', 'all', isCompetitionPreference)
   const filter = filterPreference as (typeof competitionFilters)[number]['key']
   const [schedule, setSchedule] = useState<Matchday | null>(null)
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null)
@@ -107,7 +111,8 @@ export function MatchdayResearch({
   const [detailError, setDetailError] = useState<string | null>(null)
   const [scheduleReload, setScheduleReload] = useState(0)
   const [detailReload, setDetailReload] = useState(0)
-  const [bookmakerPreference, setBookmakerMode] = useResearchPreference('matchday_bookmakers', 'both', (value) => ['both', 'allwyn', 'novibet'].includes(value))
+  const [bookmakerPreference, setBookmakerMode] = useResearchPreference('matchday_bookmakers', 'both', isBookmakerPreference)
+  const recoveredEmptyLanding = useRef(false)
   const bookmakerMode = bookmakerPreference as BookmakerMode
   const selectedBookmakers = useMemo<MatchdayBookmakerCode[]>(
     () => (bookmakerMode === 'both' ? ['allwyn', 'novibet'] : [bookmakerMode]),
@@ -116,9 +121,23 @@ export function MatchdayResearch({
 
   useEffect(() => {
     let active = true
+    let redirecting = false
     void loadMatchday(date, timezone)
       .then((loaded) => {
         if (!active) return
+        const recoveryDate = nextGoodDate ?? loaded.next_event_date
+        if (
+          !recoveredEmptyLanding.current &&
+          loaded.total_events === 0 &&
+          recoveryDate &&
+          recoveryDate !== date &&
+          date <= localDateString(new Date())
+        ) {
+          recoveredEmptyLanding.current = true
+          redirecting = true
+          setDate(recoveryDate)
+          return
+        }
         setSchedule(loaded)
         const first = findFirstEvent(loaded.competitions)
         setSelectedEventId(first)
@@ -133,12 +152,12 @@ export function MatchdayResearch({
         setError(caught instanceof Error ? caught.message : 'Unable to load this matchday')
       })
       .finally(() => {
-        if (active) setLoading(false)
+        if (active && !redirecting) setLoading(false)
       })
     return () => {
       active = false
     }
-  }, [date, onSelectEvent, scheduleReload, timezone])
+  }, [date, nextGoodDate, onSelectEvent, scheduleReload, setDate, timezone])
 
   useEffect(() => {
     if (selectedEventId === null) {
@@ -211,7 +230,7 @@ export function MatchdayResearch({
           <div className="flex items-center gap-2">
             {nextGoodDate ? (
               <button
-                className="hidden h-10 border border-emerald-700 bg-emerald-50 px-3 text-xs font-bold text-emerald-800 hover:bg-emerald-100 sm:block"
+                className="h-10 border border-emerald-700 bg-emerald-50 px-3 text-xs font-bold text-emerald-800 hover:bg-emerald-100"
                 onClick={() => chooseDate(nextGoodDate)}
                 type="button"
               >
@@ -298,7 +317,14 @@ export function MatchdayResearch({
               </div>
             </div>
           ) : (
-            <EmptyMatchday filter={filter} onNextDay={() => chooseDate(shiftDate(date, 1))} onShowAll={() => setFilter('all')} />
+            <EmptyMatchday
+              filter={filter}
+              nextEventDate={schedule.next_event_date}
+              onNextDay={() => chooseDate(schedule.next_event_date ?? shiftDate(date, 1))}
+              onPreviousDay={schedule.previous_event_date ? () => chooseDate(schedule.previous_event_date!) : null}
+              onShowAll={() => setFilter('all')}
+              previousEventDate={schedule.previous_event_date}
+            />
           )}
           <p className="border-l-4 border-sky-500 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950">
             {schedule.data_note}
@@ -916,8 +942,8 @@ function ResearchEmpty({ text }: { text: string }) {
   return <div className="border border-zinc-200 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500">{text}</div>
 }
 
-function EmptyMatchday({ filter, onNextDay, onShowAll }: { filter: string; onNextDay: () => void; onShowAll: () => void }) {
-  return <div className="border-y border-zinc-200 bg-white px-6 py-14 text-center"><CalendarDays aria-hidden="true" className="mx-auto text-zinc-400" size={28} /><h2 className="mt-3 font-bold">No timestamped fixtures for this view</h2><p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-zinc-500">{filter === 'all' ? 'No permitted fixtures are stored for this date. Try the next day, or import a fixture and odds feed in Data operations.' : 'This competition group has no imported matches on the selected day. Show all tracked competitions or try the next day.'}</p><div className="mt-4 flex flex-wrap justify-center gap-2">{filter !== 'all' ? <button className="border border-zinc-300 px-3 py-2 text-sm font-semibold" onClick={onShowAll} type="button">Show all tracked</button> : null}<button className="bg-zinc-900 px-3 py-2 text-sm font-semibold text-white" onClick={onNextDay} type="button">Try next day</button></div></div>
+function EmptyMatchday({ filter, nextEventDate, onNextDay, onPreviousDay, onShowAll, previousEventDate }: { filter: string; nextEventDate: string | null; onNextDay: () => void; onPreviousDay: (() => void) | null; onShowAll: () => void; previousEventDate: string | null }) {
+  return <div className="border-y border-zinc-200 bg-white px-6 py-14 text-center"><CalendarDays aria-hidden="true" className="mx-auto text-zinc-400" size={28} /><h2 className="mt-3 font-bold">No timestamped fixtures for this view</h2><p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-zinc-500">{filter === 'all' ? 'No permitted fixtures are stored for this date. Jump directly to the nearest stored matchday, or import a fixture and odds feed in Data operations.' : 'This competition group has no imported matches on the selected day. Show all tracked competitions or jump to another stored matchday.'}</p><div className="mt-4 flex flex-wrap justify-center gap-2">{filter !== 'all' ? <button className="border border-zinc-300 px-3 py-2 text-sm font-semibold" onClick={onShowAll} type="button">Show all tracked</button> : null}{onPreviousDay ? <button className="border border-zinc-300 px-3 py-2 text-sm font-semibold" onClick={onPreviousDay} type="button">Previous games: {previousEventDate}</button> : null}<button className="bg-zinc-900 px-3 py-2 text-sm font-semibold text-white" onClick={onNextDay} type="button">{nextEventDate ? `Next games: ${nextEventDate}` : 'Try next day'}</button></div></div>
 }
 
 function MatchdayLoading({ label }: { label: string }) {
