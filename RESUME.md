@@ -753,6 +753,27 @@ infer closing flags, or enable player props before their independent validation 
   snapshots, and the expected warning for older Odds failures remains until those jobs age out of
   the recent window. Closing snapshots remain zero.
 
+### Matchday discovery and recommendation handoff (2026-08-07)
+
+- [x] Fix empty Matchday landing dates. `GET /api/v1/matchdays` now returns the nearest previous
+  and next stored event dates, the dashboard automatically recovers a stale empty landing date
+  once, and exact stored-matchday controls remain visible on mobile. Commit `d42a270` is pushed.
+- [x] Put recommendation status directly below bookmaker selection for every opened match. Qualified
+  suggestions remain distinct from a clearly labelled research-only watchlist; when none qualify,
+  the UI displays the exact market blockers and never promotes raw EV to a recommendation. Commit
+  `95d6d49` is pushed.
+- [x] Reconcile only the deterministic provider-name variation `Club` versus `Club FC` across
+  fixture, odds, and result imports. The earliest stored identity remains canonical; no broader
+  fuzzy matching was added and all minimum-history gates remain unchanged. A rollback-only 30-day
+  replay increased creatable/reusable predictions from 1 to 8 and research candidates from 1 to
+  10, while the other 39 eligible events still failed their original history gates. Commit
+  `6563d2d` is pushed.
+- [x] Reload the worker and apply the resolver through normal provider collection. Odds job `261`
+  completed, all upcoming fixture identities now have zero pending trailing-`FC` corrections, and
+  the persistent scheduler is running under Python PID `18032`. No signal gate was bypassed.
+- [x] Complete verification: 283 backend tests and 78 frontend tests pass, together with Ruff,
+  Ruff formatting, Mypy, ESLint, TypeScript, and the production build.
+
 ## Next resume action
 
 Keep the scheduler on its configured cadence and use `py -m app.cli monitor-collection
@@ -762,4 +783,7 @@ calibration specification before inspecting its outcomes, and then run a new unt
 Do not reuse Bundesliga 2024/25 as validation. Historical market acquisition remains unchecked
 until the owner supplies permitted timestamped odds or approves a source/account after probability
 validation passes. Player adjustments, player props, market signals, CLV, staking, ROI, and
-profitability claims remain blocked.
+profitability claims remain blocked. Matchday will create supported Premier League prediction
+research through the normal seven-day refresh horizon; until independent validation and fresh
+compatible prices satisfy every gate, the site must continue to show no qualified bet
+recommendation and explain why.
