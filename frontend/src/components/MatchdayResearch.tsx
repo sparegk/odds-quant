@@ -336,7 +336,6 @@ export function MatchdayResearch({
 }
 
 export function MatchDetail({ detail }: { detail: MatchdayEventDetail }) {
-  const likely = [...(detail.latest_prediction?.predictions ?? [])].sort((left, right) => right.probability - left.probability)
   const bestPrices = detail.markets.flatMap((market) => market.best_prices.map((price) => ({ market, price })))
   const builderQuotes = [...detail.builder_quotes].sort((left, right) => (right.lower_expected_value ?? -1) - (left.lower_expected_value ?? -1))
   const storedSnapshots = detail.markets.flatMap((market) => market.snapshots)
@@ -355,37 +354,10 @@ export function MatchDetail({ detail }: { detail: MatchdayEventDetail }) {
 
       <div className="space-y-7 p-5">
         <BookmakerAvailability detail={detail} />
+        <BetRecommendations detail={detail} />
         <AvailabilityExplorer detail={detail} />
         <PredictionEvidence detail={detail} />
         <ModelMarketLab detail={detail} />
-        <section>
-          <DetailHeading eyebrow="Probability versus exact price" title="Ranked match suggestions" />
-          {detail.suggestions.length ? (
-            <div className="space-y-3">
-              {detail.suggestions.map((suggestion) => (
-                <SuggestionCard key={`${suggestion.source_kind}-${suggestion.source_id}`} suggestion={suggestion} />
-              ))}
-            </div>
-          ) : likely.length ? (
-            <div>
-              <div className="mb-3 border-l-4 border-amber-400 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950">
-                Likelihood only—not a betting edge. No calibrated price signal is stored at this cutoff.
-              </div>
-              <div className="grid gap-2 sm:grid-cols-3">
-                {likely.slice(0, 3).map((prediction) => (
-                  <div className="border border-zinc-200 p-3" key={prediction.id}>
-                    <p className="text-xs font-semibold text-zinc-500">{prediction.selection_name}</p>
-                    <p className="mt-2 text-xl font-bold">{percentage(prediction.probability)}</p>
-                    <p className="mt-1 text-xs text-zinc-500">Fair odds {prediction.fair_odds.toFixed(2)} / lower {percentage(prediction.lower_probability)}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <ResearchEmpty text="No timestamp-valid pre-kickoff model output is stored for this match." />
-          )}
-          <p className="mt-3 text-xs leading-5 text-zinc-500">{detail.evidence_note}</p>
-        </section>
 
         <MarketCoverage detail={detail} />
 
@@ -437,6 +409,47 @@ export function MatchDetail({ detail }: { detail: MatchdayEventDetail }) {
       </div>
     </article>
   )
+}
+
+function BetRecommendations({ detail }: { detail: MatchdayEventDetail }) {
+  const likely = [...(detail.latest_prediction?.predictions ?? [])].sort((left, right) => right.probability - left.probability)
+  const watchlist = [...detail.model_market_comparisons]
+    .filter((comparison) => comparison.expected_value > 0)
+    .sort((left, right) => right.expected_value - left.expected_value)
+    .slice(0, 3)
+  const blockers = [...new Set(
+    detail.suggestion_market_statuses
+      .filter((market) => market.status !== 'available')
+      .map((market) => `${market.label}: ${market.reason}`),
+  )].slice(0, 4)
+
+  return <section aria-label="Bet recommendations">
+    <DetailHeading eyebrow="Qualified evidence only" title="Bet recommendations" />
+    {detail.suggestions.length ? (
+      <div className="space-y-3">
+        {detail.suggestions.map((suggestion) => (
+          <SuggestionCard key={`${suggestion.source_kind}-${suggestion.source_id}`} suggestion={suggestion} />
+        ))}
+      </div>
+    ) : (
+      <div className="space-y-4">
+        <div className="border-l-4 border-amber-400 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950" role="status">
+          <p className="font-bold">No qualified bet recommendation for this match</p>
+          <p className="mt-1">The app will only recommend a selection when a calibrated lower probability clears a fresh, exact selected-bookmaker price.</p>
+          {blockers.length ? <ul className="mt-2 list-disc pl-5 text-xs">{blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}</ul> : null}
+        </div>
+        {watchlist.length ? <div>
+          <p className="text-xs font-bold uppercase text-sky-700">Research watchlist—not recommendations</p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-3">{watchlist.map((comparison) => <div className="border border-sky-200 bg-sky-50 p-3" key={`${comparison.market_id}-${comparison.selection_id}`}><p className="text-xs font-semibold text-zinc-600">{comparison.selection_name} · {comparison.best_bookmaker}</p><p className="mt-1 font-mono font-bold">{comparison.best_odds.toFixed(2)} · raw EV {signedPercentage(comparison.expected_value)}</p><p className="mt-1 text-[11px] leading-4 text-sky-900">{comparison.qualification_blockers[0] ?? 'Qualification gates remain unresolved.'}</p></div>)}</div>
+        </div> : null}
+        {likely.length ? <div>
+          <p className="mb-2 text-xs font-bold uppercase text-zinc-500">Outcome likelihoods—not betting edges</p>
+          <div className="grid gap-2 sm:grid-cols-3">{likely.slice(0, 3).map((prediction) => <div className="border border-zinc-200 p-3" key={prediction.id}><p className="text-xs font-semibold text-zinc-500">{prediction.selection_name}</p><p className="mt-2 text-xl font-bold">{percentage(prediction.probability)}</p><p className="mt-1 text-xs text-zinc-500">Fair odds {prediction.fair_odds.toFixed(2)} / lower {percentage(prediction.lower_probability)}</p></div>)}</div>
+        </div> : <ResearchEmpty text="No timestamp-valid pre-kickoff model output is stored for this match." />}
+      </div>
+    )}
+    <p className="mt-3 text-xs leading-5 text-zinc-500">{detail.evidence_note}</p>
+  </section>
 }
 
 function ModelMarketLab({ detail }: { detail: MatchdayEventDetail }) {

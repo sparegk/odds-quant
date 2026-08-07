@@ -468,6 +468,7 @@ describe('MatchdayResearch', () => {
     render(<MatchdayResearch onSelectEvent={selectEvent} />)
 
     expect(await screen.findByRole('heading', { name: /Northbridge FC vs Riverside Athletic/ })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Bet recommendations' })).toBeInTheDocument()
     expect(screen.getByText('Home or draw')).toBeInTheDocument()
     expect(screen.getByText(/Novibet @ 1.80/)).toBeInTheDocument()
     expect(screen.getByText('62.0%')).toBeInTheDocument()
@@ -550,6 +551,16 @@ describe('MatchdayResearch', () => {
     render(<MatchDetail detail={{ ...detail, model_market_comparisons: [] }} />)
 
     expect(screen.getByText(/Comparison blocked: no fresh exact selected-bookmaker price/)).toBeInTheDocument()
+  })
+
+  it('keeps positive raw comparisons visible without calling them recommendations', () => {
+    render(<MatchDetail detail={{ ...detail, suggestions: [] }} />)
+
+    expect(screen.getByText('No qualified bet recommendation for this match')).toBeInTheDocument()
+    expect(screen.getByText('Research watchlist—not recommendations')).toBeInTheDocument()
+    expect(screen.getByText(/2.15 · raw EV \+11.8%/)).toBeInTheDocument()
+    expect(screen.getAllByText(/no calibrated VALUE signal is stored/i).length).toBeGreaterThan(0)
+    expect(screen.getByText('Outcome likelihoods—not betting edges')).toBeInTheDocument()
   })
 
   it('retries a failed matchday without losing the selected date', async () => {
