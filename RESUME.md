@@ -728,3 +728,10 @@ infer closing flags, or enable player props before their independent validation 
   decision remain unchanged, Elo primaries reject the option, and Model Performance labels the
   row as a development benchmark with different-coverage evidence. Focused backend tests, Ruff,
   formatting, Mypy, the Model Performance test, ESLint, TypeScript, and the production build pass.
+- [x] Run the opt-in benchmark on the now-examined Bundesliga window and store immutable
+  development run `6`, fingerprint
+  `4e6ae4ba47f46b6a6f2596a966ac154bf3109073014d8d9ba7a26a1c3245b010`. It recovered 279/279
+  coverage across 60 unseen-team fixtures. All-candidate Brier/log loss/ECE were
+  0.62910/1.04955/0.08225; the shared 219 forecasts were exactly identical to strict Poisson. The
+  candidate remains development-only because ECE still misses 0.08 and no new untouched evidence
+  has tested it.

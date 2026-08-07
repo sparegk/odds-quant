@@ -90,3 +90,22 @@ This holdout is now examined evidence. Do not loosen the venue-history rule, rec
 confidence intervals, or calibration threshold in response to these results and replay the same
 window as untouched validation. No model promotion, value signal, CLV, staking, ROI, player
 feature, or profitability claim is authorized by this run.
+
+## Examined cold-start development replay
+
+After the external holdout was examined and its decision frozen, the same outcomes were reused
+only as development evidence for league-prior handling of promoted teams. Opt-in run `6`, method
+`expanding-window-v7-cold-start-development`, has fingerprint
+`4e6ae4ba47f46b6a6f2596a966ac154bf3109073014d8d9ba7a26a1c3245b010`.
+
+The strict primary receipt remained unchanged at 219 observations and `insufficient_evidence`.
+The separate `league-prior-cold-start-poisson-v1` benchmark evaluated all 279 candidates, including
+60 fixtures with an unseen team and fewer than eight venue-specific matches. Its all-candidate
+Brier score was `0.62910`, log loss was `1.04955`, and ECE was `0.08225`. On the 219 matches shared
+with the strict primary, both forecasts were identical and their paired loss differences were
+exactly zero; the primitive therefore changed only the explicitly labelled cold-start cases.
+
+Full coverage is useful development evidence, but ECE still exceeds the fixed `0.08` threshold and
+the different-coverage point scores are not a promotion comparison. This run cannot replace the
+external receipt, authorize a model, or be relabelled as untouched. A future specification must
+pre-register cold-start uncertainty and calibration rules, then face a genuinely new holdout.
