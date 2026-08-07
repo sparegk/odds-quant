@@ -715,3 +715,10 @@ infer closing flags, or enable player props before their independent validation 
 - [ ] Acquire permitted historical market evidence. This remains externally blocked until the
   owner supplies a permitted timestamped odds file or approves a source/account after a genuinely
   new untouched probability run passes.
+
+### Cold-start probability development (2026-08-07)
+
+- [x] Add an isolated league-prior Poisson primitive for promoted or otherwise unseen teams. It
+  returns explicit prior-use and venue-history evidence, while the existing strict
+  `expected_goals` path still rejects an unseen team. This is a tested development primitive only;
+  it is not active in stored models, live predictions, promotion, or signals.

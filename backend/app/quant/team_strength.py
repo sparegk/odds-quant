@@ -39,6 +39,32 @@ class PoissonTeamStrengthModel:
         away_lambda = self.league_away_goals * away.away_attack * home.home_defence
         return (_bounded_lambda(home_lambda), _bounded_lambda(away_lambda))
 
+    def expected_goals_with_league_priors(
+        self, home_team_id: int, away_team_id: int
+    ) -> ColdStartExpectedGoals:
+        home = self.teams.get(home_team_id, _league_prior_strength())
+        away = self.teams.get(away_team_id, _league_prior_strength())
+        home_lambda = self.league_home_goals * home.home_attack * away.away_defence
+        away_lambda = self.league_away_goals * away.away_attack * home.home_defence
+        return ColdStartExpectedGoals(
+            home_lambda=_bounded_lambda(home_lambda),
+            away_lambda=_bounded_lambda(away_lambda),
+            home_venue_matches=home.home_matches,
+            away_venue_matches=away.away_matches,
+            home_used_league_prior=home_team_id not in self.teams,
+            away_used_league_prior=away_team_id not in self.teams,
+        )
+
+
+@dataclass(frozen=True)
+class ColdStartExpectedGoals:
+    home_lambda: float
+    away_lambda: float
+    home_venue_matches: int
+    away_venue_matches: int
+    home_used_league_prior: bool
+    away_used_league_prior: bool
+
 
 def fit_poisson_team_strength(
     matches: list[HistoricalScore],
@@ -145,6 +171,17 @@ def model_from_config(config: dict[str, object], *, sample_size: int) -> Poisson
 def _shrunk_ratio(total: int, matches: int, league_rate: float, prior: float) -> float:
     rate = (total + prior * league_rate) / (matches + prior) if matches + prior else league_rate
     return rate / league_rate
+
+
+def _league_prior_strength() -> TeamStrength:
+    return TeamStrength(
+        home_attack=1.0,
+        home_defence=1.0,
+        away_attack=1.0,
+        away_defence=1.0,
+        home_matches=0,
+        away_matches=0,
+    )
 
 
 def _bounded_lambda(value: float) -> float:
