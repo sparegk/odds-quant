@@ -402,6 +402,19 @@ export interface CalibrationBucket {
   absolute_error: number
 }
 
+export interface ExternalValidationReceipt {
+  experiment_id: string
+  display_name: string
+  evidence_role: string
+  specification_frozen_at: string
+  executed_at: string
+  evaluation_fingerprint: string
+  probability_decision: string
+  examined: boolean
+  retuning_permitted: boolean
+  market_validation_authorized: boolean
+}
+
 export interface EvaluationRun {
   id: number
   model_version_id: number
@@ -418,6 +431,7 @@ export interface EvaluationRun {
   metrics: Record<string, unknown>
   benchmarks: Record<string, Record<string, unknown>>
   calibration: CalibrationBucket[]
+  external_validation?: ExternalValidationReceipt | null
   created_at: string
 }
 

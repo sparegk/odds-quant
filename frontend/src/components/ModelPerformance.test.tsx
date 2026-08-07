@@ -44,8 +44,26 @@ describe('ModelPerformance', () => {
       calibration: [], created_at: '2026-06-01T02:00:00Z',
     }
 
-    render(<ModelPerformance dashboard={{ ...base, models: [model], evaluations: [evaluation] }} />)
+    const externalValidation = {
+      experiment_id: 'bundesliga-2024-25-v6-poisson-primary',
+      display_name: 'Bundesliga 2024/25',
+      evidence_role: 'pre_registered_external_holdout',
+      specification_frozen_at: '2026-08-04T00:00:00Z',
+      executed_at: '2026-08-07T12:00:35Z',
+      evaluation_fingerprint: 'external-validation-fingerprint',
+      probability_decision: 'insufficient_evidence',
+      examined: true,
+      retuning_permitted: false,
+      market_validation_authorized: false,
+    }
+    render(<ModelPerformance dashboard={{ ...base, models: [model], evaluations: [{ ...evaluation, external_validation: externalValidation }] }} />)
 
+    expect(screen.getByRole('heading', { name: 'External validation receipt' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Bundesliga 2024/25' })).toBeInTheDocument()
+    expect(screen.getByText('EXAMINED · INSUFFICIENT EVIDENCE')).toBeInTheDocument()
+    expect(screen.getByText('Evaluation fingerprint: external-validation-fingerprint')).toBeInTheDocument()
+    expect(screen.getAllByText('Not permitted').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Not authorized').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Chronological Elo').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Dixon-Coles').length).toBeGreaterThan(0)
     expect(screen.getByRole('heading', { name: 'Model and configuration comparison' })).toBeInTheDocument()

@@ -24,6 +24,7 @@ export function ModelPerformance({ dashboard, onChanged }: { dashboard: Dashboar
       <div className="min-w-0 space-y-7">
         <section className="border border-zinc-200 bg-white"><div className="flex flex-wrap items-start justify-between gap-4 p-5"><div><p className="text-xs font-bold uppercase text-emerald-700">{selected.name}</p><h3 className="mt-1 text-xl font-bold">{selected.version}</h3><p className="mt-1 text-sm text-zinc-500">{selected.is_demo ? 'DEMO TRAINING DATA' : 'PERMITTED EXTERNAL HISTORY'}</p></div><ValidationStatuses probability={selected.probability_evaluation_status} market={selected.evaluation_status} /></div><div className="grid grid-cols-2 border-t border-zinc-200 md:grid-cols-4"><Metric label="Training matches" value={selected.sample_size.toString()} /><Metric label="Feature version" value={selected.feature_version} /><Metric label="Evaluations" value={evaluations.length.toString()} /><Metric label="Registry status" value={humanizeCode(selected.status)} /></div><div className="grid gap-2 border-t border-zinc-200 px-5 py-4 text-xs text-zinc-500 sm:grid-cols-2"><p>Training window: {formatDateTime(selected.training_start)} to {formatDateTime(selected.training_end)}</p><p>Created: {formatDateTime(selected.created_at)}</p><p className="font-mono">Data fingerprint: {selected.data_fingerprint}</p><p>Model ID #{selected.id}</p></div></section>
         <EvaluationSummary run={latest} />
+        <ExternalValidationEvidence run={latest} />
         <ExperimentComparison anchor={latest} evaluations={dashboard.evaluations} />
         <PromotionReadiness run={latest} />
         <EvaluationDiagnosis run={latest} />
@@ -38,6 +39,29 @@ export function ModelPerformance({ dashboard, onChanged }: { dashboard: Dashboar
 function EvaluationSummary({ run }: { run: EvaluationRun | undefined }) {
   if (!run) return <ModelEmpty title="Performance is not established" detail="This trained version has no chronological held-out evaluation. It cannot unlock calibrated value signals." />
   return <section><Heading eyebrow="Latest chronological replay" title="Proper-score performance" /><div className="grid grid-cols-2 border border-zinc-200 bg-white md:grid-cols-4"><Metric label="1X2 Brier" value={formatScoreInterval(run.metrics, 'brier_score')} /><Metric label="Log loss" value={formatScoreInterval(run.metrics, 'log_loss')} /><Metric label="Calibration error" value={percent(value(run, 'expected_calibration_error'))} /><Metric label="Coverage" value={`${numberMetric(run, 'evaluated_events', 0)} / ${numberMetric(run, 'candidate_events', 0)}`} /></div><BenchmarkComparison run={run} /></section>
+}
+
+function ExternalValidationEvidence({ run }: { run: EvaluationRun | undefined }) {
+  const receipt = run?.external_validation
+  if (!receipt) return null
+  const passed = receipt.probability_decision === 'probability_validated'
+  return <section aria-labelledby={'external-validation-title'}>
+    <Heading eyebrow={'Pre-registered external holdout'} title={'External validation receipt'} />
+    <div className={`border-l-4 p-5 ${passed ? 'border-emerald-500 bg-emerald-50' : 'border-amber-400 bg-amber-50'}`}>
+      <div className={'flex flex-wrap items-start justify-between gap-4'}>
+        <div><h4 className={'font-bold'} id={'external-validation-title'}>{receipt.display_name}</h4><p className={'mt-1 text-xs text-zinc-600'}>{humanizeCode(receipt.evidence_role)} · {receipt.experiment_id}</p></div>
+        <span className={'border border-black/10 bg-white px-2 py-1 text-xs font-bold'}>{receipt.examined ? 'EXAMINED' : 'LOCKED'} · {humanizeCode(receipt.probability_decision).toUpperCase()}</span>
+      </div>
+      <div className={'mt-4 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4'}>
+        <p><span className={'font-bold'}>Specification frozen</span><br />{formatDateTime(receipt.specification_frozen_at)}</p>
+        <p><span className={'font-bold'}>Replay executed</span><br />{formatDateTime(receipt.executed_at)}</p>
+        <p><span className={'font-bold'}>Retuning</span><br />{receipt.retuning_permitted ? 'Permitted' : 'Not permitted'}</p>
+        <p><span className={'font-bold'}>Market validation</span><br />{receipt.market_validation_authorized ? 'Authorized' : 'Not authorized'}</p>
+      </div>
+      <p className={'mt-4 break-all font-mono text-xs text-zinc-600'}>Evaluation fingerprint: {receipt.evaluation_fingerprint}</p>
+      <p className={'mt-3 text-xs leading-5 text-zinc-700'}>This label is attached only by an exact fingerprint match to the checked-in receipt. Examined external evidence cannot be retuned and replayed as untouched validation.</p>
+    </div>
+  </section>
 }
 
 interface ExperimentRow {

@@ -685,3 +685,15 @@ infer closing flags, or enable player props before their independent validation 
 - [x] Preserve the failed result without retuning. The Bundesliga holdout is now examined evidence;
   it does not promote the model or authorize market, signal, staking, player-feature, or
   profitability work. See `BUNDESLIGA_EXTERNAL_VALIDATION.md` for the full receipt.
+
+### External-validation site receipt checkpoint (2026-08-07)
+
+- [x] Bind the Bundesliga external-validation classification to the immutable evaluation
+  fingerprint in a typed backend registry. Unmatched evaluation runs receive no external-holdout
+  label, and the matched receipt explicitly blocks retuning and market authorization.
+- [x] Expose the receipt through the evaluation API and Model Performance. The site shows the
+  pre-registration date, execution date, examined status, probability decision, full fingerprint,
+  and separate retuning and market-validation decisions.
+- [x] Add deterministic backend fingerprint tests and frontend rendering coverage. Focused backend
+  evaluation/API tests, Ruff, formatting, Mypy, the Model Performance test, ESLint, TypeScript,
+  and the production build pass.

@@ -54,6 +54,7 @@ from app.quant.odds import devig_proportional
 from app.quant.poisson import derive_market, score_matrix
 from app.quant.team_strength import HistoricalScore, fit_poisson_team_strength
 from app.schemas.models import CalibrationBucketView, EvaluateModelRequest, EvaluationRunView
+from app.services.external_validation import receipt_for_evaluation
 from app.services.modeling import ELO_MODEL_KIND, MODEL_KIND, competition_family_ids
 
 MINIMUM_PROMOTION_OBSERVATIONS = 200
@@ -1299,6 +1300,7 @@ def _run_view(session: Session, run: BacktestRun) -> EvaluationRunView:
             if benchmark != primary_benchmark
         },
         calibration=calibration,
+        external_validation=receipt_for_evaluation(run.fingerprint),
         created_at=_utc(run.created_at),
     )
 

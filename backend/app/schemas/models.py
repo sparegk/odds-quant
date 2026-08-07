@@ -191,6 +191,19 @@ class CalibrationBucketView(BaseModel):
     absolute_error: float
 
 
+class ExternalValidationReceiptView(BaseModel):
+    experiment_id: str
+    display_name: str
+    evidence_role: str
+    specification_frozen_at: datetime
+    executed_at: datetime
+    evaluation_fingerprint: str
+    probability_decision: str
+    examined: bool
+    retuning_permitted: bool
+    market_validation_authorized: bool
+
+
 class EvaluationRunView(BaseModel):
     id: int
     model_version_id: int
@@ -207,4 +220,5 @@ class EvaluationRunView(BaseModel):
     metrics: dict[str, object]
     benchmarks: dict[str, dict[str, object]]
     calibration: list[CalibrationBucketView]
+    external_validation: ExternalValidationReceiptView | None = None
     created_at: datetime
