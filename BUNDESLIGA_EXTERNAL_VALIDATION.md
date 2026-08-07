@@ -61,3 +61,32 @@ nested grid, and 12-member Poisson/Elo/Dixon-Coles ensemble grid.
 A deterministic test binds the manifest to the implementation constants. The implementation
 commit is `28ce95ebc2a5c51ef89a2ea6dfef6ef37382e658`. Any specification change requires a new manifest
 and a new untouched dataset; it cannot be justified from this holdout's metrics.
+
+## Untouched replay receipt
+
+The frozen replay completed on 2026-08-07 without changing the registered specification.
+Poisson model `pq1-c25-202409200000-c72fb25b` (local model ID `7`) retained all 612 eligible
+training results. Immutable evaluation run `5` has fingerprint
+`0784718941c4f2e22326902be89c76158f038b0d2a66e487f4b078708d2bf9cb`.
+
+| Evidence | Frozen gate | Observed | Decision |
+| --- | ---: | ---: | --- |
+| Non-demo permitted data | required | yes | pass |
+| Evaluated observations | at least 200 | 219 | pass |
+| Eligible-event coverage | at least 90% | 219 / 279 (78.49%) | fail |
+| Expected calibration error | at most 0.08 | 0.08521 | fail |
+| Uniform Brier paired 95% upper difference | below 0 | 0.01140 | fail |
+| Uniform log-loss paired 95% upper difference | below 0 | 0.03010 | fail |
+| Chronological recalibration | accepted | identity accepted | pass |
+
+The primary Poisson point estimates were Brier `0.62171` and log loss `1.04079`, compared with
+uniform Brier `0.66667` and log loss `1.09861`. Those favorable point estimates are not enough:
+the paired 95% intervals crossed zero. Sixty candidates were excluded by the pre-registered
+venue-history rule (31 insufficient home-venue histories and 29 insufficient away-venue
+histories), so the fixed coverage gate also failed. The stored probability and market decisions
+are both `insufficient_evidence`.
+
+This holdout is now examined evidence. Do not loosen the venue-history rule, recalibration rule,
+confidence intervals, or calibration threshold in response to these results and replay the same
+window as untouched validation. No model promotion, value signal, CLV, staking, ROI, player
+feature, or profitability claim is authorized by this run.

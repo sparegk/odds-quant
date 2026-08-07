@@ -670,3 +670,18 @@ infer closing flags, or enable player props before their independent validation 
 - After the immutable run is stored, audit every probability gate and record the outcome without
   retuning. Do not start market, signal, staking, or player-feature work unless its prerequisite
   gate explicitly passes.
+
+### Bundesliga untouched replay checkpoint (2026-08-07)
+
+- [x] Train the frozen primary specification as model ID `7`, version
+  `pq1-c25-202409200000-c72fb25b`, from all 612 eligible prior results without changing the
+  registered training boundary or hyperparameters.
+- [x] Complete immutable evaluation run `5` over the locked 2024/25 window. Its fingerprint is
+  `0784718941c4f2e22326902be89c76158f038b0d2a66e487f4b078708d2bf9cb`.
+- [x] Audit every frozen probability gate. Observation count and chronological identity
+  recalibration passed. Coverage was 219/279 (78.49%) against 90%, ECE was 0.08521 against 0.08,
+  and the paired uniform Brier/log-loss upper differences were 0.01140/0.03010 against the
+  below-zero requirements. The stored probability decision is `insufficient_evidence`.
+- [x] Preserve the failed result without retuning. The Bundesliga holdout is now examined evidence;
+  it does not promote the model or authorize market, signal, staking, player-feature, or
+  profitability work. See `BUNDESLIGA_EXTERNAL_VALIDATION.md` for the full receipt.
