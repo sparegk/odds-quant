@@ -80,6 +80,7 @@ class EvaluateModelRequest(BaseModel):
     prediction_lead_minutes: int = Field(default=60, ge=1, le=10_080)
     minimum_training_matches: int = Field(default=20, ge=6, le=100_000)
     calibration_bins: int = Field(default=10, ge=2, le=50)
+    include_cold_start_benchmark: bool = False
 
     @field_validator("evaluation_start", "evaluation_end")
     @classmethod

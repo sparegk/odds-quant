@@ -68,6 +68,8 @@ BOOTSTRAP_CONFIDENCE_LEVEL = 0.95
 BOOTSTRAP_RESAMPLES = 2000
 EVALUATION_METHOD_VERSION = "expanding-window-block-bootstrap-v6-ensemble"
 ELO_EVALUATION_METHOD_VERSION = "expanding-window-block-bootstrap-v6-elo-ensemble"
+COLD_START_EVALUATION_METHOD_VERSION = "expanding-window-v7-cold-start-development"
+COLD_START_BENCHMARK_VERSION = "league-prior-cold-start-poisson-v1"
 MINIMUM_RECALIBRATION_HISTORY = 60
 MINIMUM_RECALIBRATION_EVALUATION_OBSERVATIONS = 100
 MINIMUM_RECALIBRATION_VALIDATION_OBSERVATIONS = 50
@@ -133,6 +135,17 @@ class _ReplayObservation:
     market_log_loss: float | None
 
 
+@dataclass(frozen=True)
+class _ColdStartObservation:
+    event_id: int
+    probabilities: dict[str, float]
+    actual_outcome: str
+    home_venue_matches: int
+    away_venue_matches: int
+    home_used_league_prior: bool
+    away_used_league_prior: bool
+
+
 def evaluate_model(
     session: Session,
     model_id: int,
@@ -150,6 +163,8 @@ def evaluate_model(
         raise EvaluationError("model version not found")
     if model.kind not in {MODEL_KIND, ELO_MODEL_KIND} or model.status != "trained":
         raise EvaluationError("model version is not a trained supported team-strength model")
+    if request.include_cold_start_benchmark and model.kind != MODEL_KIND:
+        raise EvaluationError("cold-start development benchmark requires a Poisson primary model")
 
     competition_id = _config_int(model.config, "competition_id")
     minimum_team_matches = _config_int(model.config, "minimum_team_matches")
@@ -157,6 +172,8 @@ def evaluate_model(
     evaluation_method_version = (
         ELO_EVALUATION_METHOD_VERSION if model.kind == ELO_MODEL_KIND else EVALUATION_METHOD_VERSION
     )
+    if request.include_cold_start_benchmark:
+        evaluation_method_version = COLD_START_EVALUATION_METHOD_VERSION
     shrinkage_matches = (
         _config_number(model.config, "shrinkage_matches") if model.kind == MODEL_KIND else 5.0
     )
@@ -184,6 +201,7 @@ def evaluate_model(
         raise EvaluationError("no final results exist in the evaluation window")
 
     replayed: list[_ReplayObservation] = []
+    cold_start_replayed: list[_ColdStartObservation] = []
     exclusions: dict[str, int] = {}
     for result, event in candidate_rows:
         predicted_at = _utc(event.kickoff_at) - timedelta(minutes=request.prediction_lead_minutes)
@@ -230,6 +248,24 @@ def evaluate_model(
             for training_result, training_event in training_rows
         ]
         fitted = fit_poisson_team_strength(scores, shrinkage_matches=shrinkage_matches)
+        if request.include_cold_start_benchmark:
+            cold_start = fitted.expected_goals_with_league_priors(
+                event.home_team_id, event.away_team_id
+            )
+            cold_start_replayed.append(
+                _ColdStartObservation(
+                    event_id=event.id,
+                    probabilities=derive_market(
+                        score_matrix(cold_start.home_lambda, cold_start.away_lambda),
+                        "MATCH_RESULT",
+                    ),
+                    actual_outcome=_actual_outcome(result),
+                    home_venue_matches=cold_start.home_venue_matches,
+                    away_venue_matches=cold_start.away_venue_matches,
+                    home_used_league_prior=cold_start.home_used_league_prior,
+                    away_used_league_prior=cold_start.away_used_league_prior,
+                )
+            )
         home = fitted.teams.get(event.home_team_id)
         away = fitted.teams.get(event.away_team_id)
         if home is None or home.home_matches < minimum_team_matches:
@@ -398,6 +434,57 @@ def evaluate_model(
             primary_name=primary_benchmark,
         )
         benchmark_metrics["poisson"] = poisson_metrics
+    if cold_start_replayed:
+        cold_start_rows = [
+            (observation.probabilities, observation.actual_outcome)
+            for observation in cold_start_replayed
+        ]
+        cold_start_metrics, _ = summarize_probabilities(
+            cold_start_rows, bins=request.calibration_bins
+        )
+        _attach_score_intervals(
+            cold_start_metrics,
+            cold_start_rows,
+            seed_material=bootstrap_seed_material,
+            namespace="poisson_cold_start",
+        )
+        cold_start_by_event = {
+            observation.event_id: observation for observation in cold_start_replayed
+        }
+        aligned_cold_start_rows = [
+            (
+                cold_start_by_event[observation.event.id].probabilities,
+                observation.actual_outcome,
+            )
+            for observation in replayed
+        ]
+        _attach_paired_loss_difference(
+            cold_start_metrics,
+            probability_rows,
+            aligned_cold_start_rows,
+            seed_material=bootstrap_seed_material,
+            namespace="poisson_cold_start",
+        )
+        cold_start_metrics.update(
+            {
+                "version": COLD_START_BENCHMARK_VERSION,
+                "evidence_role": "examined_development_benchmark",
+                "candidate_events": len(candidate_rows),
+                "evaluated_events": len(cold_start_replayed),
+                "coverage": len(cold_start_replayed) / len(candidate_rows),
+                "paired_observations": len(replayed),
+                "below_minimum_venue_history_events": sum(
+                    observation.home_venue_matches < minimum_team_matches
+                    or observation.away_venue_matches < minimum_team_matches
+                    for observation in cold_start_replayed
+                ),
+                "unseen_team_prior_events": sum(
+                    observation.home_used_league_prior or observation.away_used_league_prior
+                    for observation in cold_start_replayed
+                ),
+            }
+        )
+        benchmark_metrics["poisson_cold_start"] = cold_start_metrics
     nested_inputs = [
         (observation.nested_candidate_probabilities, observation.actual_outcome)
         for observation in replayed
@@ -552,6 +639,7 @@ def evaluate_model(
         model=model,
         request=request,
         replayed=replayed,
+        cold_start_replayed=cold_start_replayed,
         evaluation_status=evaluation_status,
         probability_evaluation_status=probability_evaluation_status,
         evaluation_method_version=evaluation_method_version,
@@ -562,6 +650,9 @@ def evaluate_model(
 
     config: dict[str, object] = {
         "evaluation_kind": "expanding_window_match_result",
+        "development_benchmarks": (
+            [COLD_START_BENCHMARK_VERSION] if request.include_cold_start_benchmark else []
+        ),
         "evaluation_method_version": evaluation_method_version,
         "primary_benchmark": primary_benchmark,
         "primary_model_kind": model.kind,
@@ -1310,6 +1401,7 @@ def _evaluation_fingerprint(
     model: ModelVersion,
     request: EvaluateModelRequest,
     replayed: list[_ReplayObservation],
+    cold_start_replayed: list[_ColdStartObservation],
     evaluation_status: str,
     probability_evaluation_status: str,
     evaluation_method_version: str = EVALUATION_METHOD_VERSION,
@@ -1317,7 +1409,7 @@ def _evaluation_fingerprint(
     payload = {
         "model_version": model.version,
         "evaluation_method_version": evaluation_method_version,
-        "request": request.model_dump(mode="json"),
+        "request": _fingerprint_request(request),
         "evaluation_status": evaluation_status,
         "probability_evaluation_status": probability_evaluation_status,
         "observations": [
@@ -1340,8 +1432,28 @@ def _evaluation_fingerprint(
             for row in replayed
         ],
     }
+    if cold_start_replayed:
+        payload["cold_start_observations"] = [
+            {
+                "event_id": row.event_id,
+                "probabilities": row.probabilities,
+                "actual_outcome": row.actual_outcome,
+                "home_venue_matches": row.home_venue_matches,
+                "away_venue_matches": row.away_venue_matches,
+                "home_used_league_prior": row.home_used_league_prior,
+                "away_used_league_prior": row.away_used_league_prior,
+            }
+            for row in cold_start_replayed
+        ]
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _fingerprint_request(request: EvaluateModelRequest) -> dict[str, object]:
+    payload: dict[str, object] = request.model_dump(mode="json")
+    if not request.include_cold_start_benchmark:
+        payload.pop("include_cold_start_benchmark")
+    return payload
 
 
 def _nested_candidate_probabilities(

@@ -34,6 +34,7 @@ describe('ModelPerformance', () => {
       }, probability_evaluation_status: 'probability_validated', evaluation_status: 'insufficient_market_evidence', is_demo: false,
       metrics: { brier_score: 0.5, log_loss: 0.8, expected_calibration_error: 0.04, evaluated_events: 40, candidate_events: 40, observations: 40, score_intervals: { brier_score: interval(0.5, 0.47, 0.53), log_loss: interval(0.8, 0.75, 0.85) } },
       benchmarks: {
+        poisson_cold_start: { brier_score: 0.49, log_loss: 0.79, expected_calibration_error: 0.04, observations: 44, evaluated_events: 44, candidate_events: 44, below_minimum_venue_history_events: 4, paired_loss_difference: paired([0.01, -0.01, 0.03], [0.01, -0.01, 0.03]) },
         dixon_coles: { brier_score: 0.52, log_loss: 0.82, observations: 40, score_intervals: { brier_score: interval(0.52, 0.49, 0.55), log_loss: interval(0.82, 0.77, 0.87) }, paired_loss_difference: paired([-0.02, -0.04, -0.005], [-0.02, -0.04, -0.003]) },
         elo: { brier_score: 0.51, log_loss: 0.81, observations: 40, score_intervals: { brier_score: interval(0.51, 0.48, 0.54), log_loss: interval(0.81, 0.76, 0.86) }, paired_loss_difference: paired([-0.01, -0.03, 0.01], [-0.01, -0.03, -0.001]) },
         nested_selected: { brier_score: 0.505, log_loss: 0.805, expected_calibration_error: 0.045, observations: 40, selection_counts: { poisson_shrinkage_5: 25, elo_k_20: 15 }, paired_loss_difference: paired([-0.005, -0.02, 0.01], [-0.005, -0.02, 0.01]) },
@@ -65,10 +66,12 @@ describe('ModelPerformance', () => {
     expect(screen.getAllByText('Not permitted').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Not authorized').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Chronological Elo').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Poisson cold-start').length).toBeGreaterThan(0)
+    expect(screen.getByText(/44 \/ 44 coverage · 4 cold-start events/)).toBeInTheDocument()
     expect(screen.getAllByText('Dixon-Coles').length).toBeGreaterThan(0)
     expect(screen.getByRole('heading', { name: 'Model and configuration comparison' })).toBeInTheDocument()
     expect(screen.getByText('Identical evaluation window')).toBeInTheDocument()
-    expect(screen.getByText('OBSERVATIONS ALIGNED')).toBeInTheDocument()
+    expect(screen.getByText('CHECK COVERAGE')).toBeInTheDocument()
     expect(screen.getAllByText('Nested selected').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Chronological ensemble').length).toBeGreaterThan(0)
     expect(screen.getByText(/Poisson Shrinkage 5 25/)).toBeInTheDocument()

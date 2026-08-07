@@ -77,7 +77,7 @@ function ExperimentComparison({ anchor, evaluations }: { anchor: EvaluationRun |
   if (!anchor) return null
   const alignedRuns = evaluations.filter((run) => run.evaluation_start === anchor.evaluation_start && run.evaluation_end === anchor.evaluation_end && run.is_demo === anchor.is_demo)
   const represented = new Set<string>()
-  const benchmarkLabels: Record<string, string> = { poisson: 'Poisson', elo: 'Chronological Elo', dixon_coles: 'Dixon-Coles', nested_selected: 'Nested selected', chronological_ensemble: 'Chronological ensemble' }
+  const benchmarkLabels: Record<string, string> = { poisson: 'Poisson', poisson_cold_start: 'Poisson cold-start', elo: 'Chronological Elo', dixon_coles: 'Dixon-Coles', nested_selected: 'Nested selected', chronological_ensemble: 'Chronological ensemble' }
   const rows: ExperimentRow[] = alignedRuns.map((run) => {
     const primary = primaryBenchmark(run)
     represented.add(primary)
@@ -277,6 +277,7 @@ function primaryBenchmark(run: EvaluationRun): string {
 }
 
 function experimentConfiguration(key: string, metrics: Record<string, unknown>, run: EvaluationRun): string {
+  if (key === 'poisson_cold_start') return `League-prior development benchmark · ${formatCount(recordValue(metrics, 'evaluated_events'))} / ${formatCount(recordValue(metrics, 'candidate_events'))} coverage · ${formatCount(recordValue(metrics, 'below_minimum_venue_history_events'))} cold-start events.`
   if (key === 'nested_selected') {
     const counts = recordObject(metrics, 'selection_counts')
     return counts ? `Selections: ${Object.entries(counts).map(([name, count]) => `${humanizeCode(name)} ${String(count)}`).join(' · ')}` : 'Pre-registered nested candidate grid.'

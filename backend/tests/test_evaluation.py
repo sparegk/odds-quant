@@ -29,6 +29,7 @@ from app.schemas.models import EvaluateModelRequest, TrainEloRequest, TrainPoiss
 from app.services.demo_seed import seed_demo_results
 from app.services.evaluation import (
     EvaluationError,
+    _fingerprint_request,
     _policy_decision,
     _temperature_recalibration_metrics,
     evaluate_model,
@@ -92,6 +93,40 @@ def _request() -> EvaluateModelRequest:
         minimum_training_matches=20,
         calibration_bins=5,
     )
+
+
+def test_cold_start_flag_preserves_strict_fingerprint_request_payload() -> None:
+    strict = _fingerprint_request(_request())
+    development = _fingerprint_request(
+        _request().model_copy(update={"include_cold_start_benchmark": True})
+    )
+
+    assert "include_cold_start_benchmark" not in strict
+    assert development["include_cold_start_benchmark"] is True
+
+
+def test_cold_start_benchmark_is_opt_in_and_does_not_change_primary_eligibility(
+    session: Session,
+) -> None:
+    model = _model(session)
+    strict = evaluate_model(session, model.id, _request(), now=AS_OF)
+    development_request = _request().model_copy(update={"include_cold_start_benchmark": True})
+
+    development = evaluate_model(session, model.id, development_request, now=AS_OF)
+
+    assert development.id != strict.id
+    assert development.metrics["candidate_events"] == 12
+    assert development.metrics["evaluated_events"] == 8
+    assert "poisson_cold_start" not in strict.benchmarks
+    cold_start = development.benchmarks["poisson_cold_start"]
+    assert cold_start["version"] == "league-prior-cold-start-poisson-v1"
+    assert cold_start["evidence_role"] == "examined_development_benchmark"
+    assert cold_start["candidate_events"] == 12
+    assert cold_start["evaluated_events"] == 12
+    assert cold_start["coverage"] == pytest.approx(1.0)
+    assert cold_start["paired_observations"] == 8
+    assert cold_start["below_minimum_venue_history_events"] == 4
+    assert development.config["development_benchmarks"] == ["league-prior-cold-start-poisson-v1"]
 
 
 def test_walk_forward_evaluation_persists_immutable_demo_evidence(

@@ -150,6 +150,7 @@ def _parser() -> argparse.ArgumentParser:
     evaluate.add_argument("--prediction-lead-minutes", type=int, default=60)
     evaluate.add_argument("--minimum-training-matches", type=int, default=20)
     evaluate.add_argument("--calibration-bins", type=int, default=10)
+    evaluate.add_argument("--include-cold-start-benchmark", action="store_true")
     signals = commands.add_parser(
         "generate-signals", help="join a calibrated prediction to compatible fresh odds"
     )
@@ -333,6 +334,7 @@ def main() -> int:
                         prediction_lead_minutes=args.prediction_lead_minutes,
                         minimum_training_matches=args.minimum_training_matches,
                         calibration_bins=args.calibration_bins,
+                        include_cold_start_benchmark=args.include_cold_start_benchmark,
                     ),
                 )
             else:

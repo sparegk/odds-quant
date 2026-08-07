@@ -722,3 +722,9 @@ infer closing flags, or enable player props before their independent validation 
   returns explicit prior-use and venue-history evidence, while the existing strict
   `expected_goals` path still rejects an unseen team. This is a tested development primitive only;
   it is not active in stored models, live predictions, promotion, or signals.
+- [x] Add an explicit `--include-cold-start-benchmark` development replay mode. It stores a
+  separately versioned full-candidate benchmark, cold-start counts, aligned paired intervals, and
+  all cold-start inputs in the evaluation fingerprint. The strict primary eligibility and policy
+  decision remain unchanged, Elo primaries reject the option, and Model Performance labels the
+  row as a development benchmark with different-coverage evidence. Focused backend tests, Ruff,
+  formatting, Mypy, the Model Performance test, ESLint, TypeScript, and the production build pass.
