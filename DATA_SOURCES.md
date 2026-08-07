@@ -91,6 +91,28 @@ store prices or expose a prop.
 
 ## Closing Evidence Audit
 
+### Post-external-validation market audit: 2026-08-07
+
+The configured store now contains 3,463 permitted final results and 11,539 permitted odds
+snapshots, but no historical result season has any timestamped odds and the store still contains
+zero explicit closing snapshots. The available odds belong to upcoming 2026/27 events, so they
+cannot be joined retrospectively to the examined Premier League or Bundesliga evaluations.
+
+The current official [The Odds API historical contract](https://the-odds-api.com/liveapi/guides/v4/)
+does provide timestamp-addressed snapshots and lists historical Bundesliga coverage, but access is
+paid. It still requires an approved account plus a sanitized proof of exact bookmaker coverage,
+retention rights, event identity, complete 1X2 outcomes, and quota cost. A timestamp-addressed
+snapshot is ordinary historical price evidence; it is not automatically an explicit closing
+designation. [Sportmonks Premium history](https://docs.sportmonks.com/v3/endpoints-and-entities/endpoints/premium-odds-feed/premium-pre-match-odds/get-all-historical-odds)
+still documents only a seven-day post-kickoff retrieval window, and Odds-API.io still documents
+closing values without an original timestamp attached to each returned bookmaker price.
+
+No purchase, credential use, adapter, historical import, or closing flag is authorized. Frozen
+Bundesliga run `5` is `insufficient_evidence` on the probability track, so market acquisition
+would not unlock signals even if a price source passed its independent contract. Reconsider a paid
+snapshot feed only after a genuinely new untouched probability run passes, or after the owner
+provides an already permitted timestamped odds file for research-only ingestion.
+
 ### Historical-odds acquisition review: 2026-07-30
 
 No reviewed source currently passes the complete acquisition gate, so no historical-odds

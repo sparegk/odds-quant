@@ -697,3 +697,21 @@ infer closing flags, or enable player props before their independent validation 
 - [x] Add deterministic backend fingerprint tests and frontend rendering coverage. Focused backend
   evaluation/API tests, Ruff, formatting, Mypy, the Model Performance test, ESLint, TypeScript,
   and the production build pass.
+
+### Historical market-evidence recheck (2026-08-07)
+
+- [x] Re-audit the configured database after the external replay. It contains 3,463 permitted
+  finals and 11,539 permitted odds snapshots, but historical result seasons have zero timestamped
+  odds and the entire store has zero explicit closing snapshots. Current prices cover upcoming
+  2026/27 events only and cannot be backfilled into examined evaluations.
+- [x] Recheck current official historical-price contracts without making a paid request. The Odds
+  API offers paid timestamp-addressed Bundesliga snapshots but still requires subscription,
+  bookmaker, licensing, identity, completeness, and quota approval; Sportmonks retains its
+  seven-day retrieval limit; Odds-API.io still lacks an original per-price timestamp on its
+  closing response. `DATA_SOURCES.md` records the decision.
+- [x] Apply the probability prerequisite. Because frozen Bundesliga run `5` did not pass, no paid
+  market acquisition, adapter, market evaluation, signal, CLV, staking, ROI, or profitability work
+  is authorized now.
+- [ ] Acquire permitted historical market evidence. This remains externally blocked until the
+  owner supplies a permitted timestamped odds file or approves a source/account after a genuinely
+  new untouched probability run passes.
