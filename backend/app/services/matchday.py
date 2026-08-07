@@ -460,9 +460,7 @@ def list_matchday(
         as_of=reference,
         total_events=sum(len(item.events) for item in schedule),
         previous_event_date=(
-            _utc(previous_kickoff).astimezone(zone).date()
-            if previous_kickoff is not None
-            else None
+            _utc(previous_kickoff).astimezone(zone).date() if previous_kickoff is not None else None
         ),
         next_event_date=(
             _utc(next_kickoff).astimezone(zone).date() if next_kickoff is not None else None

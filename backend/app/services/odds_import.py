@@ -27,6 +27,7 @@ from app.db.models import (
 )
 from app.db.session import Base
 from app.schemas.odds import EXPECTED_SELECTIONS, ImportSummary, OddsImportRow
+from app.services.team_identity import get_or_create_team
 
 MAX_CSV_BYTES = 5 * 1024 * 1024
 MAX_CSV_ROWS = 20_000
@@ -491,7 +492,7 @@ def _provider(session: Session, slug: str, name: str, is_demo: bool) -> Provider
 
 
 def _team(session: Session, sport_id: int, name: str) -> Team:
-    return _one_or_create(session, Team, sport_id=sport_id, name=name, defaults={})
+    return get_or_create_team(session, sport_id=sport_id, name=name)
 
 
 def _one_or_create[ModelT: Base](

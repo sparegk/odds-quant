@@ -17,9 +17,9 @@ from app.db.models import (
     Provider,
     RawIngestion,
     Sport,
-    Team,
 )
 from app.schemas.results import ResultImportRow, ResultImportSummary
+from app.services.team_identity import get_or_create_team
 
 MAX_RESULTS_CSV_BYTES = 5 * 1024 * 1024
 MAX_RESULTS_CSV_ROWS = 20_000
@@ -235,8 +235,8 @@ def _persist_result(
         raise ResultImportError(
             [_error(None, "country", "competition country conflicts with stored identity")]
         )
-    home = _one_or_create(session, Team, {}, sport_id=sport.id, name=row.home_team)
-    away = _one_or_create(session, Team, {}, sport_id=sport.id, name=row.away_team)
+    home = get_or_create_team(session, sport_id=sport.id, name=row.home_team)
+    away = get_or_create_team(session, sport_id=sport.id, name=row.away_team)
     event = session.scalar(
         select(Event).where(
             Event.provider_id == provider.id,

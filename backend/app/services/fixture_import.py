@@ -16,6 +16,7 @@ from app.db.models import (
     Team,
 )
 from app.schemas.fixtures import FixtureImportRow, FixtureImportSummary
+from app.services.team_identity import get_or_create_team
 
 
 class FixtureImportError(ValueError):
@@ -104,8 +105,8 @@ def import_provider_fixtures(
         elif competition.country != row.country:
             raise FixtureImportError("competition country conflicts with stored identity")
 
-        home = _team(session, sport.id, row.home_team)
-        away = _team(session, sport.id, row.away_team)
+        home = get_or_create_team(session, sport_id=sport.id, name=row.home_team)
+        away = get_or_create_team(session, sport_id=sport.id, name=row.away_team)
         event = session.scalar(
             select(Event).where(
                 Event.provider_id == provider.id,
@@ -182,15 +183,6 @@ def import_provider_fixtures(
         events_created=events_created,
         observations_created=observations_created,
     )
-
-
-def _team(session: Session, sport_id: int, name: str) -> Team:
-    team = session.scalar(select(Team).where(Team.sport_id == sport_id, Team.name == name))
-    if team is None:
-        team = Team(sport_id=sport_id, name=name)
-        session.add(team)
-        session.flush()
-    return team
 
 
 def _apply_pre_kickoff_correction(

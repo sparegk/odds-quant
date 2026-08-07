@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date as CalendarDate
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel
@@ -33,14 +34,14 @@ class MatchdayCompetitionView(BaseModel):
 
 
 class MatchdayView(BaseModel):
-    date: date
+    date: CalendarDate
     timezone: str
     local_start: datetime
     local_end: datetime
     as_of: datetime
     total_events: int
-    previous_event_date: date | None
-    next_event_date: date | None
+    previous_event_date: CalendarDate | None
+    next_event_date: CalendarDate | None
     competitions: list[MatchdayCompetitionView]
     data_note: str
 

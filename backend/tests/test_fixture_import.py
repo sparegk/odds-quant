@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.db.models import Event, FixtureObservation, MatchResult
+from app.db.models import Event, FixtureObservation, MatchResult, Sport, Team
 from app.db.session import Base
 from app.schemas.fixtures import FixtureImportRow
 from app.services.fixture_import import FixtureImportError, import_provider_fixtures
@@ -134,3 +134,30 @@ def test_fixture_correction_fails_closed_after_result_evidence(
         unchanged = session.get_one(Event, event.id)
         assert unchanged.home_team_id == first_observation.home_team_id
         assert unchanged.away_team_id == first_observation.away_team_id
+
+
+def test_fixture_import_reuses_earliest_team_for_trailing_fc_name_variant(
+    sessions: sessionmaker[Session],
+) -> None:
+    with sessions() as session:
+        sport = Sport(slug="football", name="Football")
+        session.add(sport)
+        session.flush()
+        canonical = Team(sport_id=sport.id, name="Manchester United FC")
+        session.add(canonical)
+        session.commit()
+
+        _import(
+            session,
+            _row(
+                observed_at=AS_OF,
+                kickoff_at=AS_OF + timedelta(days=5),
+                home_team="Manchester United",
+                away_team="Chelsea FC",
+            ),
+        )
+
+        event = session.scalar(select(Event))
+        assert event is not None
+        assert event.home_team_id == canonical.id
+        assert session.scalar(select(Team.id).where(Team.name == "Manchester United")) is None
