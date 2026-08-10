@@ -28,10 +28,15 @@ from app.db.session import Base
 from app.schemas.models import EvaluateModelRequest, TrainEloRequest, TrainPoissonRequest
 from app.services.demo_seed import seed_demo_results
 from app.services.evaluation import (
+    COLD_START_CALIBRATION_VERSION,
+    COLD_START_UNCERTAINTY_VERSION,
+    COLD_START_VALIDATION_BENCHMARK_VERSION,
     EvaluationError,
+    _cold_start_uncertainty_class,
     _fingerprint_request,
     _policy_decision,
     _temperature_recalibration_metrics,
+    _widen_cold_start_probabilities,
     evaluate_model,
 )
 from app.services.modeling import train_elo_model, train_poisson_model
@@ -102,7 +107,54 @@ def test_cold_start_flag_preserves_strict_fingerprint_request_payload() -> None:
     )
 
     assert "include_cold_start_benchmark" not in strict
+    assert "include_cold_start_validation" not in strict
     assert development["include_cold_start_benchmark"] is True
+
+
+def test_cold_start_validation_widens_sparse_probabilities_deterministically() -> None:
+    widened, reliability = _widen_cold_start_probabilities(
+        {"HOME": 0.6, "DRAW": 0.25, "AWAY": 0.15},
+        home_venue_matches=0,
+        away_venue_matches=8,
+    )
+
+    assert reliability == pytest.approx(0.5)
+    assert widened == pytest.approx(
+        {
+            "HOME": 0.5 * 0.6 + 0.5 / 3,
+            "DRAW": 0.5 * 0.25 + 0.5 / 3,
+            "AWAY": 0.5 * 0.15 + 0.5 / 3,
+        }
+    )
+    assert sum(widened.values()) == pytest.approx(1.0)
+    assert (
+        _cold_start_uncertainty_class(
+            home_venue_matches=0,
+            away_venue_matches=8,
+            home_used_league_prior=True,
+            away_used_league_prior=False,
+        )
+        == "league_prior"
+    )
+
+
+def test_cold_start_modes_are_mutually_exclusive() -> None:
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        _request().model_copy(
+            update={
+                "include_cold_start_benchmark": True,
+                "include_cold_start_validation": True,
+            }
+        ).model_validate(
+            _request()
+            .model_copy(
+                update={
+                    "include_cold_start_benchmark": True,
+                    "include_cold_start_validation": True,
+                }
+            )
+            .model_dump()
+        )
 
 
 def test_cold_start_benchmark_is_opt_in_and_does_not_change_primary_eligibility(
@@ -127,6 +179,29 @@ def test_cold_start_benchmark_is_opt_in_and_does_not_change_primary_eligibility(
     assert cold_start["paired_observations"] == 8
     assert cold_start["below_minimum_venue_history_events"] == 4
     assert development.config["development_benchmarks"] == ["league-prior-cold-start-poisson-v1"]
+
+
+def test_cold_start_validation_is_versioned_and_cannot_promote_demo_model(
+    session: Session,
+) -> None:
+    model = _model(session)
+    request = _request().model_copy(update={"include_cold_start_validation": True})
+
+    validation = evaluate_model(session, model.id, request, now=AS_OF)
+
+    cold_start = validation.benchmarks["poisson_cold_start"]
+    assert cold_start["version"] == COLD_START_VALIDATION_BENCHMARK_VERSION
+    assert cold_start["evidence_role"] == "pre_registered_untouched_candidate"
+    assert cold_start["uncertainty_version"] == COLD_START_UNCERTAINTY_VERSION
+    assert cold_start["calibration_version"] == COLD_START_CALIBRATION_VERSION
+    candidate_policy = cold_start["candidate_probability_policy"]
+    assert isinstance(candidate_policy, dict)
+    assert candidate_policy["status"] == "demo_only"
+    assert candidate_policy["automatic_model_promotion"] is False
+    assert validation.config["validation_candidates"] == [COLD_START_VALIDATION_BENCHMARK_VERSION]
+    validation_config = validation.config["cold_start_validation"]
+    assert isinstance(validation_config, dict)
+    assert validation_config["calibration_method"] == ("identity_only_no_outcome_fitted_parameters")
 
 
 def test_walk_forward_evaluation_persists_immutable_demo_evidence(

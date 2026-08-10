@@ -81,6 +81,7 @@ class EvaluateModelRequest(BaseModel):
     minimum_training_matches: int = Field(default=20, ge=6, le=100_000)
     calibration_bins: int = Field(default=10, ge=2, le=50)
     include_cold_start_benchmark: bool = False
+    include_cold_start_validation: bool = False
 
     @field_validator("evaluation_start", "evaluation_end")
     @classmethod
@@ -93,6 +94,8 @@ class EvaluateModelRequest(BaseModel):
     def validate_evaluation_window(self) -> EvaluateModelRequest:
         if self.evaluation_end <= self.evaluation_start:
             raise ValueError("evaluation_end must be after evaluation_start")
+        if self.include_cold_start_benchmark and self.include_cold_start_validation:
+            raise ValueError("cold-start development and validation modes are mutually exclusive")
         return self
 
 

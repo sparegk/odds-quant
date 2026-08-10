@@ -70,6 +70,11 @@ EVALUATION_METHOD_VERSION = "expanding-window-block-bootstrap-v6-ensemble"
 ELO_EVALUATION_METHOD_VERSION = "expanding-window-block-bootstrap-v6-elo-ensemble"
 COLD_START_EVALUATION_METHOD_VERSION = "expanding-window-v7-cold-start-development"
 COLD_START_BENCHMARK_VERSION = "league-prior-cold-start-poisson-v1"
+COLD_START_VALIDATION_METHOD_VERSION = "expanding-window-v8-cold-start-validation"
+COLD_START_VALIDATION_BENCHMARK_VERSION = "league-prior-cold-start-poisson-v2"
+COLD_START_UNCERTAINTY_VERSION = "venue-history-uniform-mixture-v1"
+COLD_START_CALIBRATION_VERSION = "identity-after-uncertainty-widening-v1"
+COLD_START_VENUE_HISTORY_TARGET = 8
 MINIMUM_RECALIBRATION_HISTORY = 60
 MINIMUM_RECALIBRATION_EVALUATION_OBSERVATIONS = 100
 MINIMUM_RECALIBRATION_VALIDATION_OBSERVATIONS = 50
@@ -144,6 +149,42 @@ class _ColdStartObservation:
     away_venue_matches: int
     home_used_league_prior: bool
     away_used_league_prior: bool
+    reliability_weight: float
+    uncertainty_class: str
+
+
+def _widen_cold_start_probabilities(
+    probabilities: dict[str, float],
+    *,
+    home_venue_matches: int,
+    away_venue_matches: int,
+) -> tuple[dict[str, float], float]:
+    home_evidence = min(max(home_venue_matches, 0), COLD_START_VENUE_HISTORY_TARGET)
+    away_evidence = min(max(away_venue_matches, 0), COLD_START_VENUE_HISTORY_TARGET)
+    reliability_weight = (home_evidence + away_evidence) / (2 * COLD_START_VENUE_HISTORY_TARGET)
+    uniform_weight = 1.0 - reliability_weight
+    widened = {
+        outcome: reliability_weight * probabilities[outcome] + uniform_weight / len(OUTCOMES)
+        for outcome in OUTCOMES
+    }
+    return widened, reliability_weight
+
+
+def _cold_start_uncertainty_class(
+    *,
+    home_venue_matches: int,
+    away_venue_matches: int,
+    home_used_league_prior: bool,
+    away_used_league_prior: bool,
+) -> str:
+    if home_used_league_prior or away_used_league_prior:
+        return "league_prior"
+    if (
+        home_venue_matches < COLD_START_VENUE_HISTORY_TARGET
+        or away_venue_matches < COLD_START_VENUE_HISTORY_TARGET
+    ):
+        return "sparse_venue_history"
+    return "standard_history"
 
 
 def evaluate_model(
@@ -163,8 +204,11 @@ def evaluate_model(
         raise EvaluationError("model version not found")
     if model.kind not in {MODEL_KIND, ELO_MODEL_KIND} or model.status != "trained":
         raise EvaluationError("model version is not a trained supported team-strength model")
-    if request.include_cold_start_benchmark and model.kind != MODEL_KIND:
-        raise EvaluationError("cold-start development benchmark requires a Poisson primary model")
+    include_cold_start = (
+        request.include_cold_start_benchmark or request.include_cold_start_validation
+    )
+    if include_cold_start and model.kind != MODEL_KIND:
+        raise EvaluationError("cold-start evaluation requires a Poisson primary model")
 
     competition_id = _config_int(model.config, "competition_id")
     minimum_team_matches = _config_int(model.config, "minimum_team_matches")
@@ -174,6 +218,8 @@ def evaluate_model(
     )
     if request.include_cold_start_benchmark:
         evaluation_method_version = COLD_START_EVALUATION_METHOD_VERSION
+    elif request.include_cold_start_validation:
+        evaluation_method_version = COLD_START_VALIDATION_METHOD_VERSION
     shrinkage_matches = (
         _config_number(model.config, "shrinkage_matches") if model.kind == MODEL_KIND else 5.0
     )
@@ -248,22 +294,39 @@ def evaluate_model(
             for training_result, training_event in training_rows
         ]
         fitted = fit_poisson_team_strength(scores, shrinkage_matches=shrinkage_matches)
-        if request.include_cold_start_benchmark:
+        if include_cold_start:
             cold_start = fitted.expected_goals_with_league_priors(
                 event.home_team_id, event.away_team_id
             )
+            cold_start_probabilities = derive_market(
+                score_matrix(cold_start.home_lambda, cold_start.away_lambda),
+                "MATCH_RESULT",
+            )
+            reliability_weight = 1.0
+            uncertainty_class = "legacy_unclassified"
+            if request.include_cold_start_validation:
+                cold_start_probabilities, reliability_weight = _widen_cold_start_probabilities(
+                    cold_start_probabilities,
+                    home_venue_matches=cold_start.home_venue_matches,
+                    away_venue_matches=cold_start.away_venue_matches,
+                )
+                uncertainty_class = _cold_start_uncertainty_class(
+                    home_venue_matches=cold_start.home_venue_matches,
+                    away_venue_matches=cold_start.away_venue_matches,
+                    home_used_league_prior=cold_start.home_used_league_prior,
+                    away_used_league_prior=cold_start.away_used_league_prior,
+                )
             cold_start_replayed.append(
                 _ColdStartObservation(
                     event_id=event.id,
-                    probabilities=derive_market(
-                        score_matrix(cold_start.home_lambda, cold_start.away_lambda),
-                        "MATCH_RESULT",
-                    ),
+                    probabilities=cold_start_probabilities,
                     actual_outcome=_actual_outcome(result),
                     home_venue_matches=cold_start.home_venue_matches,
                     away_venue_matches=cold_start.away_venue_matches,
                     home_used_league_prior=cold_start.home_used_league_prior,
                     away_used_league_prior=cold_start.away_used_league_prior,
+                    reliability_weight=reliability_weight,
+                    uncertainty_class=uncertainty_class,
                 )
             )
         home = fitted.teams.get(event.home_team_id)
@@ -448,27 +511,48 @@ def evaluate_model(
             seed_material=bootstrap_seed_material,
             namespace="poisson_cold_start",
         )
-        cold_start_by_event = {
-            observation.event_id: observation for observation in cold_start_replayed
-        }
-        aligned_cold_start_rows = [
-            (
-                cold_start_by_event[observation.event.id].probabilities,
-                observation.actual_outcome,
+        if request.include_cold_start_validation:
+            cold_start_uniform_rows = [
+                ({outcome: 1 / 3 for outcome in OUTCOMES}, actual) for _, actual in cold_start_rows
+            ]
+            _attach_paired_loss_difference(
+                cold_start_metrics,
+                cold_start_rows,
+                cold_start_uniform_rows,
+                seed_material=bootstrap_seed_material,
+                namespace="poisson_cold_start_validation_uniform",
+                primary_name="poisson_cold_start",
             )
-            for observation in replayed
-        ]
-        _attach_paired_loss_difference(
-            cold_start_metrics,
-            probability_rows,
-            aligned_cold_start_rows,
-            seed_material=bootstrap_seed_material,
-            namespace="poisson_cold_start",
-        )
+        else:
+            cold_start_by_event = {
+                observation.event_id: observation for observation in cold_start_replayed
+            }
+            aligned_cold_start_rows = [
+                (
+                    cold_start_by_event[observation.event.id].probabilities,
+                    observation.actual_outcome,
+                )
+                for observation in replayed
+            ]
+            _attach_paired_loss_difference(
+                cold_start_metrics,
+                probability_rows,
+                aligned_cold_start_rows,
+                seed_material=bootstrap_seed_material,
+                namespace="poisson_cold_start",
+            )
         cold_start_metrics.update(
             {
-                "version": COLD_START_BENCHMARK_VERSION,
-                "evidence_role": "examined_development_benchmark",
+                "version": (
+                    COLD_START_VALIDATION_BENCHMARK_VERSION
+                    if request.include_cold_start_validation
+                    else COLD_START_BENCHMARK_VERSION
+                ),
+                "evidence_role": (
+                    "pre_registered_untouched_candidate"
+                    if request.include_cold_start_validation
+                    else "examined_development_benchmark"
+                ),
                 "candidate_events": len(candidate_rows),
                 "evaluated_events": len(cold_start_replayed),
                 "coverage": len(cold_start_replayed) / len(candidate_rows),
@@ -482,8 +566,35 @@ def evaluate_model(
                     observation.home_used_league_prior or observation.away_used_league_prior
                     for observation in cold_start_replayed
                 ),
+                "uncertainty_version": (
+                    COLD_START_UNCERTAINTY_VERSION
+                    if request.include_cold_start_validation
+                    else None
+                ),
+                "calibration_version": (
+                    COLD_START_CALIBRATION_VERSION
+                    if request.include_cold_start_validation
+                    else None
+                ),
+                "minimum_reliability_weight": min(
+                    observation.reliability_weight for observation in cold_start_replayed
+                ),
+                "uncertainty_class_counts": {
+                    uncertainty_class: sum(
+                        observation.uncertainty_class == uncertainty_class
+                        for observation in cold_start_replayed
+                    )
+                    for uncertainty_class in sorted(
+                        {observation.uncertainty_class for observation in cold_start_replayed}
+                    )
+                },
             }
         )
+        if request.include_cold_start_validation:
+            cold_start_metrics["candidate_probability_policy"] = _cold_start_candidate_policy(
+                cold_start_metrics,
+                is_demo=bool(model.is_demo or any(event.is_demo for _, event in candidate_rows)),
+            )
         benchmark_metrics["poisson_cold_start"] = cold_start_metrics
     nested_inputs = [
         (observation.nested_candidate_probabilities, observation.actual_outcome)
@@ -653,6 +764,11 @@ def evaluate_model(
         "development_benchmarks": (
             [COLD_START_BENCHMARK_VERSION] if request.include_cold_start_benchmark else []
         ),
+        "validation_candidates": (
+            [COLD_START_VALIDATION_BENCHMARK_VERSION]
+            if request.include_cold_start_validation
+            else []
+        ),
         "evaluation_method_version": evaluation_method_version,
         "primary_benchmark": primary_benchmark,
         "primary_model_kind": model.kind,
@@ -687,6 +803,26 @@ def evaluate_model(
             "validation_partition": "later_untouched_half_of_walk_forward_observations",
             "activation_rule": "selected_method_must_not_degrade_untouched_validation",
         },
+        **(
+            {
+                "cold_start_validation": {
+                    "benchmark_version": COLD_START_VALIDATION_BENCHMARK_VERSION,
+                    "uncertainty_version": COLD_START_UNCERTAINTY_VERSION,
+                    "venue_history_target": COLD_START_VENUE_HISTORY_TARGET,
+                    "reliability_weight": (
+                        "(min(home_venue_matches,target)+min(away_venue_matches,target))/(2*target)"
+                    ),
+                    "widening_target": "uniform_match_result_probability",
+                    "calibration_version": COLD_START_CALIBRATION_VERSION,
+                    "calibration_method": "identity_only_no_outcome_fitted_parameters",
+                    "candidate_policy_version": "cold-start-probability-policy-v1",
+                    "automatic_model_promotion": False,
+                    "market_authorization": False,
+                }
+            }
+            if request.include_cold_start_validation
+            else {}
+        ),
         "nested_model_selection": {
             "version": NESTED_SELECTION_VERSION,
             "minimum_history": NESTED_SELECTION_MINIMUM_HISTORY,
@@ -1196,6 +1332,46 @@ def _paired_interval_upper(metrics: dict[str, object], metric: str) -> float:
     return _metric_number(interval, "upper")
 
 
+def _cold_start_candidate_policy(
+    metrics: dict[str, object],
+    *,
+    is_demo: bool,
+) -> dict[str, object]:
+    checks = {
+        "non_demo_data": not is_demo,
+        "minimum_observations": (
+            _metric_number(metrics, "observations") >= MINIMUM_PROMOTION_OBSERVATIONS
+        ),
+        "minimum_coverage": (_metric_number(metrics, "coverage") >= MINIMUM_PROMOTION_COVERAGE),
+        "maximum_expected_calibration_error": (
+            _metric_number(metrics, "expected_calibration_error") <= MAXIMUM_PROMOTION_ECE
+        ),
+        "uniform_brier_upper_difference_below_zero": (
+            _paired_interval_upper(metrics, "brier_score") < 0
+        ),
+        "uniform_log_loss_upper_difference_below_zero": (
+            _paired_interval_upper(metrics, "log_loss") < 0
+        ),
+        "identity_calibration_pre_registered": True,
+    }
+    if is_demo:
+        status = "demo_only"
+    elif all(checks.values()):
+        status = "probability_validated_candidate"
+    else:
+        status = "insufficient_evidence"
+    return {
+        "version": "cold-start-probability-policy-v1",
+        "status": status,
+        "checks": checks,
+        "minimum_observations": MINIMUM_PROMOTION_OBSERVATIONS,
+        "minimum_coverage": MINIMUM_PROMOTION_COVERAGE,
+        "maximum_expected_calibration_error": MAXIMUM_PROMOTION_ECE,
+        "automatic_model_promotion": False,
+        "market_authorization": False,
+    }
+
+
 def _policy_decision(
     metrics: dict[str, object],
     uniform_metrics: dict[str, object],
@@ -1442,6 +1618,14 @@ def _evaluation_fingerprint(
                 "away_venue_matches": row.away_venue_matches,
                 "home_used_league_prior": row.home_used_league_prior,
                 "away_used_league_prior": row.away_used_league_prior,
+                **(
+                    {
+                        "reliability_weight": row.reliability_weight,
+                        "uncertainty_class": row.uncertainty_class,
+                    }
+                    if request.include_cold_start_validation
+                    else {}
+                ),
             }
             for row in cold_start_replayed
         ]
@@ -1453,6 +1637,8 @@ def _fingerprint_request(request: EvaluateModelRequest) -> dict[str, object]:
     payload: dict[str, object] = request.model_dump(mode="json")
     if not request.include_cold_start_benchmark:
         payload.pop("include_cold_start_benchmark")
+    if not request.include_cold_start_validation:
+        payload.pop("include_cold_start_validation")
     return payload
 
 
