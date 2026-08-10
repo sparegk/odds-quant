@@ -1,0 +1,44 @@
+{
+  "schema_version": "cross-league-confirmation-policy-v1",
+  "policy_version": "cross-league-cold-start-confirmation-v1",
+  "frozen_at": "2026-08-10T18:52:57Z",
+  "candidate": {
+    "benchmark_version": "league-prior-cold-start-poisson-v2",
+    "evaluation_method_version": "expanding-window-v8-cold-start-validation",
+    "implementation_commit": "f722ca1",
+    "uncertainty_version": "venue-history-uniform-mixture-v1",
+    "calibration_version": "identity-after-uncertainty-widening-v1",
+    "calibration_method": "identity_only_no_outcome_fitted_parameters"
+  },
+  "sequence": {
+    "required_untouched_families": 2,
+    "both_families_selected_before_first_replay": true,
+    "fixed_execution_order_required": true,
+    "replacement_before_first_replay_requires_documented_data_failure": true,
+    "replacement_after_first_replay_permitted": false,
+    "third_family_rescue_permitted": false
+  },
+  "family_gate": {
+    "minimum_observations": 200,
+    "minimum_coverage": 0.9,
+    "maximum_expected_calibration_error": 0.08,
+    "require_uniform_brier_upper_difference_below_zero": true,
+    "require_uniform_log_loss_upper_difference_below_zero": true,
+    "require_non_demo_data": true,
+    "require_identity_calibration_pre_registered": true
+  },
+  "combined_decision": {
+    "passing_family_decision": "probability_validated_candidate",
+    "all_two_families_must_pass_independently": true,
+    "metric_pooling_permitted": false,
+    "one_failure_decision": "replication_failed",
+    "two_pass_decision": "replicated_probability_candidate"
+  },
+  "authorization": {
+    "automatic_model_promotion": false,
+    "market_authorization": false,
+    "player_features_authorized": false,
+    "signals_authorized": false,
+    "staking_or_profitability_claims_authorized": false
+  }
+}

@@ -808,7 +808,10 @@ infer closing flags, or enable player props before their independent validation 
   reports both providers healthy with no alerts on jobs `268` and `269`; persistent scheduler PID
   `6620` remains active at the configured 900-second cadence. The branch was clean and aligned with
   `origin/main`. No provider request was accelerated.
-- [ ] Freeze a cross-league sequential confirmation policy before selecting or scoring outcomes.
+- [x] Freeze cross-league confirmation policy `cross-league-cold-start-confirmation-v1` before
+  selecting or scoring outcomes. Exactly two preselected families must both pass independently;
+  metric pooling, post-first-replay replacement, third-family rescue, automatic promotion, and
+  market authorization are forbidden. See `CROSS_LEAGUE_CONFIRMATION.md`.
 - [ ] Select and pre-register two complete untouched competition families before replaying either.
 - [ ] Execute and record the unchanged cold-start v2 replay on the first registered family.
 - [ ] Execute the second replay and apply the frozen combined replication decision.
