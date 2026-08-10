@@ -1,0 +1,99 @@
+{
+  "schema_version": "external-probability-validation-v2-cold-start",
+  "experiment_id": "ligue1-2024-25-v8-cold-start-poisson",
+  "frozen_at": "2026-08-10T18:04:24Z",
+  "implementation_commit": "f722ca1",
+  "competition": {
+    "sport": "football",
+    "name": "Ligue 1",
+    "country": "France",
+    "timezone": "Europe/Paris",
+    "family_scope": "same_sport_name_country_all_seasons"
+  },
+  "datasets": [
+    {
+      "role": "training",
+      "path": "2022-23/fr.1.json",
+      "season": "2022/23",
+      "source_commit": "0b539b297fd18a5043ffd6d02188124fd6205d20",
+      "published_at": "2024-09-19T17:16:39Z",
+      "git_blob": "66703493e83dbd16b18f0a891a78a3b3a91b71a1",
+      "raw_sha256": "3cd34fbdbecc9638b9d36dbec349420c489bd0ac55195900675bf23655bb07ce",
+      "final_rows": 380
+    },
+    {
+      "role": "training",
+      "path": "2023-24/fr.1.json",
+      "season": "2023/24",
+      "source_commit": "440950e9c855556cc5023a3ea598feeed7c08722",
+      "published_at": "2024-08-28T10:00:05Z",
+      "git_blob": "9e42eb9982de8d3652242edf198b4197cdbbaef0",
+      "raw_sha256": "3ed1224cdd7b2c540d098260060ff050284c08193a549f6901f3e565f1317b25",
+      "final_rows": 306
+    },
+    {
+      "role": "untouched_holdout",
+      "path": "2024-25/fr.1.json",
+      "season": "2024/25",
+      "source_commit": "bd189ea365936c8e9c6c64261fcdd608e3cec3c5",
+      "published_at": "2025-05-21T05:26:48Z",
+      "git_blob": "8bc6ec90c62fa423386ec60473cfa6236419a636",
+      "raw_sha256": "90e9974afe6597452622387ad218f6b0011a5f91f1b426f05152f5b9c105e355",
+      "final_rows": 306
+    }
+  ],
+  "primary_model": {
+    "kind": "poisson_scoreline",
+    "training_start": "2022-08-01T00:00:00Z",
+    "training_end": "2024-09-20T00:00:00Z",
+    "minimum_matches": 200,
+    "minimum_team_matches": 8,
+    "shrinkage_matches": 5.0,
+    "feature_version": "final-score-home-away-v3-bootstrap-uncertainty"
+  },
+  "evaluation": {
+    "method_version": "expanding-window-v8-cold-start-validation",
+    "start": "2024-09-20T00:00:00Z",
+    "end_exclusive": "2025-05-19T00:00:00Z",
+    "prediction_lead_minutes": 60,
+    "minimum_training_matches": 200,
+    "calibration_bins": 10,
+    "candidate_events_before_eligibility": 270,
+    "include_cold_start_validation": true
+  },
+  "cold_start": {
+    "benchmark_version": "league-prior-cold-start-poisson-v2",
+    "uncertainty_version": "venue-history-uniform-mixture-v1",
+    "venue_history_target": 8,
+    "reliability_weight": "(min(home_venue_matches,target)+min(away_venue_matches,target))/(2*target)",
+    "widening_formula": "reliability*raw_probability+(1-reliability)/3",
+    "uncertainty_classes": ["league_prior", "sparse_venue_history", "standard_history"],
+    "calibration_version": "identity-after-uncertainty-widening-v1",
+    "calibration_method": "identity_only_no_outcome_fitted_parameters",
+    "outcome_fitted_parameters": false
+  },
+  "probability_policy": {
+    "version": "cold-start-probability-policy-v1",
+    "minimum_observations": 200,
+    "minimum_coverage": 0.9,
+    "maximum_expected_calibration_error": 0.08,
+    "require_uniform_brier_upper_difference_below_zero": true,
+    "require_uniform_log_loss_upper_difference_below_zero": true,
+    "demo_data_eligible": false
+  },
+  "bootstrap": {
+    "method": "moving_block_bootstrap",
+    "confidence_level": 0.95,
+    "resamples": 2000,
+    "block_length_rule": "round_cube_root_sample_size_minimum_1",
+    "seed_derivation": "sha256_seed_material_and_metric_namespace"
+  },
+  "decision_rules": {
+    "strict_primary_policy_remains_independent": true,
+    "candidate_may_pass_only_if_all_probability_policy_checks_pass": true,
+    "automatic_model_promotion": false,
+    "market_authorization": false,
+    "no_retuning_after_holdout_inspection": true,
+    "passing_candidate_requires_separate_activation_and_new_model_version": true
+  }
+}
