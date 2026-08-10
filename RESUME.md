@@ -802,6 +802,17 @@ infer closing flags, or enable player props before their independent validation 
 
 ## Next resume action
 
+### Cross-league replication execution (2026-08-10)
+
+- [x] Verify the operational baseline before new research. `monitor-collection --fail-on-alerts`
+  reports both providers healthy with no alerts on jobs `268` and `269`; persistent scheduler PID
+  `6620` remains active at the configured 900-second cadence. The branch was clean and aligned with
+  `origin/main`. No provider request was accelerated.
+- [ ] Freeze a cross-league sequential confirmation policy before selecting or scoring outcomes.
+- [ ] Select and pre-register two complete untouched competition families before replaying either.
+- [ ] Execute and record the unchanged cold-start v2 replay on the first registered family.
+- [ ] Execute the second replay and apply the frozen combined replication decision.
+
 Keep the scheduler on its configured cadence and use `py -m app.cli monitor-collection
 --fail-on-alerts`; do not accelerate requests merely to clear an aging warning. Ligue 1 2024/25
 and Bundesliga 2024/25 are now examined and must not be retuned or reused as untouched validation.
