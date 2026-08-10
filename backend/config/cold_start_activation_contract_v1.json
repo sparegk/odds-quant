@@ -21,7 +21,7 @@
     "feature_version": "final-score-home-away-v4-cold-start-v2",
     "prediction_policy_version": "league-prior-uniform-widening-v2",
     "league_prior_method": "fitted_league_home_away_rates_for_missing_team_venue_strength",
-    "venue_history_target": 3,
+    "venue_history_target": 8,
     "uncertainty_version": "venue-history-uniform-mixture-v1",
     "calibration_version": "identity-after-uncertainty-widening-v1",
     "calibration_method": "identity_only_no_outcome_fitted_parameters",

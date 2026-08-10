@@ -15,7 +15,7 @@ fingerprints. Any evidence drift fails closed.
 The new row must use model kind `poisson_team_strength_cold_start_v2`, version prefix `pqc2`, and
 feature version `final-score-home-away-v4-cold-start-v2`. Prediction behavior is pinned to the
 validated v2 method: publication-safe Poisson training, fitted league priors for missing venue
-strength, a three-match venue-history reliability target, deterministic widening toward uniform,
+strength, an eight-match venue-history reliability target, deterministic widening toward uniform,
 and identity calibration after widening.
 
 The new path may create pre-kickoff probability outputs. It starts with probability status

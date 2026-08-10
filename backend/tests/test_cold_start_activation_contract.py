@@ -11,6 +11,7 @@ from app.services.cold_start_activation import (
     COLD_START_MODEL_KIND,
     COLD_START_PREDICTION_POLICY_VERSION,
     COLD_START_UNCERTAINTY_VERSION,
+    COLD_START_VENUE_HISTORY_TARGET,
     CONFIRMATION_POLICY_VERSION,
     CONFIRMATION_SELECTION_ID,
     EXPECTED_FAMILY_FINGERPRINTS,
@@ -68,7 +69,11 @@ def test_activation_contract_pins_evidence_and_probability_only_path() -> None:
     )
     assert path["uncertainty_version"] == COLD_START_UNCERTAINTY_VERSION
     assert path["calibration_version"] == COLD_START_CALIBRATION_VERSION
-    assert path["venue_history_target"] == 3
+    assert (
+        path["venue_history_target"]
+        == decision["venue_history_target"]
+        == (COLD_START_VENUE_HISTORY_TARGET)
+    )
     assert decision["status"] == "approved_probability_only_model_path"
     assert decision["probability_prediction_authorized"] is True
     assert decision["automatic_signal_generation_authorized"] is False

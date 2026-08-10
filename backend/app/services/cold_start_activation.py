@@ -11,6 +11,7 @@ COLD_START_FEATURE_VERSION = "final-score-home-away-v4-cold-start-v2"
 COLD_START_PREDICTION_POLICY_VERSION = "league-prior-uniform-widening-v2"
 COLD_START_UNCERTAINTY_VERSION = "venue-history-uniform-mixture-v1"
 COLD_START_CALIBRATION_VERSION = "identity-after-uncertainty-widening-v1"
+COLD_START_VENUE_HISTORY_TARGET = 8
 EXPECTED_FAMILY_FINGERPRINTS = (
     "40d196d536580d5af7153af345aaf43d075760e817e16ddd41b4e24acc65e551",
     "353bc4310da6b91615e76265aefd25e290c9545fa1d6052aa99a2e6472565821",
@@ -65,6 +66,7 @@ def cold_start_activation_decision(
         "prediction_policy_version": COLD_START_PREDICTION_POLICY_VERSION,
         "uncertainty_version": COLD_START_UNCERTAINTY_VERSION,
         "calibration_version": COLD_START_CALIBRATION_VERSION,
+        "venue_history_target": COLD_START_VENUE_HISTORY_TARGET,
         "initial_probability_evaluation_status": "probability_validated",
         "initial_market_evaluation_status": "insufficient_market_evidence",
         "source_model_immutability_required": True,
