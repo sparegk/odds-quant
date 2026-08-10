@@ -28,3 +28,17 @@ def test_ligue1_cold_start_external_validation_receipt_is_fingerprint_bound() ->
     assert receipt.examined is True
     assert receipt.retuning_permitted is False
     assert receipt.market_validation_authorized is False
+
+
+def test_eredivisie_confirmation_receipt_is_fingerprint_bound() -> None:
+    fingerprint = "40d196d536580d5af7153af345aaf43d075760e817e16ddd41b4e24acc65e551"
+
+    receipt = receipt_for_evaluation(fingerprint)
+
+    assert receipt is not None
+    assert receipt.experiment_id == "eredivisie-2024-25-v8-cold-start-poisson"
+    assert receipt.evidence_role == "pre_registered_cross_league_family_one"
+    assert receipt.probability_decision == "probability_validated_candidate"
+    assert receipt.examined is True
+    assert receipt.retuning_permitted is False
+    assert receipt.market_validation_authorized is False

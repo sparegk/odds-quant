@@ -42,3 +42,19 @@ family at selection time. Raw files remain temporary and uncommitted.
 The commits, blobs, SHA-256 hashes, timezones, windows, hyperparameters, and fixed execution order
 are registered in `backend/config/cross_league_confirmation_selection_v1.json`. After the
 Eredivisie replay begins, neither family may be replaced.
+
+## Family one receipt: Eredivisie
+
+Atomic jobs `193` through `195` created 918/918 pinned results under competition IDs `29` through
+`31`. Model 9, `pq1-c31-202409200000-4c7ae9e0`, trained on exactly 612 publication-safe results.
+Immutable run 8 has fingerprint
+`40d196d536580d5af7153af345aaf43d075760e817e16ddd41b4e24acc65e551`.
+
+Strict Poisson evaluated only 96/263 candidates and failed observation, coverage, ECE, paired
+uniform, and recalibration gates. The cold-start candidate evaluated 263/263, including 167
+league-prior events. Its Brier score was `0.62764`, log loss `1.04458`, and ECE `0.04460`; paired
+95% upper differences against uniform were `-0.00851` Brier and `-0.01218` log loss. Every frozen
+family gate passed, so the family decision is `probability_validated_candidate`.
+
+The combined decision remains pending Primeira Liga. Model 9 remains unvalidated; no automatic
+promotion, market acquisition, signal, staking, or profitability work is authorized.

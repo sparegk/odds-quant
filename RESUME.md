@@ -816,7 +816,11 @@ infer closing flags, or enable player props before their independent validation 
   fixed as Eredivisie 2024/25 first (612 training results, 263 candidates), then Primeira Liga
   2024/25 (612 training results, 261 candidates). All six pinned CC0 files are complete at 306/306
   finals; neither family had a stored competition, model, or run at selection time.
-- [ ] Execute and record the unchanged cold-start v2 replay on the first registered family.
+- [x] Execute unchanged cold-start v2 on family one. Eredivisie jobs `193`-`195` imported 918/918
+  results; model `9` trained on 612 results. Run `8`, fingerprint
+  `40d196d536580d5af7153af345aaf43d075760e817e16ddd41b4e24acc65e551`, produced 263/263 candidate
+  coverage, ECE `0.04460`, and paired upper differences `-0.00851`/`-0.01218`; every family gate
+  passed. The combined decision remains pending family two and model `9` remains unvalidated.
 - [ ] Execute the second replay and apply the frozen combined replication decision.
 
 Keep the scheduler on its configured cadence and use `py -m app.cli monitor-collection

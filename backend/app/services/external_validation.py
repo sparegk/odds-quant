@@ -29,6 +29,18 @@ _RECEIPTS = (
         retuning_permitted=False,
         market_validation_authorized=False,
     ),
+    ExternalValidationReceiptView(
+        experiment_id="eredivisie-2024-25-v8-cold-start-poisson",
+        display_name="Eredivisie 2024/25 cold-start",
+        evidence_role="pre_registered_cross_league_family_one",
+        specification_frozen_at=datetime(2026, 8, 10, 18, 57, 49, tzinfo=UTC),
+        executed_at=datetime(2026, 8, 10, 19, 17, 36, 71786, tzinfo=UTC),
+        evaluation_fingerprint=("40d196d536580d5af7153af345aaf43d075760e817e16ddd41b4e24acc65e551"),
+        probability_decision="probability_validated_candidate",
+        examined=True,
+        retuning_permitted=False,
+        market_validation_authorized=False,
+    ),
 )
 
 
