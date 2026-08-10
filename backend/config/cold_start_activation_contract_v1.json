@@ -1,0 +1,44 @@
+{
+  "schema_version": "cold-start-activation-contract-v1",
+  "contract_version": "cold-start-v2-probability-activation-v1",
+  "frozen_at": "2026-08-10T21:07:59.614054Z",
+  "evidence": {
+    "confirmation_policy_version": "cross-league-cold-start-confirmation-v1",
+    "confirmation_selection_id": "eredivisie-primeira-2024-25-cold-start-v2",
+    "required_confirmation_status": "replicated_probability_candidate",
+    "family_evaluation_fingerprints": [
+      "40d196d536580d5af7153af345aaf43d075760e817e16ddd41b4e24acc65e551",
+      "353bc4310da6b91615e76265aefd25e290c9545fa1d6052aa99a2e6472565821"
+    ],
+    "source_model_ids": [9, 10],
+    "source_models_must_remain_unvalidated": true,
+    "strict_runs_must_remain_insufficient": true
+  },
+  "activated_model_path": {
+    "new_model_row_required": true,
+    "kind": "poisson_team_strength_cold_start_v2",
+    "version_prefix": "pqc2",
+    "feature_version": "final-score-home-away-v4-cold-start-v2",
+    "prediction_policy_version": "league-prior-uniform-widening-v2",
+    "league_prior_method": "fitted_league_home_away_rates_for_missing_team_venue_strength",
+    "venue_history_target": 3,
+    "uncertainty_version": "venue-history-uniform-mixture-v1",
+    "calibration_version": "identity-after-uncertainty-widening-v1",
+    "calibration_method": "identity_only_no_outcome_fitted_parameters",
+    "initial_probability_evaluation_status": "probability_validated",
+    "initial_market_evaluation_status": "insufficient_market_evidence"
+  },
+  "authorization": {
+    "probability_prediction_authorized": true,
+    "automatic_signal_generation_authorized": false,
+    "market_authorization": false,
+    "player_features_authorized": false,
+    "staking_or_profitability_claims_authorized": false
+  },
+  "immutability": {
+    "mutate_source_models": false,
+    "reuse_holdouts_for_retuning": false,
+    "change_frozen_v2_math": false,
+    "inherit_market_validation": false
+  }
+}

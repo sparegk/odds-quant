@@ -802,6 +802,16 @@ infer closing flags, or enable player props before their independent validation 
 
 ## Next resume action
 
+### Cold-start v2 activation (2026-08-11)
+
+- [x] Freeze probability-only activation contract `cold-start-v2-probability-activation-v1` against
+  the exact two-family receipt. It authorizes only a new `pqc2` model row using the frozen v2 math;
+  models `9`/`10` and strict runs `8`/`9` remain unchanged. Market validation, automatic signals,
+  player features, staking, ROI, and profitability claims remain blocked. See
+  `COLD_START_ACTIVATION.md`.
+- [ ] Implement and verify the new explicitly versioned `pqc2` model path without changing the
+  frozen activation contract or creating market signals.
+
 ### Cross-league replication execution (2026-08-10)
 
 - [x] Verify the operational baseline before new research. `monitor-collection --fail-on-alerts`
