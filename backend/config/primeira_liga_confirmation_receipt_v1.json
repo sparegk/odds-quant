@@ -1,0 +1,54 @@
+{
+  "schema_version": "cross-league-family-receipt-v1",
+  "selection_id": "eredivisie-primeira-2024-25-cold-start-v2",
+  "policy_version": "cross-league-cold-start-confirmation-v1",
+  "sequence_position": 2,
+  "experiment_id": "primeira-liga-2024-25-v8-cold-start-poisson",
+  "executed_at": "2026-08-10T19:35:43.235167Z",
+  "imports": {
+    "job_ids": [197, 198, 200],
+    "rows_received": 918,
+    "rows_imported": 918,
+    "results_created": 918,
+    "competition_ids": [32, 33, 34]
+  },
+  "model": {
+    "id": 10,
+    "version": "pq1-c34-202409200000-71feb737",
+    "data_fingerprint": "e9abe9982b6163bb694392eed093d00fe4722dbc41edc79954d44aa4027a9266",
+    "sample_size": 612,
+    "probability_evaluation_status": "unvalidated",
+    "evaluation_status": "unvalidated"
+  },
+  "evaluation": {
+    "run_id": 9,
+    "fingerprint": "353bc4310da6b91615e76265aefd25e290c9545fa1d6052aa99a2e6472565821",
+    "strict_primary": {
+      "observations": 78,
+      "candidate_events": 261,
+      "coverage": 0.2988505747126437,
+      "brier_score": 0.6567809898277386,
+      "log_loss": 1.0837565578618273,
+      "expected_calibration_error": 0.09192116957953159,
+      "decision": "insufficient_evidence"
+    },
+    "cold_start_candidate": {
+      "observations": 261,
+      "candidate_events": 261,
+      "coverage": 1.0,
+      "league_prior_events": 183,
+      "brier_score": 0.6465364905230214,
+      "log_loss": 1.070021499914572,
+      "expected_calibration_error": 0.027588242650076922,
+      "uniform_brier_upper_difference": -0.00002712608792704026,
+      "uniform_log_loss_upper_difference": -0.001642274818888023,
+      "decision": "probability_validated_candidate",
+      "all_family_gates_passed": true
+    }
+  },
+  "combined_confirmation": {
+    "status": "replicated_probability_candidate",
+    "automatic_model_promotion": false,
+    "market_authorization": false
+  }
+}

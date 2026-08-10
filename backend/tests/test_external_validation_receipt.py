@@ -42,3 +42,17 @@ def test_eredivisie_confirmation_receipt_is_fingerprint_bound() -> None:
     assert receipt.examined is True
     assert receipt.retuning_permitted is False
     assert receipt.market_validation_authorized is False
+
+
+def test_primeira_confirmation_receipt_is_fingerprint_bound() -> None:
+    fingerprint = "353bc4310da6b91615e76265aefd25e290c9545fa1d6052aa99a2e6472565821"
+
+    receipt = receipt_for_evaluation(fingerprint)
+
+    assert receipt is not None
+    assert receipt.experiment_id == "primeira-liga-2024-25-v8-cold-start-poisson"
+    assert receipt.evidence_role == "pre_registered_cross_league_family_two"
+    assert receipt.probability_decision == "probability_validated_candidate"
+    assert receipt.examined is True
+    assert receipt.retuning_permitted is False
+    assert receipt.market_validation_authorized is False

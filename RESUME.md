@@ -821,14 +821,25 @@ infer closing flags, or enable player props before their independent validation 
   `40d196d536580d5af7153af345aaf43d075760e817e16ddd41b4e24acc65e551`, produced 263/263 candidate
   coverage, ECE `0.04460`, and paired upper differences `-0.00851`/`-0.01218`; every family gate
   passed. The combined decision remains pending family two and model `9` remains unvalidated.
-- [ ] Execute the second replay and apply the frozen combined replication decision.
+- [x] Execute family two and apply the frozen combined decision. Primeira Liga jobs `197`, `198`,
+  and `200` imported 918/918 results; model `10` trained on 612. Run `9`, fingerprint
+  `353bc4310da6b91615e76265aefd25e290c9545fa1d6052aa99a2e6472565821`, produced 261/261 coverage,
+  ECE `0.02759`, and paired upper differences `-0.000027`/`-0.001642`; every family gate passed.
+  With both preselected families passing independently, the combined status is
+  `replicated_probability_candidate`. Models `9`/`10` remain unvalidated, and automatic promotion
+  and all market authorization remain blocked pending a separately reviewed activation.
+- [x] Complete final verification: 296 backend tests and 78 frontend tests pass, together with
+  Ruff, Ruff formatting, Mypy, ESLint, TypeScript, and the production build. Final monitoring is
+  healthy with no alerts on provider jobs `277` and `278`; scheduler PID `6620` remains active.
+  The store still has zero value signals and zero closing snapshots.
 
 Keep the scheduler on its configured cadence and use `py -m app.cli monitor-collection
---fail-on-alerts`; do not accelerate requests merely to clear an aging warning. Ligue 1 2024/25
-and Bundesliga 2024/25 are now examined and must not be retuned or reused as untouched validation.
-Any further probability attempt requires another genuinely new exact family and a new receipt
-frozen before outcome inspection. Historical market acquisition remains unchecked
-until the owner supplies permitted timestamped odds or approves a source/account after probability
+--fail-on-alerts`; do not accelerate requests merely to clear an aging warning. The cold-start v2
+candidate now has replicated probability evidence from the preselected Eredivisie and Primeira
+Liga sequence. Do not retune or reuse either holdout. The next quantitative step is a separately
+reviewed activation contract and a new explicitly versioned model path; do not mutate models `9`
+or `10`, whose strict-primary decisions remain insufficient. Historical market acquisition remains
+unchecked until the owner supplies permitted timestamped odds or approves a source/account after probability
 validation passes. Player adjustments, player props, market signals, CLV, staking, ROI, and
 profitability claims remain blocked. Matchday will create supported Premier League prediction
 research through the normal seven-day refresh horizon; until independent validation and fresh

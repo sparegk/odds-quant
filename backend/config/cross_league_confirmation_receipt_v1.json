@@ -1,0 +1,39 @@
+{
+  "schema_version": "cross-league-confirmation-receipt-v1",
+  "selection_id": "eredivisie-primeira-2024-25-cold-start-v2",
+  "policy_version": "cross-league-cold-start-confirmation-v1",
+  "family_receipts": [
+    {
+      "position": 1,
+      "experiment_id": "eredivisie-2024-25-v8-cold-start-poisson",
+      "evaluation_fingerprint": "40d196d536580d5af7153af345aaf43d075760e817e16ddd41b4e24acc65e551",
+      "probability_decision": "probability_validated_candidate",
+      "examined": true
+    },
+    {
+      "position": 2,
+      "experiment_id": "primeira-liga-2024-25-v8-cold-start-poisson",
+      "evaluation_fingerprint": "353bc4310da6b91615e76265aefd25e290c9545fa1d6052aa99a2e6472565821",
+      "probability_decision": "probability_validated_candidate",
+      "examined": true
+    }
+  ],
+  "decision": {
+    "status": "replicated_probability_candidate",
+    "required_untouched_families": 2,
+    "all_families_passed": true,
+    "metric_pooling_permitted": false,
+    "replacement_family_permitted_after_first_replay": false,
+    "automatic_model_promotion": false,
+    "market_authorization": false
+  },
+  "stored_state": {
+    "model_ids": [9, 10],
+    "model_probability_statuses": ["unvalidated", "unvalidated"],
+    "model_market_statuses": ["unvalidated", "unvalidated"],
+    "run_ids": [8, 9],
+    "strict_run_probability_statuses": ["insufficient_evidence", "insufficient_evidence"],
+    "value_signals": 0,
+    "closing_snapshots": 0
+  }
+}

@@ -41,6 +41,18 @@ _RECEIPTS = (
         retuning_permitted=False,
         market_validation_authorized=False,
     ),
+    ExternalValidationReceiptView(
+        experiment_id="primeira-liga-2024-25-v8-cold-start-poisson",
+        display_name="Primeira Liga 2024/25 cold-start",
+        evidence_role="pre_registered_cross_league_family_two",
+        specification_frozen_at=datetime(2026, 8, 10, 18, 57, 49, tzinfo=UTC),
+        executed_at=datetime(2026, 8, 10, 19, 35, 43, 235167, tzinfo=UTC),
+        evaluation_fingerprint=("353bc4310da6b91615e76265aefd25e290c9545fa1d6052aa99a2e6472565821"),
+        probability_decision="probability_validated_candidate",
+        examined=True,
+        retuning_permitted=False,
+        market_validation_authorized=False,
+    ),
 )
 
 
