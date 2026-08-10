@@ -27,6 +27,7 @@ def chronological_block_bootstrap_expected_goals(
     resamples: int,
     seed_material: str,
     block_length: int | None = None,
+    allow_league_priors: bool = False,
 ) -> BootstrapExpectedGoals:
     """Refit team strengths on circular blocks from an ordered training history."""
 
@@ -59,7 +60,11 @@ def chronological_block_bootstrap_expected_goals(
                 sampled,
                 shrinkage_matches=shrinkage_matches,
             )
-            samples.append(fitted.expected_goals(home_team_id, away_team_id))
+            if allow_league_priors:
+                forecast = fitted.expected_goals_with_league_priors(home_team_id, away_team_id)
+                samples.append((forecast.home_lambda, forecast.away_lambda))
+            else:
+                samples.append(fitted.expected_goals(home_team_id, away_team_id))
         except ValueError:
             continue
     if len(samples) != resamples:

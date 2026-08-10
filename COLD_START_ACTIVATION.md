@@ -23,9 +23,28 @@ The new path may create pre-kickoff probability outputs. It starts with probabil
 authorize automatic value signals, market validation, player features, staking, ROI, or
 profitability claims. Those remain separate gates.
 
+Only `MATCH_RESULT` probabilities are persisted by this activated path because that is the target
+validated by the two-family replay. Other score-matrix-derived markets do not inherit this
+probability evidence.
+
 ## Immutability
 
 Models 9 and 10 remain `unvalidated`; runs 8 and 9 remain `insufficient_evidence` under the strict
 primary path. The two holdouts cannot be reused for retuning, and the frozen v2 math cannot be
 changed under this contract. A behavior change requires a new version and new chronological
 evidence.
+
+## Execution receipt
+
+The legacy live source model 2 failed closed because it used feature version v2. A fresh strict
+source, model 11 (`pq1-c5-202606020000-af71f829`), was trained with the identical publication-safe
+window and hyperparameters under current feature version v3. It remains unvalidated.
+
+Model 12 (`pqc2-c5-202606020000-7917411c`) is the resulting activated probability-only row. Live
+output 232 for Arsenal FC v Coventry City verified the intended promoted-team path before kickoff:
+Coventry had zero away-history, league-prior uncertainty was recorded, reliability was `0.5`, all
+400 bootstrap refits succeeded, identity calibration was applied, and only `MATCH_RESULT`
+probabilities were persisted. No value signal was created.
+
+Final verification passed 302 backend tests and 78 frontend tests plus all lint, formatting,
+typing, and production-build gates. Collection monitoring remained healthy with no alerts.

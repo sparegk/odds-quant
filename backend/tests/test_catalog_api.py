@@ -15,6 +15,7 @@ from app.db.models import (
     Competition,
     Event,
     MatchResult,
+    ModelVersion,
     OddsSnapshot,
     Provider,
     ProviderJob,
@@ -597,6 +598,15 @@ def test_results_training_and_prediction_api_are_connected(
     )
     assert training.status_code == 201
     assert training.json()["evaluation_status"] == "unvalidated"
+    source_model = session.get_one(ModelVersion, training.json()["id"])
+    source_model.is_demo = False
+    session.commit()
+    activation = client.post(f"/api/v1/models/{training.json()['id']}/activate-cold-start")
+    assert activation.status_code == 201
+    assert activation.json()["version"].startswith("pqc2-")
+    assert activation.json()["kind"] == "poisson_team_strength_cold_start_v2"
+    assert activation.json()["probability_evaluation_status"] == "probability_validated"
+    assert activation.json()["evaluation_status"] == "insufficient_market_evidence"
 
     elo_training = client.post(
         "/api/v1/models/train-elo",

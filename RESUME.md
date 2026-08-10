@@ -809,8 +809,22 @@ infer closing flags, or enable player props before their independent validation 
   models `9`/`10` and strict runs `8`/`9` remain unchanged. Market validation, automatic signals,
   player features, staking, ROI, and profitability claims remain blocked. See
   `COLD_START_ACTIVATION.md`.
-- [ ] Implement and verify the new explicitly versioned `pqc2` model path without changing the
-  frozen activation contract or creating market signals.
+- [x] Implement and verify the new explicitly versioned `pqc2` model path without changing the
+  frozen activation contract or creating market signals. The path clones a non-demo trained
+  Poisson source into a distinct immutable row, supports unseen and sparse venue histories through
+  the frozen eight-match league-prior widening, persists only `MATCH_RESULT` probabilities, and
+  remains `insufficient_market_evidence` for all signal gates. Legacy source model `2` failed
+  closed on its v2 feature version, so current-feature strict source model `11` was trained with the
+  same 1,520-match window and remains unvalidated. Activated model `12`,
+  `pqc2-c5-202606020000-7917411c`, produced pre-kickoff output `232` for Arsenal-Coventry with
+  Coventry at zero away-history, league-prior uncertainty, reliability `0.5`, 400/400 bootstrap
+  refits, identity calibration, and only `MATCH_RESULT` predictions. Models `9`/`10` and runs
+  `8`/`9` remain unchanged; value signals and closing snapshots remain zero.
+
+Final verification: 302 backend tests and 78 frontend tests pass, together with Ruff, Ruff
+formatting, Mypy, ESLint, TypeScript, and the production build. Collection monitoring is healthy
+with no alerts on provider jobs `282` and `284`; the reloaded scheduler is active under PID
+`16368`.
 
 ### Cross-league replication execution (2026-08-10)
 

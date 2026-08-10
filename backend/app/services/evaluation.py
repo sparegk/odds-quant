@@ -29,6 +29,15 @@ from app.quant.calibration import (
     fit_temperature_calibrator,
     walk_forward_temperature_scaling,
 )
+from app.quant.cold_start import (
+    COLD_START_VENUE_HISTORY_TARGET,
+)
+from app.quant.cold_start import (
+    cold_start_uncertainty_class as _cold_start_uncertainty_class,
+)
+from app.quant.cold_start import (
+    widen_match_result_probabilities as _widen_cold_start_probabilities,
+)
 from app.quant.dixon_coles import DixonColesMatch, fit_dixon_coles
 from app.quant.elo import EloConfig, EloMatchResult, elo_probabilities_as_of
 from app.quant.ensemble import (
@@ -74,7 +83,6 @@ COLD_START_VALIDATION_METHOD_VERSION = "expanding-window-v8-cold-start-validatio
 COLD_START_VALIDATION_BENCHMARK_VERSION = "league-prior-cold-start-poisson-v2"
 COLD_START_UNCERTAINTY_VERSION = "venue-history-uniform-mixture-v1"
 COLD_START_CALIBRATION_VERSION = "identity-after-uncertainty-widening-v1"
-COLD_START_VENUE_HISTORY_TARGET = 8
 MINIMUM_RECALIBRATION_HISTORY = 60
 MINIMUM_RECALIBRATION_EVALUATION_OBSERVATIONS = 100
 MINIMUM_RECALIBRATION_VALIDATION_OBSERVATIONS = 50
@@ -151,40 +159,6 @@ class _ColdStartObservation:
     away_used_league_prior: bool
     reliability_weight: float
     uncertainty_class: str
-
-
-def _widen_cold_start_probabilities(
-    probabilities: dict[str, float],
-    *,
-    home_venue_matches: int,
-    away_venue_matches: int,
-) -> tuple[dict[str, float], float]:
-    home_evidence = min(max(home_venue_matches, 0), COLD_START_VENUE_HISTORY_TARGET)
-    away_evidence = min(max(away_venue_matches, 0), COLD_START_VENUE_HISTORY_TARGET)
-    reliability_weight = (home_evidence + away_evidence) / (2 * COLD_START_VENUE_HISTORY_TARGET)
-    uniform_weight = 1.0 - reliability_weight
-    widened = {
-        outcome: reliability_weight * probabilities[outcome] + uniform_weight / len(OUTCOMES)
-        for outcome in OUTCOMES
-    }
-    return widened, reliability_weight
-
-
-def _cold_start_uncertainty_class(
-    *,
-    home_venue_matches: int,
-    away_venue_matches: int,
-    home_used_league_prior: bool,
-    away_used_league_prior: bool,
-) -> str:
-    if home_used_league_prior or away_used_league_prior:
-        return "league_prior"
-    if (
-        home_venue_matches < COLD_START_VENUE_HISTORY_TARGET
-        or away_venue_matches < COLD_START_VENUE_HISTORY_TARGET
-    ):
-        return "sparse_venue_history"
-    return "standard_history"
 
 
 def evaluate_model(

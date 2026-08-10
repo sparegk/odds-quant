@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.quant.cold_start import COLD_START_VENUE_HISTORY_TARGET as COLD_START_VENUE_HISTORY_TARGET
+
 ACTIVATION_CONTRACT_VERSION = "cold-start-v2-probability-activation-v1"
 CONFIRMATION_POLICY_VERSION = "cross-league-cold-start-confirmation-v1"
 CONFIRMATION_SELECTION_ID = "eredivisie-primeira-2024-25-cold-start-v2"
@@ -11,7 +13,6 @@ COLD_START_FEATURE_VERSION = "final-score-home-away-v4-cold-start-v2"
 COLD_START_PREDICTION_POLICY_VERSION = "league-prior-uniform-widening-v2"
 COLD_START_UNCERTAINTY_VERSION = "venue-history-uniform-mixture-v1"
 COLD_START_CALIBRATION_VERSION = "identity-after-uncertainty-widening-v1"
-COLD_START_VENUE_HISTORY_TARGET = 8
 EXPECTED_FAMILY_FINGERPRINTS = (
     "40d196d536580d5af7153af345aaf43d075760e817e16ddd41b4e24acc65e551",
     "353bc4310da6b91615e76265aefd25e290c9545fa1d6052aa99a2e6472565821",
@@ -30,6 +31,20 @@ class ColdStartActivationEvidence:
     strict_run_probability_statuses: tuple[str, ...]
     value_signal_count: int
     closing_snapshot_count: int
+
+
+def frozen_activation_evidence() -> ColdStartActivationEvidence:
+    return ColdStartActivationEvidence(
+        policy_version=CONFIRMATION_POLICY_VERSION,
+        selection_id=CONFIRMATION_SELECTION_ID,
+        confirmation_status=REQUIRED_CONFIRMATION_STATUS,
+        family_fingerprints=EXPECTED_FAMILY_FINGERPRINTS,
+        source_model_ids=EXPECTED_SOURCE_MODEL_IDS,
+        source_model_probability_statuses=("unvalidated", "unvalidated"),
+        strict_run_probability_statuses=("insufficient_evidence", "insufficient_evidence"),
+        value_signal_count=0,
+        closing_snapshot_count=0,
+    )
 
 
 def cold_start_activation_decision(

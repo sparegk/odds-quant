@@ -23,14 +23,18 @@ from app.db.models import (
     ModelVersion,
     Player,
     Provider,
+    Team,
 )
 from app.db.session import Base
+from app.quant.cold_start import widen_match_result_probabilities
 from app.quant.poisson import derive_market
 from app.schemas.models import PredictEventRequest, TrainEloRequest, TrainPoissonRequest
+from app.services.cold_start_activation import COLD_START_MODEL_KIND
 from app.services.demo_seed import build_demo_results_csv, seed_demo_data, seed_demo_results
 from app.services.modeling import (
     ELO_MODEL_KIND,
     ModelingError,
+    activate_cold_start_model,
     predict_event,
     train_elo_model,
     train_poisson_model,
@@ -199,6 +203,96 @@ def test_elo_candidate_training_is_versioned_deterministic_and_unvalidated(
     assert original.config["home_advantage"] == 75.0
     assert original.config["draw_probability_at_even_strength"] == 0.26
     assert session.scalar(select(func.count()).select_from(ModelEventOutput)) == 0
+
+
+def test_cold_start_activation_is_new_deterministic_probability_only_model(
+    session: Session,
+) -> None:
+    source_view = train_poisson_model(session, _training_request(session), now=AS_OF)
+    source = session.get_one(ModelVersion, source_view.id)
+    source.is_demo = False
+    session.commit()
+
+    activated = activate_cold_start_model(session, source.id)
+    repeated = activate_cold_start_model(session, source.id)
+    unchanged_source = session.get_one(ModelVersion, source.id)
+
+    assert activated.id == repeated.id
+    assert activated.id != source.id
+    assert activated.version.startswith("pqc2-")
+    assert activated.kind == COLD_START_MODEL_KIND
+    assert activated.feature_version == "final-score-home-away-v4-cold-start-v2"
+    assert activated.data_fingerprint == source.data_fingerprint
+    assert activated.probability_evaluation_status == "probability_validated"
+    assert activated.evaluation_status == "insufficient_market_evidence"
+    assert activated.config["source_model_id"] == source.id
+    assert activated.config["authorized_probability_markets"] == ["MATCH_RESULT"]
+    assert activated.config["market_authorization"] is False
+    assert activated.metrics["held_out_evaluation"] is False
+    assert activated.metrics["method_held_out_evaluation"] is True
+    assert unchanged_source.version == source_view.version
+    assert unchanged_source.probability_evaluation_status == "unvalidated"
+    assert unchanged_source.evaluation_status == "unvalidated"
+
+
+def test_cold_start_prediction_uses_league_prior_widening_for_unseen_team(
+    session: Session,
+) -> None:
+    source_view = train_poisson_model(session, _training_request(session), now=AS_OF)
+    source = session.get_one(ModelVersion, source_view.id)
+    source.is_demo = False
+    target = session.scalar(
+        select(Event).where(Event.status == "scheduled").order_by(Event.kickoff_at)
+    )
+    assert target is not None
+    competition = session.get_one(Competition, target.competition_id)
+    promoted_team = Team(sport_id=competition.sport_id, name="Promoted unseen test team")
+    session.add(promoted_team)
+    session.flush()
+    target.home_team_id = promoted_team.id
+    target.is_demo = False
+    session.commit()
+    activated = activate_cold_start_model(session, source.id)
+
+    with pytest.raises(ModelingError, match="insufficient home team at home history"):
+        predict_event(
+            session,
+            source.id,
+            PredictEventRequest(event_id=target.id, predicted_at=AS_OF, inputs_as_of=AS_OF),
+            now=AS_OF,
+        )
+
+    output = predict_event(
+        session,
+        activated.id,
+        PredictEventRequest(event_id=target.id, predicted_at=AS_OF, inputs_as_of=AS_OF),
+        now=AS_OF,
+    )
+    raw = derive_market(np.asarray(output.score_matrix), "MATCH_RESULT")
+    expected, reliability = widen_match_result_probabilities(
+        raw,
+        home_venue_matches=0,
+        away_venue_matches=output.probability_uncertainty.away_venue_matches or 0,
+    )
+
+    assert output.probability_uncertainty.method == (
+        "chronological_block_bootstrap_with_league_priors"
+    )
+    assert output.probability_uncertainty.version == "venue-history-uniform-mixture-v1"
+    assert output.probability_uncertainty.uncertainty_class == "league_prior"
+    assert output.probability_uncertainty.home_used_league_prior is True
+    assert output.probability_uncertainty.home_venue_matches == 0
+    assert output.probability_uncertainty.reliability_weight == pytest.approx(reliability)
+    assert output.probability_calibration.method == "identity"
+    assert output.probability_calibration.temperature == pytest.approx(1)
+    assert set(output.derived_probabilities) == {"MATCH_RESULT"}
+    assert output.derived_probabilities["MATCH_RESULT"] == pytest.approx(expected)
+    assert len(output.predictions) == 3
+
+
+def test_validation_evidence_models_cannot_be_activated(session: Session) -> None:
+    with pytest.raises(ModelingError, match="validation evidence models"):
+        activate_cold_start_model(session, 9)
 
 
 def test_post_cutoff_correction_cannot_change_elo_candidate_training(

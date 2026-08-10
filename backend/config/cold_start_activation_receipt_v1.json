@@ -1,0 +1,77 @@
+{
+  "schema_version": "cold-start-activation-receipt-v1",
+  "activation_contract_version": "cold-start-v2-probability-activation-v1",
+  "executed_at": "2026-08-10T21:42:41.441583Z",
+  "rejected_legacy_source": {
+    "model_id": 2,
+    "feature_version": "final-score-home-away-v2-cross-season",
+    "reason": "source model feature version does not match the activation contract",
+    "model_created": false
+  },
+  "strict_source": {
+    "model_id": 11,
+    "version": "pq1-c5-202606020000-af71f829",
+    "feature_version": "final-score-home-away-v3-bootstrap-uncertainty",
+    "competition_id": 5,
+    "training_start": "2022-08-01T00:00:00Z",
+    "training_end": "2026-06-02T00:00:00Z",
+    "data_fingerprint": "fcd1ebc3612b58f6db4a78c94a6eb89ebf95f9d24e9b76e12dcf7d42ba4da4d0",
+    "sample_size": 1520,
+    "probability_evaluation_status": "unvalidated",
+    "evaluation_status": "unvalidated"
+  },
+  "activated_model": {
+    "model_id": 12,
+    "version": "pqc2-c5-202606020000-7917411c",
+    "kind": "poisson_team_strength_cold_start_v2",
+    "feature_version": "final-score-home-away-v4-cold-start-v2",
+    "source_model_id": 11,
+    "data_fingerprint": "fcd1ebc3612b58f6db4a78c94a6eb89ebf95f9d24e9b76e12dcf7d42ba4da4d0",
+    "sample_size": 1520,
+    "probability_evaluation_status": "probability_validated",
+    "evaluation_status": "insufficient_market_evidence",
+    "authorized_probability_markets": ["MATCH_RESULT"],
+    "market_authorization": false,
+    "automatic_signal_generation_authorized": false
+  },
+  "live_prediction_verification": {
+    "output_id": 232,
+    "event_id": 1214,
+    "fixture": "Arsenal FC v Coventry City",
+    "predicted_at": "2026-08-10T21:43:06.042139Z",
+    "inputs_as_of": "2026-08-10T21:43:06.042139Z",
+    "kickoff_at": "2026-08-21T19:00:00Z",
+    "uncertainty_method": "chronological_block_bootstrap_with_league_priors",
+    "uncertainty_version": "venue-history-uniform-mixture-v1",
+    "uncertainty_class": "league_prior",
+    "home_venue_matches": 76,
+    "away_venue_matches": 0,
+    "away_used_league_prior": true,
+    "reliability_weight": 0.5,
+    "requested_refits": 400,
+    "successful_refits": 400,
+    "calibration_method": "identity",
+    "calibration_version": "identity-after-uncertainty-widening-v1",
+    "prediction_market_types": ["MATCH_RESULT"],
+    "match_result_probabilities": {
+      "HOME": 0.5053970716527573,
+      "DRAW": 0.25830195944667095,
+      "AWAY": 0.23630096890057178
+    }
+  },
+  "stored_gate_state": {
+    "validation_model_ids": [9, 10],
+    "validation_model_probability_statuses": ["unvalidated", "unvalidated"],
+    "strict_run_ids": [8, 9],
+    "strict_run_probability_statuses": ["insufficient_evidence", "insufficient_evidence"],
+    "value_signals": 0,
+    "closing_snapshots": 0
+  },
+  "operations": {
+    "verified_at": "2026-08-10T21:52:37.465635Z",
+    "healthy": true,
+    "provider_job_ids": [282, 284],
+    "scheduler_pid": 16368,
+    "alerts": []
+  }
+}

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from copy import deepcopy
 from datetime import UTC, datetime
 
 import numpy as np
@@ -28,6 +29,10 @@ from app.db.models import (
 from app.quant.calibration import (
     PROMOTION_POLICY_VERSION,
     temperature_scale,
+)
+from app.quant.cold_start import (
+    cold_start_uncertainty_class,
+    widen_match_result_probabilities,
 )
 from app.quant.elo import EloConfig
 from app.quant.evaluation import OUTCOMES
@@ -55,6 +60,18 @@ from app.schemas.models import (
     TrainEloRequest,
     TrainPoissonRequest,
 )
+from app.services.cold_start_activation import (
+    ACTIVATION_CONTRACT_VERSION,
+    COLD_START_CALIBRATION_VERSION,
+    COLD_START_FEATURE_VERSION,
+    COLD_START_MODEL_KIND,
+    COLD_START_PREDICTION_POLICY_VERSION,
+    COLD_START_UNCERTAINTY_VERSION,
+    EXPECTED_FAMILY_FINGERPRINTS,
+    EXPECTED_SOURCE_MODEL_IDS,
+    cold_start_activation_decision,
+    frozen_activation_evidence,
+)
 
 MODEL_KIND = "poisson_team_strength"
 ELO_MODEL_KIND = "davidson_elo"
@@ -64,6 +81,7 @@ UNCERTAINTY_METHOD = "chronological_moving_block_bootstrap_refit"
 UNCERTAINTY_VERSION = "probability-uncertainty-v1"
 UNCERTAINTY_CONFIDENCE_LEVEL = 0.95
 UNCERTAINTY_RESAMPLES = 400
+COLD_START_UNCERTAINTY_METHOD = "chronological_block_bootstrap_with_league_priors"
 
 
 class ModelingError(ValueError):
@@ -169,6 +187,90 @@ def train_poisson_model(
         },
         status="trained",
         is_demo=all(event.is_demo for _, event in observations),
+    )
+    session.add(model)
+    session.commit()
+    return _model_view(model)
+
+
+def activate_cold_start_model(
+    session: Session,
+    source_model_id: int,
+) -> ModelVersionView:
+    activation = cold_start_activation_decision(frozen_activation_evidence())
+    if activation["status"] != "approved_probability_only_model_path":
+        raise ModelingError("cold-start activation contract did not approve the model path")
+    if source_model_id in EXPECTED_SOURCE_MODEL_IDS:
+        raise ModelingError("validation evidence models cannot be activated or mutated")
+    source = session.get(ModelVersion, source_model_id)
+    if source is None:
+        raise ModelingError("source model version not found")
+    if source.kind != MODEL_KIND or source.status != "trained":
+        raise ModelingError("cold-start activation requires a trained Poisson source model")
+    if source.is_demo:
+        raise ModelingError("demo models cannot activate the validated cold-start path")
+    if source.feature_version != FEATURE_VERSION:
+        raise ModelingError("source model feature version does not match the activation contract")
+
+    specification = json.dumps(
+        {
+            "activation_contract_version": ACTIVATION_CONTRACT_VERSION,
+            "data_fingerprint": source.data_fingerprint,
+            "feature_version": COLD_START_FEATURE_VERSION,
+            "prediction_policy_version": COLD_START_PREDICTION_POLICY_VERSION,
+            "source_model_id": source.id,
+            "source_model_version": source.version,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
+    specification_hash = hashlib.sha256(specification).hexdigest()
+    competition_id = _config_int(source.config, "competition_id")
+    version = (
+        f"pqc2-c{competition_id}-{_utc(source.training_end):%Y%m%d%H%M}-{specification_hash[:8]}"
+    )
+    existing = session.scalar(select(ModelVersion).where(ModelVersion.version == version))
+    if existing is not None:
+        return _model_view(existing)
+
+    config = deepcopy(source.config)
+    config.update(
+        {
+            "activation_contract_version": ACTIVATION_CONTRACT_VERSION,
+            "source_model_id": source.id,
+            "source_model_version": source.version,
+            "prediction_policy_version": COLD_START_PREDICTION_POLICY_VERSION,
+            "cold_start_uncertainty_version": COLD_START_UNCERTAINTY_VERSION,
+            "cold_start_calibration_version": COLD_START_CALIBRATION_VERSION,
+            "authorized_probability_markets": ["MATCH_RESULT"],
+            "market_authorization": False,
+            "automatic_signal_generation_authorized": False,
+        }
+    )
+    model = ModelVersion(
+        name="Activated cold-start v2 Poisson probability model",
+        version=version,
+        kind=COLD_START_MODEL_KIND,
+        training_start=_utc(source.training_start),
+        training_end=_utc(source.training_end),
+        data_fingerprint=source.data_fingerprint,
+        feature_version=COLD_START_FEATURE_VERSION,
+        sample_size=source.sample_size,
+        probability_evaluation_status="probability_validated",
+        evaluation_status="insufficient_market_evidence",
+        config=config,
+        metrics={
+            "metric_scope": "cross_league_method_activation",
+            "held_out_evaluation": False,
+            "method_held_out_evaluation": True,
+            "activation_contract_version": ACTIVATION_CONTRACT_VERSION,
+            "confirmation_status": "replicated_probability_candidate",
+            "family_evaluation_fingerprints": list(EXPECTED_FAMILY_FINGERPRINTS),
+            "source_training_metrics": deepcopy(source.metrics),
+            "market_evidence_inherited": False,
+        },
+        status="trained",
+        is_demo=False,
     )
     session.add(model)
     session.commit()
@@ -289,7 +391,7 @@ def predict_event(
     model = session.get(ModelVersion, model_id)
     if model is None:
         raise ModelingError("model version not found")
-    if model.kind != MODEL_KIND or model.status != "trained":
+    if model.kind not in {MODEL_KIND, COLD_START_MODEL_KIND} or model.status != "trained":
         raise ModelingError("model version is not an active Poisson team-strength model")
     event = session.get(Event, request.event_id)
     if event is None:
@@ -331,29 +433,75 @@ def predict_event(
         return _output_view(session, existing, model)
 
     fitted = model_from_config(model.config, sample_size=model.sample_size)
-    minimum_team_matches = _config_int(model.config, "minimum_team_matches")
-    _require_team_history(
-        fitted.teams[event.home_team_id].home_matches if event.home_team_id in fitted.teams else 0,
-        minimum_team_matches,
-        "home team at home",
-    )
-    _require_team_history(
-        fitted.teams[event.away_team_id].away_matches if event.away_team_id in fitted.teams else 0,
-        minimum_team_matches,
-        "away team away",
-    )
-    home_lambda, away_lambda = fitted.expected_goals(event.home_team_id, event.away_team_id)
+    cold_start_venue_matches: tuple[int, int] | None = None
+    cold_start_details: dict[str, object] = {}
+    if model.kind == COLD_START_MODEL_KIND:
+        forecast = fitted.expected_goals_with_league_priors(
+            event.home_team_id,
+            event.away_team_id,
+        )
+        home_lambda, away_lambda = forecast.home_lambda, forecast.away_lambda
+        cold_start_venue_matches = (
+            forecast.home_venue_matches,
+            forecast.away_venue_matches,
+        )
+        _, reliability_weight = widen_match_result_probabilities(
+            {outcome: 1 / len(OUTCOMES) for outcome in OUTCOMES},
+            home_venue_matches=forecast.home_venue_matches,
+            away_venue_matches=forecast.away_venue_matches,
+        )
+        cold_start_details = {
+            "reliability_weight": reliability_weight,
+            "uncertainty_class": cold_start_uncertainty_class(
+                home_venue_matches=forecast.home_venue_matches,
+                away_venue_matches=forecast.away_venue_matches,
+                home_used_league_prior=forecast.home_used_league_prior,
+                away_used_league_prior=forecast.away_used_league_prior,
+            ),
+            "home_venue_matches": forecast.home_venue_matches,
+            "away_venue_matches": forecast.away_venue_matches,
+            "home_used_league_prior": forecast.home_used_league_prior,
+            "away_used_league_prior": forecast.away_used_league_prior,
+        }
+    else:
+        minimum_team_matches = _config_int(model.config, "minimum_team_matches")
+        _require_team_history(
+            (
+                fitted.teams[event.home_team_id].home_matches
+                if event.home_team_id in fitted.teams
+                else 0
+            ),
+            minimum_team_matches,
+            "home team at home",
+        )
+        _require_team_history(
+            (
+                fitted.teams[event.away_team_id].away_matches
+                if event.away_team_id in fitted.teams
+                else 0
+            ),
+            minimum_team_matches,
+            "away team away",
+        )
+        home_lambda, away_lambda = fitted.expected_goals(event.home_team_id, event.away_team_id)
     matrix = score_matrix(home_lambda, away_lambda)
     uncertainty, bootstrap_matrices = _prediction_uncertainty(
         session,
         model=model,
         event=event,
+        allow_league_priors=model.kind == COLD_START_MODEL_KIND,
     )
-    calibration, calibration_temperature = _prediction_calibration(
-        session,
-        model=model,
-        inputs_as_of=inputs_as_of,
-    )
+    uncertainty.update(cold_start_details)
+    calibration: dict[str, object]
+    calibration_temperature: float | None
+    if model.kind == COLD_START_MODEL_KIND:
+        calibration, calibration_temperature = _cold_start_identity_calibration(model)
+    else:
+        calibration, calibration_temperature = _prediction_calibration(
+            session,
+            model=model,
+            inputs_as_of=inputs_as_of,
+        )
     output = ModelEventOutput(
         event_id=event.id,
         model_version_id=model.id,
@@ -387,6 +535,7 @@ def predict_event(
         bootstrap_matrices=bootstrap_matrices,
         confidence_level=_config_float(uncertainty, "confidence_level"),
         calibration_temperature=calibration_temperature,
+        cold_start_venue_matches=cold_start_venue_matches,
     )
     session.commit()
     return _output_view(session, output, model)
@@ -535,6 +684,7 @@ def _persist_selection_predictions(
     bootstrap_matrices: list[np.ndarray[tuple[int, int], np.dtype[np.float64]]] | None,
     confidence_level: float,
     calibration_temperature: float | None,
+    cold_start_venue_matches: tuple[int, int] | None,
 ) -> None:
     rows = session.execute(
         select(Market, Selection)
@@ -546,6 +696,8 @@ def _persist_selection_predictions(
     for market, selection in rows:
         grouped.setdefault(market.id, (market, []))[1].append(selection)
     for market, selections in grouped.values():
+        if cold_start_venue_matches is not None and market.market_type != "MATCH_RESULT":
+            continue
         line = float(market.line) if market.line is not None else None
         if line is not None and not _is_half_goal_line(line):
             continue
@@ -557,6 +709,12 @@ def _persist_selection_predictions(
             raw_probabilities,
             calibration_temperature,
         )
+        if cold_start_venue_matches is not None:
+            probabilities, _ = widen_match_result_probabilities(
+                probabilities,
+                home_venue_matches=cold_start_venue_matches[0],
+                away_venue_matches=cold_start_venue_matches[1],
+            )
         sampled_by_selection: dict[str, list[float]] = {
             selection.code: [] for selection in selections if selection.code in probabilities
         }
@@ -568,6 +726,12 @@ def _persist_selection_predictions(
                     sample_raw,
                     calibration_temperature,
                 )
+                if cold_start_venue_matches is not None:
+                    sample_probabilities, _ = widen_match_result_probabilities(
+                        sample_probabilities,
+                        home_venue_matches=cold_start_venue_matches[0],
+                        away_venue_matches=cold_start_venue_matches[1],
+                    )
                 for code in sampled_by_selection:
                     sampled_by_selection[code].append(sample_probabilities[code])
         for selection in selections:
@@ -667,6 +831,7 @@ def _output_view(
         derived_probabilities=_derived_probabilities(
             matrix,
             calibration_temperature=_output_calibration_temperature(output),
+            cold_start_venue_matches=_stored_cold_start_venue_matches(output),
         ),
         predictions=[
             SelectionPredictionView(
@@ -691,10 +856,18 @@ def _derived_probabilities(
     matrix: np.ndarray[tuple[int, int], np.dtype[np.float64]],
     *,
     calibration_temperature: float | None,
+    cold_start_venue_matches: tuple[int, int] | None = None,
 ) -> dict[str, dict[str, float]]:
     match_result = derive_market(matrix, "MATCH_RESULT")
     if calibration_temperature is not None:
         match_result = temperature_scale(match_result, calibration_temperature)
+    if cold_start_venue_matches is not None:
+        match_result, _ = widen_match_result_probabilities(
+            match_result,
+            home_venue_matches=cold_start_venue_matches[0],
+            away_venue_matches=cold_start_venue_matches[1],
+        )
+        return {"MATCH_RESULT": match_result}
     return {
         "MATCH_RESULT": match_result,
         "TOTAL_GOALS_2.5": derive_market(matrix, "TOTAL_GOALS", 2.5),
@@ -714,6 +887,7 @@ def _prediction_uncertainty(
     *,
     model: ModelVersion,
     event: Event,
+    allow_league_priors: bool = False,
 ) -> tuple[
     dict[str, object],
     list[np.ndarray[tuple[int, int], np.dtype[np.float64]]] | None,
@@ -764,14 +938,17 @@ def _prediction_uncertainty(
             shrinkage_matches=_config_float(model.config, "shrinkage_matches"),
             resamples=resamples,
             seed_material=seed_material,
+            allow_league_priors=allow_league_priors,
         )
     except ValueError as exc:
         raise ModelingError(f"probability uncertainty failed closed: {exc}") from exc
     matrices = [score_matrix(home, away) for home, away in distribution.samples]
     return (
         {
-            "method": UNCERTAINTY_METHOD,
-            "version": version,
+            "method": (
+                COLD_START_UNCERTAINTY_METHOD if allow_league_priors else UNCERTAINTY_METHOD
+            ),
+            "version": COLD_START_UNCERTAINTY_VERSION if allow_league_priors else version,
             "confidence_level": confidence_level,
             "requested_refits": distribution.requested_refits,
             "successful_refits": len(distribution.samples),
@@ -781,6 +958,27 @@ def _prediction_uncertainty(
             "training_fingerprint": model.data_fingerprint,
         },
         matrices,
+    )
+
+
+def _cold_start_identity_calibration(
+    model: ModelVersion,
+) -> tuple[dict[str, object], float]:
+    fingerprint = hashlib.sha256(
+        f"{ACTIVATION_CONTRACT_VERSION}:{model.version}:identity".encode()
+    ).hexdigest()
+    return (
+        {
+            "method": "identity",
+            "version": COLD_START_CALIBRATION_VERSION,
+            "applied": True,
+            "temperature": 1.0,
+            "sample_size": 0,
+            "input_fingerprint": fingerprint,
+            "fit_through": None,
+            "evaluation_run_id": None,
+        },
+        1.0,
     )
 
 
@@ -906,6 +1104,20 @@ def _calibration_view(output: ModelEventOutput) -> ProbabilityCalibrationView:
 def _output_calibration_temperature(output: ModelEventOutput) -> float | None:
     calibration = _calibration_view(output)
     return calibration.temperature if calibration.applied else None
+
+
+def _stored_cold_start_venue_matches(output: ModelEventOutput) -> tuple[int, int] | None:
+    values = output.probability_uncertainty or {}
+    home = values.get("home_venue_matches")
+    away = values.get("away_venue_matches")
+    if (
+        isinstance(home, int)
+        and not isinstance(home, bool)
+        and isinstance(away, int)
+        and not isinstance(away, bool)
+    ):
+        return (home, away)
+    return None
 
 
 def _fingerprint(observations: list[tuple[MatchResult, Event]]) -> str:

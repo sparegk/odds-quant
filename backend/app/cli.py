@@ -33,6 +33,7 @@ from app.services.demo_seed import seed_demo_data, seed_demo_results
 from app.services.evaluation import EvaluationError, evaluate_model
 from app.services.modeling import (
     ModelingError,
+    activate_cold_start_model,
     predict_event,
     train_elo_model,
     train_poisson_model,
@@ -123,6 +124,11 @@ def _parser() -> argparse.ArgumentParser:
     train.add_argument("--minimum-matches", type=int, default=20)
     train.add_argument("--minimum-team-matches", type=int, default=3)
     train.add_argument("--shrinkage-matches", type=float, default=5.0)
+    activate_cold_start = commands.add_parser(
+        "activate-cold-start",
+        help="create the receipt-bound probability-only cold-start model path",
+    )
+    activate_cold_start.add_argument("source_model_id", type=int)
     train_elo = commands.add_parser(
         "train-elo", help="register a versioned Davidson Elo research candidate"
     )
@@ -315,6 +321,8 @@ def main() -> int:
                         draw_probability_at_even_strength=(args.draw_probability_at_even_strength),
                     ),
                 )
+            elif args.command == "activate-cold-start":
+                result = activate_cold_start_model(session, args.source_model_id)
             elif args.command == "predict-event":
                 result = predict_event(
                     session,

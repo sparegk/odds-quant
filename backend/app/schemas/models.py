@@ -142,6 +142,12 @@ class ProbabilityUncertaintyView(BaseModel):
     block_length: int | None
     seed_fingerprint: str | None
     training_fingerprint: str
+    reliability_weight: float | None = None
+    uncertainty_class: str | None = None
+    home_venue_matches: int | None = None
+    away_venue_matches: int | None = None
+    home_used_league_prior: bool | None = None
+    away_used_league_prior: bool | None = None
 
 
 class ProbabilityCalibrationView(BaseModel):

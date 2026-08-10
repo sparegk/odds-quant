@@ -25,6 +25,7 @@ from app.services.evaluation import (
 )
 from app.services.modeling import (
     ModelingError,
+    activate_cold_start_model,
     get_model,
     list_event_predictions,
     list_models,
@@ -82,6 +83,23 @@ def model_detail(model_id: int, database: Database) -> ModelVersionView:
     if model is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Model not found")
     return model
+
+
+@router.post(
+    "/models/{model_id}/activate-cold-start",
+    response_model=ModelVersionView,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_admin_key)],
+    tags=["models"],
+)
+def activate_cold_start(model_id: int, database: Database) -> ModelVersionView:
+    try:
+        return activate_cold_start_model(database, model_id)
+    except ModelingError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
 
 
 @router.post(
