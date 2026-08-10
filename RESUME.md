@@ -812,7 +812,10 @@ infer closing flags, or enable player props before their independent validation 
   selecting or scoring outcomes. Exactly two preselected families must both pass independently;
   metric pooling, post-first-replay replacement, third-family rescue, automatic promotion, and
   market authorization are forbidden. See `CROSS_LEAGUE_CONFIRMATION.md`.
-- [ ] Select and pre-register two complete untouched competition families before replaying either.
+- [x] Select and jointly pre-register both untouched families before replaying either. Execution is
+  fixed as Eredivisie 2024/25 first (612 training results, 263 candidates), then Primeira Liga
+  2024/25 (612 training results, 261 candidates). All six pinned CC0 files are complete at 306/306
+  finals; neither family had a stored competition, model, or run at selection time.
 - [ ] Execute and record the unchanged cold-start v2 replay on the first registered family.
 - [ ] Execute the second replay and apply the frozen combined replication decision.
 

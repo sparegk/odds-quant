@@ -1,0 +1,144 @@
+{
+  "schema_version": "cross-league-confirmation-selection-v1",
+  "selection_id": "eredivisie-primeira-2024-25-cold-start-v2",
+  "frozen_at": "2026-08-10T18:57:49Z",
+  "policy_version": "cross-league-cold-start-confirmation-v1",
+  "policy_commit": "99102ed",
+  "candidate_implementation_commit": "f722ca1",
+  "candidate": {
+    "benchmark_version": "league-prior-cold-start-poisson-v2",
+    "evaluation_method_version": "expanding-window-v8-cold-start-validation",
+    "uncertainty_version": "venue-history-uniform-mixture-v1",
+    "calibration_version": "identity-after-uncertainty-widening-v1"
+  },
+  "execution_order": [
+    {
+      "position": 1,
+      "experiment_id": "eredivisie-2024-25-v8-cold-start-poisson",
+      "competition": {
+        "sport": "football",
+        "name": "Eredivisie",
+        "country": "Netherlands",
+        "timezone": "Europe/Amsterdam",
+        "family_scope": "same_sport_name_country_all_seasons"
+      },
+      "datasets": [
+        {
+          "role": "training",
+          "path": "2022-23/nl.1.json",
+          "season": "2022/23",
+          "source_commit": "0b539b297fd18a5043ffd6d02188124fd6205d20",
+          "published_at": "2024-09-19T17:16:39Z",
+          "git_blob": "198e2e23c4d46b7978fd76cbd3a6c02bf1328d50",
+          "raw_sha256": "1caefc633d3a3fb4f9a6247752187992e8ac0106650018f217bb45925bfac529",
+          "final_rows": 306
+        },
+        {
+          "role": "training",
+          "path": "2023-24/nl.1.json",
+          "season": "2023/24",
+          "source_commit": "0b539b297fd18a5043ffd6d02188124fd6205d20",
+          "published_at": "2024-09-19T17:16:39Z",
+          "git_blob": "f175cde719ec20b8ce5aea22c98d6355e64f3b85",
+          "raw_sha256": "2aa4ca5fe814bb8ccd297a6f77231fc30bd83dd95e98fdc80ac6237e10f45b08",
+          "final_rows": 306
+        },
+        {
+          "role": "untouched_holdout",
+          "path": "2024-25/nl.1.json",
+          "season": "2024/25",
+          "source_commit": "bd189ea365936c8e9c6c64261fcdd608e3cec3c5",
+          "published_at": "2025-05-21T05:26:48Z",
+          "git_blob": "668124659dac4fe9ab3a956a7b72b8b91b7c7bbb",
+          "raw_sha256": "e6398379f3d68eb2863cc7dcac12c60219ab186614366bb86560039638b2f6c5",
+          "final_rows": 306
+        }
+      ],
+      "primary_model": {
+        "training_start": "2022-08-01T00:00:00Z",
+        "training_end": "2024-09-20T00:00:00Z",
+        "minimum_matches": 200,
+        "minimum_team_matches": 8,
+        "shrinkage_matches": 5.0,
+        "expected_training_results": 612
+      },
+      "evaluation": {
+        "start": "2024-09-20T00:00:00Z",
+        "end_exclusive": "2025-05-19T00:00:00Z",
+        "prediction_lead_minutes": 60,
+        "minimum_training_matches": 200,
+        "calibration_bins": 10,
+        "candidate_events_before_eligibility": 263,
+        "include_cold_start_validation": true
+      }
+    },
+    {
+      "position": 2,
+      "experiment_id": "primeira-liga-2024-25-v8-cold-start-poisson",
+      "competition": {
+        "sport": "football",
+        "name": "Primeira Liga",
+        "country": "Portugal",
+        "timezone": "Europe/Lisbon",
+        "family_scope": "same_sport_name_country_all_seasons"
+      },
+      "datasets": [
+        {
+          "role": "training",
+          "path": "2022-23/pt.1.json",
+          "season": "2022/23",
+          "source_commit": "0b539b297fd18a5043ffd6d02188124fd6205d20",
+          "published_at": "2024-09-19T17:16:39Z",
+          "git_blob": "318b724971fe0b3c4bd6ffc3fbda671e8573d55b",
+          "raw_sha256": "495746810cd8979e82c575c68146ecf0ff0846e34a43d538171c94b1344f7447",
+          "final_rows": 306
+        },
+        {
+          "role": "training",
+          "path": "2023-24/pt.1.json",
+          "season": "2023/24",
+          "source_commit": "0b539b297fd18a5043ffd6d02188124fd6205d20",
+          "published_at": "2024-09-19T17:16:39Z",
+          "git_blob": "4672079a2ef125c0658cb03681a7086e6683eda4",
+          "raw_sha256": "fbe88420e15a09690ad145277cba8da39c515e899b5ffa3c1e2ef9cfc2090a17",
+          "final_rows": 306
+        },
+        {
+          "role": "untouched_holdout",
+          "path": "2024-25/pt.1.json",
+          "season": "2024/25",
+          "source_commit": "bd189ea365936c8e9c6c64261fcdd608e3cec3c5",
+          "published_at": "2025-05-21T05:26:48Z",
+          "git_blob": "1d210317fba610536c4fad676cbb1a46b36413e3",
+          "raw_sha256": "204a047e80abae556e9aed6afede82335d93866a49b479f585313ae5e7a9ecff",
+          "final_rows": 306
+        }
+      ],
+      "primary_model": {
+        "training_start": "2022-08-01T00:00:00Z",
+        "training_end": "2024-09-20T00:00:00Z",
+        "minimum_matches": 200,
+        "minimum_team_matches": 8,
+        "shrinkage_matches": 5.0,
+        "expected_training_results": 612
+      },
+      "evaluation": {
+        "start": "2024-09-20T00:00:00Z",
+        "end_exclusive": "2025-05-19T00:00:00Z",
+        "prediction_lead_minutes": 60,
+        "minimum_training_matches": 200,
+        "calibration_bins": 10,
+        "candidate_events_before_eligibility": 261,
+        "include_cold_start_validation": true
+      }
+    }
+  ],
+  "selection_checks": {
+    "all_files_complete": true,
+    "all_training_sources_published_before_boundary": true,
+    "all_holdouts_exceed_200_candidates": true,
+    "no_existing_competitions_models_or_runs": true,
+    "both_families_frozen_before_first_replay": true,
+    "raw_files_committed": false
+  }
+}

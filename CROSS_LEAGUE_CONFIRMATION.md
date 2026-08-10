@@ -23,3 +23,22 @@ activation and model version would still be required.
 The machine-readable policy is `backend/config/cross_league_confirmation_policy_v1.json`. The
 decision implementation is deterministic and bound to the unchanged candidate implementation
 commit `f722ca1`.
+
+## Frozen family selection
+
+Both families were selected together before either produced a model score. Execution order is
+fixed as:
+
+1. `Eredivisie / Netherlands / 2024/25`: 612 complete prior results and 263 candidates from the
+   locked `2024-09-20T00:00:00Z` boundary.
+2. `Primeira Liga / Portugal / 2024/25`: 612 complete prior results and 261 candidates from the
+   same boundary.
+
+All six OpenFootball CC0 files contain 306/306 final scores. Training files are pinned to source
+versions published before the boundary; holdout files are pinned to completed sources published
+after their seasons. There were no existing competition, model, or evaluation records for either
+family at selection time. Raw files remain temporary and uncommitted.
+
+The commits, blobs, SHA-256 hashes, timezones, windows, hyperparameters, and fixed execution order
+are registered in `backend/config/cross_league_confirmation_selection_v1.json`. After the
+Eredivisie replay begins, neither family may be replaced.
