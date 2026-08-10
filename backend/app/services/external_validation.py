@@ -17,6 +17,18 @@ _RECEIPTS = (
         retuning_permitted=False,
         market_validation_authorized=False,
     ),
+    ExternalValidationReceiptView(
+        experiment_id="ligue1-2024-25-v8-cold-start-poisson",
+        display_name="Ligue 1 2024/25 cold-start",
+        evidence_role="pre_registered_external_holdout",
+        specification_frozen_at=datetime(2026, 8, 10, 18, 4, 24, tzinfo=UTC),
+        executed_at=datetime(2026, 8, 10, 18, 33, 19, 69057, tzinfo=UTC),
+        evaluation_fingerprint=("28a2324ff783d412afbfe030d21f690892a5e2ac3f301e62b1896cea37b77471"),
+        probability_decision="insufficient_evidence",
+        examined=True,
+        retuning_permitted=False,
+        market_validation_authorized=False,
+    ),
 )
 
 

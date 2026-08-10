@@ -57,3 +57,22 @@ primary arguments, retain its model ID, and run:
 
 Record every strict-primary and cold-start gate without retuning. The holdout becomes examined as
 soon as the immutable run is written.
+
+## Untouched replay receipt
+
+The replay completed on 2026-08-10 without changing the registered specification. Model 8,
+`pq1-c28-202409200000-ecd3f939`, retained exactly 686 leakage-safe training results. Immutable run
+7 has fingerprint `28a2324ff783d412afbfe030d21f690892a5e2ac3f301e62b1896cea37b77471`.
+
+The strict primary evaluated 161 of 270 candidates (59.63% coverage), with Brier `0.60680`, log
+loss `1.01277`, and ECE `0.08824`. It passed both paired uniform intervals but failed the 200-event,
+90%-coverage, and 0.08-ECE gates.
+
+The pre-registered cold-start candidate evaluated all 270 candidates, including 109 league-prior
+events. Its Brier score was `0.61341`, log loss `1.02224`, and ECE `0.08692`. The paired
+cold-start-minus-uniform 95% upper differences were `-0.02685` for Brier and `-0.03721` for log
+loss. Observation count, coverage, non-demo provenance, identity calibration, and both paired
+intervals passed; ECE failed the frozen 0.08 threshold. Its decision is `insufficient_evidence`.
+
+This holdout is now examined. Model 8 remains unvalidated on both tracks, and no retuning, market
+acquisition, signal, player-feature, staking, ROI, or profitability work is authorized by this run.

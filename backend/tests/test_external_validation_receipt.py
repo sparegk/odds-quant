@@ -14,3 +14,17 @@ def test_bundesliga_external_validation_receipt_is_fingerprint_bound() -> None:
     assert receipt.retuning_permitted is False
     assert receipt.market_validation_authorized is False
     assert receipt_for_evaluation("0" * 64) is None
+
+
+def test_ligue1_cold_start_external_validation_receipt_is_fingerprint_bound() -> None:
+    fingerprint = "28a2324ff783d412afbfe030d21f690892a5e2ac3f301e62b1896cea37b77471"
+
+    receipt = receipt_for_evaluation(fingerprint)
+
+    assert receipt is not None
+    assert receipt.experiment_id == "ligue1-2024-25-v8-cold-start-poisson"
+    assert receipt.display_name == "Ligue 1 2024/25 cold-start"
+    assert receipt.probability_decision == "insufficient_evidence"
+    assert receipt.examined is True
+    assert receipt.retuning_permitted is False
+    assert receipt.market_validation_authorized is False

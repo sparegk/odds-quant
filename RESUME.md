@@ -774,13 +774,39 @@ infer closing flags, or enable player props before their independent validation 
 - [x] Complete verification: 283 backend tests and 78 frontend tests pass, together with Ruff,
   Ruff formatting, Mypy, ESLint, TypeScript, and the production build.
 
+### Ligue 1 cold-start external validation (2026-08-10)
+
+- [x] Restore the stopped persistent scheduler at its configured cadence. Jobs `262` and `263`
+  completed normally, both providers returned healthy with no alerts, and hidden launcher PID
+  `6620` remains active. No ad hoc provider request or cadence acceleration was used.
+- [x] Select a genuinely new exact family before model scoring. La Liga and Serie A 2024/25 were
+  rejected at 370/380 finals; no partial feed was imported. Complete CC0 Ligue 1 files were pinned
+  by commit, blob, publication timestamp, and SHA-256.
+- [x] Freeze the cold-start implementation at `f722ca1` and the pre-replay manifest at `15af527`.
+  The v2 candidate widens probabilities toward uniform from pre-kickoff venue-history counts, uses
+  identity-only calibration, retains fixed v6 proper-score/ECE gates, cannot auto-promote a model,
+  and cannot authorize markets.
+- [x] Atomically import jobs `187` through `189`, creating 992/992 final results under Ligue 1
+  competition IDs `26`, `27`, and `28`. Model `8` trained on exactly 686 leakage-safe prior-season
+  results; the 36 early holdout fixtures were excluded at the training boundary because their
+  pinned source was published only after the season.
+- [x] Complete immutable run `7`, fingerprint
+  `28a2324ff783d412afbfe030d21f690892a5e2ac3f301e62b1896cea37b77471`. Strict Poisson covered
+  161/270 and failed coverage, observation, and ECE gates. The cold-start candidate covered 270/270
+  and passed both paired uniform intervals, but ECE `0.08692` failed the frozen `0.08` threshold.
+  Both decisions remain `insufficient_evidence`; model `8` remains unvalidated and no retuning or
+  market work is authorized. See `LIGUE1_EXTERNAL_VALIDATION.md`.
+- [x] Complete verification: 288 backend tests and 78 frontend tests pass, together with Ruff,
+  Ruff formatting, Mypy, ESLint, TypeScript, and the production build. Final monitoring is healthy
+  on provider jobs `268` and `269`; the store still has zero value signals and zero closing prices.
+
 ## Next resume action
 
 Keep the scheduler on its configured cadence and use `py -m app.cli monitor-collection
---fail-on-alerts`; do not accelerate requests merely to clear the aging warning. Probability work
-must next select a genuinely new exact competition family, freeze the cold-start uncertainty and
-calibration specification before inspecting its outcomes, and then run a new untouched replay.
-Do not reuse Bundesliga 2024/25 as validation. Historical market acquisition remains unchecked
+--fail-on-alerts`; do not accelerate requests merely to clear an aging warning. Ligue 1 2024/25
+and Bundesliga 2024/25 are now examined and must not be retuned or reused as untouched validation.
+Any further probability attempt requires another genuinely new exact family and a new receipt
+frozen before outcome inspection. Historical market acquisition remains unchecked
 until the owner supplies permitted timestamped odds or approves a source/account after probability
 validation passes. Player adjustments, player props, market signals, CLV, staking, ROI, and
 profitability claims remain blocked. Matchday will create supported Premier League prediction
