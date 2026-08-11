@@ -869,3 +869,15 @@ profitability claims remain blocked. Matchday will create supported Premier Leag
 research through the normal seven-day refresh horizon; until independent validation and fresh
 compatible prices satisfy every gate, the site must continue to show no qualified bet
 recommendation and explain why.
+
+### Market-edge validation protocol (2026-08-11)
+
+- [x] Freeze contract cold-start-v2-market-edge-validation-v1 before inspecting any 2026/27
+  Premier League outcome, CLV, or return. The contract is hash-bound to the probability activation
+  evidence and pins the complete prospective cohort, lawful 1X2/closing evidence, existing paired
+  market-score gates, fixed explainable-value thresholds, one-candidate-per-event rule, explicit
+  cost treatment, and positive lower confidence bounds for both mean CLV and net ROI. Model 12
+  remains insufficient_market_evidence; automatic signals and staking remain blocked. See
+  MARKET_EDGE_VALIDATION.md.
+- [x] Verify the frozen protocol implementation. All 305 backend tests passed together with Ruff,
+  Ruff formatting, and Mypy across 148 source files.

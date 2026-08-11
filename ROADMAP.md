@@ -41,6 +41,10 @@ Completed slices: Alembic schema lifecycle, labelled demo odds and results, atom
 - Completed: Playwright Chromium workflows for ingestion-to-signals, sourced arbitrage calculation, and backtest-to-bankroll, alongside the Vitest component/API suite.
 - Completed: timestamp-valid same-market/bookmaker/provider closing-price provenance, per-observation CLV, aggregate coverage/mean/median reporting, and explicit exclusion of post-kickoff closing evidence from retrospective metrics.
 - Remaining: adequate permitted closing-price history across target competitions; closing evidence remains retrospective and is never fed into predictions or signals.
+- Market-edge protocol frozen: MARKET_EDGE_VALIDATION.md and the machine-readable v1 contract
+  preregister the post-activation Premier League 2026/27 cohort, lawful evidence requirements,
+  paired market-score gates, fixed value policy, explicit-cost CLV/ROI gates, and fail-closed
+  staking boundary. Evidence acquisition remains open.
 
 ## Later Phases
 

@@ -2,6 +2,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+SIGNAL_POLICY_VERSION = "explainable-value-v1"
+MINIMUM_SAMPLE_SIZE_PER_TEAM = 8
+MAXIMUM_CALIBRATION_ERROR = 0.10
+MAXIMUM_ODDS_AGE_MINUTES = 60.0
+MINIMUM_BOOKMAKER_COUNT = 1
+MAXIMUM_ODDS_MOVE_RATIO = 0.10
+MAXIMUM_IMPLIED_MOVE_POINTS = 0.05
+MINIMUM_VALUE_EXPECTED_VALUE = 0.05
+MINIMUM_VALUE_EDGE = 0.03
+MINIMUM_VALUE_CONFIDENCE = 0.65
+
 
 @dataclass(frozen=True)
 class SignalInput:
@@ -55,12 +66,15 @@ def classify_signal(value: SignalInput) -> dict[str, object]:
     reasons = [f"Model probability differs from market consensus by {edge:+.1%}."]
     risks: list[str] = []
     inadequate = (
-        value.sample_size_per_team < 8
-        or value.calibration_error > 0.10
-        or value.age_minutes > 60
-        or value.bookmaker_count < 1
+        value.sample_size_per_team < MINIMUM_SAMPLE_SIZE_PER_TEAM
+        or value.calibration_error > MAXIMUM_CALIBRATION_ERROR
+        or value.age_minutes > MAXIMUM_ODDS_AGE_MINUTES
+        or value.bookmaker_count < MINIMUM_BOOKMAKER_COUNT
     )
-    moved = value.odds_move_ratio >= 0.10 or value.implied_move_points >= 0.05
+    moved = (
+        value.odds_move_ratio >= MAXIMUM_ODDS_MOVE_RATIO
+        or value.implied_move_points >= MAXIMUM_IMPLIED_MOVE_POINTS
+    )
     if value.age_minutes > 15:
         risks.append("Odds snapshot is aging and may no longer be available.")
     if moved:
@@ -70,7 +84,13 @@ def classify_signal(value: SignalInput) -> dict[str, object]:
     if inadequate:
         signal = "INSUFFICIENT_DATA"
         risks.append("Reliability gates for sample size, calibration, or freshness failed.")
-    elif ev >= 0.05 and edge >= 0.03 and confidence >= 0.65 and lower_ev > 0 and not moved:
+    elif (
+        ev >= MINIMUM_VALUE_EXPECTED_VALUE
+        and edge >= MINIMUM_VALUE_EDGE
+        and confidence >= MINIMUM_VALUE_CONFIDENCE
+        and lower_ev > 0
+        and not moved
+    ):
         signal = "VALUE"
         reasons.append("EV, edge, confidence, and uncertainty gates all pass.")
     elif value.offered_odds < 2 and edge <= -0.03 and ev <= -0.05:
