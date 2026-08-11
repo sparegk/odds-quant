@@ -80,6 +80,45 @@ class DataCoverageView(BaseModel):
     competitions: list[CompetitionDataCoverage]
 
 
+class MarketEdgeBookmakerCoverage(BaseModel):
+    bookmaker_id: int
+    bookmaker: str
+    permitted_snapshots: int
+    permitted_snapshot_events: int
+    decision_window_events: int
+    explicit_closing_events: int
+    cost_profile_events: int
+
+
+class MarketEdgeCoverageView(BaseModel):
+    contract_version: str
+    cohort_selection_id: str
+    observed_at: datetime
+    activated_model_id: int
+    activated_model_version: str
+    expected_events: int
+    stored_events: int
+    final_result_events: int
+    prediction_events: int
+    permitted_snapshots: int
+    decision_window_events: int
+    two_bookmaker_events: int
+    explicit_closing_events: int
+    qualifying_bookmaker_event_pairs: int
+    cost_profile_bookmaker_event_pairs: int
+    decision_window_coverage: float
+    two_bookmaker_coverage: float
+    closing_coverage: float
+    cost_profile_coverage: float
+    minimum_market_observations: int
+    minimum_market_coverage: float
+    minimum_closing_coverage: float
+    bookmakers: list[MarketEdgeBookmakerCoverage]
+    acquisition_ready: bool
+    replay_authorized: bool
+    blockers: list[str]
+
+
 class ProviderCollectionHealth(BaseModel):
     provider_id: int
     provider: str

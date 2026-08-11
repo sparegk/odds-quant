@@ -890,3 +890,15 @@ recommendation and explain why.
   an already approved account. The fixed acquisition box remains open at 30/380 stored cohort
   fixtures, zero finals, no Premier League Novibet coverage, and zero explicit closing snapshots.
   No source join, inferred closing flag, market replay, or return inspection was performed.
+
+### Outcome-blind market-edge coverage audit (2026-08-12)
+
+- [x] Add a typed frozen-cohort audit through both
+  GET /api/v1/data/market-edge-coverage and python -m app.cli audit-market-edge-coverage. It reports
+  aggregate event, prediction, exact 1X2 decision-window, two-bookmaker, explicit closing, final,
+  and tax/constraint coverage with bounded blockers. It exposes no score, price, selection, CLV,
+  ROI, profit, or return fields.
+- [x] Verify deterministic API and CLI behavior, exact selection completeness, source-time
+  cutoffs, separate bookmaker rows, contract thresholds, and fail-closed replay authorization.
+  The configured receipt is 30/380 events, one prediction, 1,750 snapshots, Pamestoixima on 10
+  events, Novibet on zero, and zero decision-window, closing, final, or cost-covered observations.

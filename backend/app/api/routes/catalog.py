@@ -14,6 +14,7 @@ from app.schemas.api import (
     EventDetail,
     EventSummary,
     MarketComparison,
+    MarketEdgeCoverageView,
     ProviderJobView,
     ProviderSummary,
     ReadinessCounts,
@@ -27,6 +28,7 @@ from app.services.catalog import (
 )
 from app.services.collection_monitoring import collection_monitoring
 from app.services.data_coverage import data_coverage
+from app.services.market_edge_coverage import market_edge_coverage
 from app.services.readiness import readiness_counts
 
 router = APIRouter()
@@ -41,6 +43,15 @@ def readiness(database: Database) -> ReadinessCounts:
 @router.get("/data/coverage", response_model=DataCoverageView, tags=["data"])
 def coverage(database: Database) -> DataCoverageView:
     return data_coverage(database)
+
+
+@router.get(
+    "/data/market-edge-coverage",
+    response_model=MarketEdgeCoverageView,
+    tags=["data"],
+)
+def market_edge_coverage_audit(database: Database) -> MarketEdgeCoverageView:
+    return market_edge_coverage(database)
 
 
 @router.get("/data/monitoring", response_model=CollectionMonitoringView, tags=["data"])

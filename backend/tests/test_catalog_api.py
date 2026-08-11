@@ -14,7 +14,9 @@ from app.db.models import (
     Bookmaker,
     Competition,
     Event,
+    Market,
     MatchResult,
+    ModelEventOutput,
     ModelVersion,
     OddsSnapshot,
     Provider,
@@ -123,6 +125,103 @@ def test_data_coverage_fails_closed_for_demo_and_reports_permitted_gaps(
         "fewer_than_200_final_results",
         "missing_required_bookmakers",
     ]
+
+
+def test_market_edge_coverage_is_outcome_blind_and_contract_specific(
+    api: tuple[TestClient, Session, datetime],
+) -> None:
+    client, session, as_of = api
+    competition = session.scalar(select(Competition))
+    assert competition is not None
+    competition.name = "Premier League"
+    competition.country = "England"
+    competition.season = "2026/27"
+    for provider in session.scalars(select(Provider)).all():
+        provider.is_demo = False
+    for bookmaker in session.scalars(select(Bookmaker)).all():
+        bookmaker.is_demo = False
+    for event in session.scalars(select(Event)).all():
+        event.is_demo = False
+        event.kickoff_at = as_of + timedelta(hours=2)
+    for snapshot, market in session.execute(
+        select(OddsSnapshot, Market).join(Market, Market.id == OddsSnapshot.market_id)
+    ).all():
+        event = session.get_one(Event, market.event_id)
+        observed_at = as_of - timedelta(minutes=5)
+        snapshot.observed_at = observed_at
+        snapshot.source_updated_at = observed_at
+        snapshot.ingested_at = observed_at
+        snapshot.is_closing = snapshot.id == 1
+        event.kickoff_at = as_of + timedelta(hours=2)
+    activated_model = ModelVersion(
+        id=12,
+        name="Frozen activated model",
+        version="pqc2-c5-202606020000-7917411c",
+        kind="poisson_team_strength_cold_start_v2",
+        training_start=as_of - timedelta(days=60),
+        training_end=as_of - timedelta(days=1),
+        data_fingerprint="a" * 64,
+        feature_version="final-score-home-away-v4-cold-start-v2",
+        sample_size=200,
+        probability_evaluation_status="probability_validated",
+        evaluation_status="insufficient_market_evidence",
+        config={},
+        metrics={},
+        status="active",
+        is_demo=False,
+    )
+    session.add(activated_model)
+    session.flush()
+    first_event = session.scalar(select(Event).order_by(Event.id))
+    assert first_event is not None
+    session.add(
+        ModelEventOutput(
+            event_id=first_event.id,
+            model_version_id=activated_model.id,
+            predicted_at=as_of + timedelta(minutes=30),
+            inputs_as_of=as_of + timedelta(minutes=30),
+            evidence_class="team_baseline",
+            home_lambda=1.2,
+            away_lambda=1.0,
+            score_matrix=[[1.0]],
+            sample_size=200,
+            probability_uncertainty={},
+            probability_calibration={},
+            feature_activation={},
+        )
+    )
+    session.commit()
+
+    response = client.get("/api/v1/data/market-edge-coverage")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["contract_version"] == "cold-start-v2-market-edge-validation-v1"
+    assert payload["expected_events"] == 380
+    assert payload["stored_events"] == 4
+    assert payload["final_result_events"] == 0
+    assert payload["prediction_events"] == 0
+    assert payload["permitted_snapshots"] == 8
+    assert payload["decision_window_events"] == 4
+    assert payload["two_bookmaker_events"] == 4
+    assert payload["explicit_closing_events"] == 1
+    assert payload["qualifying_bookmaker_event_pairs"] == 8
+    assert payload["cost_profile_bookmaker_event_pairs"] == 0
+    assert [item["permitted_snapshots"] for item in payload["bookmakers"]] == [4, 4]
+    assert [item["permitted_snapshot_events"] for item in payload["bookmakers"]] == [4, 4]
+    assert payload["acquisition_ready"] is False
+    assert payload["replay_authorized"] is False
+    assert payload["blockers"] == [
+        "incomplete_candidate_universe",
+        "insufficient_decision_window_market_observations",
+        "insufficient_decision_window_market_coverage",
+        "insufficient_two_bookmaker_market_coverage",
+        "insufficient_explicit_closing_coverage",
+        "incomplete_final_results",
+        "incomplete_cost_profiles",
+    ]
+    assert "roi" not in payload
+    assert "clv" not in payload
+    assert "returns" not in payload
 
 
 def test_collection_monitoring_requires_two_fresh_completed_jobs(

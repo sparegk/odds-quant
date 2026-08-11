@@ -50,3 +50,19 @@ market-consensus and signal-policy constants.
 - [ ] Complete acquisition. Only 30 of the expected 380 cohort fixtures are currently stored,
   Novibet is absent for the Premier League, no cohort result is final, and the entire store has
   zero explicit closing snapshots. These are evidence blockers, not thresholds to relax.
+
+## Outcome-blind coverage audit: 2026-08-12
+
+- [x] Add one typed audit shared by GET /api/v1/data/market-edge-coverage and
+  python -m app.cli audit-market-edge-coverage. It binds to the frozen contract and reports the
+  candidate universe, persisted pre-cutoff predictions, exact complete 1X2 decision-window
+  coverage, two-bookmaker coverage, explicit closing coverage, aggregate final-result coverage,
+  and sourced tax/constraint coverage. Pamestoixima and Novibet retain separate rows even at zero.
+- [x] Keep the audit outcome-blind. Its schema contains no scores, selections, prices, CLV, ROI,
+  profit, returns, or threshold-tuning output. Future-dated observations and source updates cannot
+  count, and replay authorization remains false while any bounded acquisition blocker is present.
+
+The first configured receipt reported 30/380 stored events, one pre-cutoff model output, 1,750
+permitted complete-market snapshots, Pamestoixima coverage on 10 events, no Novibet snapshots,
+zero qualifying 60-minute decision-window events, zero explicit closings, zero finals, and zero
+cost-covered decision pairs. This is collection-readiness evidence only.

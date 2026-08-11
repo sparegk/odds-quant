@@ -31,6 +31,7 @@ from app.services.api_football_collection import collect_api_football_intelligen
 from app.services.collection_monitoring import collection_monitoring
 from app.services.demo_seed import seed_demo_data, seed_demo_results
 from app.services.evaluation import EvaluationError, evaluate_model
+from app.services.market_edge_coverage import market_edge_coverage
 from app.services.modeling import (
     ModelingError,
     activate_cold_start_model,
@@ -116,6 +117,10 @@ def _parser() -> argparse.ArgumentParser:
         "--fail-on-alerts",
         action="store_true",
         help="exit with status 3 when collection alerts are present",
+    )
+    commands.add_parser(
+        "audit-market-edge-coverage",
+        help="report outcome-blind coverage for the frozen market-edge cohort",
     )
     train = commands.add_parser("train-poisson", help="train a versioned Poisson baseline")
     train.add_argument("competition_id", type=int)
@@ -293,6 +298,8 @@ def main() -> int:
                     expected_poll_seconds=settings.provider_poll_seconds,
                     recent_job_limit=args.recent_job_limit,
                 )
+            elif args.command == "audit-market-edge-coverage":
+                result = market_edge_coverage(session)
             elif args.command == "train-poisson":
                 result = train_poisson_model(
                     session,
