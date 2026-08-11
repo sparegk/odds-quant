@@ -91,6 +91,27 @@ store prices or expose a prop.
 
 ## Closing Evidence Audit
 
+### Post-activation market acquisition audit: 2026-08-11
+
+Normal prospective collection is lawful but not yet sufficient for the frozen 2026/27 Premier
+League cohort. Completed Odds-API.io job 309 received 30 Pamestoixima price rows for 30 stored
+fixtures, no Novibet rows for that competition, and no explicit closing designation. The
+configured store has 1,660 permitted Premier League snapshots, zero cohort finals, and zero
+explicit closing snapshots globally.
+
+The current official [Odds-API.io historical contract](https://docs.odds-api.io/api-reference/historical/get-historical-odds)
+still calls finished-event values closing odds without attaching an original timestamp to each
+bookmaker price. [The Odds API v4 historical contract](https://the-odds-api.com/liveapi/guides/v4/)
+provides timestamp-addressed paid snapshots but does not itself designate a requested snapshot as
+the bookmaker closing record. [Betfair historical feed specifications](https://historicdata.betfair.com/Betfair-Historical-Data-Feed-Specification.pdf)
+provide published-time exchange updates, but that is a different source requiring separate file,
+identity, settlement, retention, and account approval.
+
+No paid request, new account, source join, closing inference, or retrospective import was made.
+Acquisition remains open until a permitted source supplies the frozen contract fields or the owner
+provides an already permitted file. Prospective collection continues only at the configured
+cadence.
+
 ### Post-external-validation market audit: 2026-08-07
 
 The configured store now contains 3,463 permitted final results and 11,539 permitted odds

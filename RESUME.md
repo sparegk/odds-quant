@@ -881,3 +881,12 @@ recommendation and explain why.
   MARKET_EDGE_VALIDATION.md.
 - [x] Verify the frozen protocol implementation. All 305 backend tests passed together with Ruff,
   Ruff formatting, and Mypy across 148 source files.
+- [x] Restore the stopped prospective collectors without accelerating cadence. Hidden scheduler
+  PID 2820 completed Odds job 309 and football-data job 310; monitoring returned healthy with no
+  alerts. Job 309 received 326 prices across 69 fixtures, while the Premier League slice remained
+  Pamestoixima-only. Permitted Premier League snapshots reached 1,660.
+- [x] Re-audit official historical-price contracts without a paid request. No reviewed source
+  supplies both an explicit closing designation and its original pre-kickoff price timestamp under
+  an already approved account. The fixed acquisition box remains open at 30/380 stored cohort
+  fixtures, zero finals, no Premier League Novibet coverage, and zero explicit closing snapshots.
+  No source join, inferred closing flag, market replay, or return inspection was performed.
