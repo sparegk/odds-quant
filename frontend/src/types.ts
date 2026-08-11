@@ -391,6 +391,45 @@ export interface DataCoverage {
   competitions: CompetitionDataCoverage[]
 }
 
+export interface MarketEdgeBookmakerCoverage {
+  bookmaker_id: number
+  bookmaker: string
+  permitted_snapshots: number
+  permitted_snapshot_events: number
+  decision_window_events: number
+  explicit_closing_events: number
+  cost_profile_events: number
+}
+
+export interface MarketEdgeCoverage {
+  contract_version: string
+  cohort_selection_id: string
+  observed_at: string
+  activated_model_id: number
+  activated_model_version: string
+  expected_events: number
+  stored_events: number
+  final_result_events: number
+  prediction_events: number
+  permitted_snapshots: number
+  decision_window_events: number
+  two_bookmaker_events: number
+  explicit_closing_events: number
+  qualifying_bookmaker_event_pairs: number
+  cost_profile_bookmaker_event_pairs: number
+  decision_window_coverage: number
+  two_bookmaker_coverage: number
+  closing_coverage: number
+  cost_profile_coverage: number
+  minimum_market_observations: number
+  minimum_market_coverage: number
+  minimum_closing_coverage: number
+  bookmakers: MarketEdgeBookmakerCoverage[]
+  acquisition_ready: boolean
+  replay_authorized: boolean
+  blockers: string[]
+}
+
 export interface CalibrationBucket {
   selection_code: string
   bucket_index: number

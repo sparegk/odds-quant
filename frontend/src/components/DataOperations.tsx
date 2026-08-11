@@ -7,6 +7,7 @@ import { CsvImportPanel as ImportPanel } from './CsvImportPanel'
 import { DataCoverageAudit } from './DataCoverageAudit'
 import { DesktopDataTable, type DesktopColumn } from './DesktopDataTable'
 import { IntelligenceBundleImport } from './IntelligenceBundleImport'
+import { MarketEdgeCoverageAudit } from './MarketEdgeCoverageAudit'
 
 export function DataOperations({ dashboard, onChanged }: { dashboard: DashboardData; onChanged?: () => Promise<void> | void }) {
   const [adminKey, setAdminKey] = useState('')
@@ -19,6 +20,7 @@ export function DataOperations({ dashboard, onChanged }: { dashboard: DashboardD
     <div><p className="text-xs font-bold uppercase text-emerald-700">Atomic ingestion</p><h2 className="mt-1 text-lg font-bold">Data operations</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-zinc-500">Upload complete timestamped CSV feeds. Any identity, completeness, chronology, settlement, or publication-time failure rejects the entire file.</p></div>
     <section className="border border-zinc-200 bg-white p-5"><label className="block max-w-md"><span className="mb-1.5 block text-xs font-semibold uppercase text-zinc-500">Admin key (memory only)</span><input aria-label="Import admin key" autoComplete="off" className="h-10 w-full border border-zinc-300 px-3 text-sm" type="password" value={adminKey} onChange={(event) => setAdminKey(event.target.value)} /></label><p className="mt-2 text-xs text-zinc-500">Sent only with upload requests and never persisted. Local development may leave it blank.</p><div className="mt-4 flex flex-wrap gap-2"><TemplateLink href="/templates/results.csv" label="Results CSV template" /><TemplateLink href="/templates/odds.csv" label="Odds CSV template" /></div><p className="mt-2 text-xs text-zinc-500">Templates contain headers only. Add permitted source records without changing column names.</p></section>
     <DataCoverageAudit refreshVersion={coverageVersion} />
+    <MarketEdgeCoverageAudit refreshVersion={coverageVersion} />
     <CollectionMonitoringPanel monitoring={dashboard.monitoring ?? null} />
     <section className="grid gap-5 xl:grid-cols-3"><ImportPanel adminKey={adminKey} kind="odds" title="Odds snapshots" detail="Complete coherent bookmaker markets with event, settlement, price, and observed-at identity." onChanged={handleChanged} /><ImportPanel adminKey={adminKey} kind="results" title="Historical results" detail="Final scores observed no earlier than settlement; later corrections append rather than overwrite." onChanged={handleChanged} /><ImportPanel adminKey={adminKey} kind="availability" title="Player availability" detail="Timestamped availability evidence with original publication and observation times." onChanged={handleChanged} /></section>
     <IntelligenceBundleImport adminKey={adminKey} onChanged={handleChanged} />

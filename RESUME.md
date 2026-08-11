@@ -902,3 +902,6 @@ recommendation and explain why.
   cutoffs, separate bookmaker rows, contract thresholds, and fail-closed replay authorization.
   The configured receipt is 30/380 events, one prediction, 1,750 snapshots, Pamestoixima on 10
   events, Novibet on zero, and zero decision-window, closing, final, or cost-covered observations.
+- [x] Add the frozen-cohort receipt to the Data operations dashboard with separate bookmaker rows,
+  bounded blockers, endpoint-failure handling, and no performance or price fields. Replay remains
+  visibly locked until acquisition is complete.

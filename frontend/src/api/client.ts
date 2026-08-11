@@ -16,6 +16,7 @@ import type {
   ImportJob,
   ImportUploadResult,
   MarketComparison,
+  MarketEdgeCoverage,
   Matchday,
   MatchdayBookmakerCode,
   MatchdayEventDetail,
@@ -170,6 +171,10 @@ export function loadComparison(eventId: number, signal?: AbortSignal): Promise<M
 
 export function loadDataCoverage(): Promise<DataCoverage> {
   return request<DataCoverage>('/api/v1/data/coverage')
+}
+
+export function loadMarketEdgeCoverage(): Promise<MarketEdgeCoverage> {
+  return request<MarketEdgeCoverage>('/api/v1/data/market-edge-coverage')
 }
 
 export function uploadCsv(

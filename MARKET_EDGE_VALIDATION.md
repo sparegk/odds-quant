@@ -66,3 +66,7 @@ The first configured receipt reported 30/380 stored events, one pre-cutoff model
 permitted complete-market snapshots, Pamestoixima coverage on 10 events, no Novibet snapshots,
 zero qualifying 60-minute decision-window events, zero explicit closings, zero finals, and zero
 cost-covered decision pairs. This is collection-readiness evidence only.
+
+- [x] Expose that same typed receipt in Data operations. The dashboard keeps Pamestoixima and
+  Novibet separate, renders bounded acquisition blockers, and keeps fixed replay visibly locked
+  on both incomplete evidence and endpoint failure. It does not load performance or price fields.

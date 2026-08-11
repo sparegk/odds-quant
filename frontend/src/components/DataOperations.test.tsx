@@ -5,6 +5,7 @@ import type { CollectionMonitoring, DashboardData } from '../types'
 import { DataOperations } from './DataOperations'
 
 vi.mock('./DataCoverageAudit', () => ({ DataCoverageAudit: () => null }))
+vi.mock('./MarketEdgeCoverageAudit', () => ({ MarketEdgeCoverageAudit: () => null }))
 
 const baseDashboard: DashboardData = {
   status: { phase: 'model_baseline', sports: ['football'], data_mode: 'user_supplied', automated_betting: false },
