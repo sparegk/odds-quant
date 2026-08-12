@@ -908,3 +908,12 @@ recommendation and explain why.
 - [x] Add a machine-actionable audit-market-edge-coverage --fail-on-blockers mode. It preserves
   the JSON receipt and exits 4 unless blockers are empty and both acquisition and fixed replay are
   explicitly authorized; the ordinary reporting command remains exit 0 while collection runs.
+
+### Pamestoixima-only prospective protocol (2026-08-12)
+
+- [x] Freeze a separate Pamestoixima-only Premier League 2026/27 protocol before the earliest
+  stored cohort kickoff and before inspecting any outcome, CLV, or return. It retains the fixed
+  model, signal thresholds, complete timestamped 1X2 rules, explicit closing/cost requirements,
+  confidence-bound gates, and full-season finality requirement. It explicitly cannot modify,
+  replace, or satisfy the original two-book market-consensus contract. See
+  PAMESTOIXIMA_EDGE_VALIDATION.md.
