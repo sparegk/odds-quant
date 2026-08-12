@@ -917,3 +917,6 @@ recommendation and explain why.
   confidence-bound gates, and full-season finality requirement. It explicitly cannot modify,
   replace, or satisfy the original two-book market-consensus contract. See
   PAMESTOIXIMA_EDGE_VALIDATION.md.
+- [x] Add a typed outcome-blind Pamestoixima-only audit through API and CLI. It reports aggregate
+  single-book snapshot, decision-window, explicit-closing, result, prediction, and cost coverage;
+  exposes no two-book or performance fields; and exits 4 while blocked.

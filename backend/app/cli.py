@@ -19,7 +19,11 @@ from app.providers.openfootball import (
     normalize_openfootball_results,
     normalize_openfootball_text_results,
 )
-from app.schemas.api import CollectionMonitoringView, MarketEdgeCoverageView
+from app.schemas.api import (
+    CollectionMonitoringView,
+    MarketEdgeCoverageView,
+    PamestoiximaEdgeCoverageView,
+)
 from app.schemas.models import (
     EvaluateModelRequest,
     PredictEventRequest,
@@ -40,6 +44,7 @@ from app.services.modeling import (
     train_poisson_model,
 )
 from app.services.odds_import import OddsImportError, import_odds_csv
+from app.services.pamestoixima_edge_coverage import pamestoixima_edge_coverage
 from app.services.results_import import (
     ResultImportError,
     import_results_csv,
@@ -126,6 +131,15 @@ def _parser() -> argparse.ArgumentParser:
         "--fail-on-blockers",
         action="store_true",
         help="exit with status 4 while acquisition or replay blockers remain",
+    )
+    pamestoixima_audit = commands.add_parser(
+        "audit-pamestoixima-edge-coverage",
+        help="report outcome-blind coverage for the frozen Pamestoixima-only cohort",
+    )
+    pamestoixima_audit.add_argument(
+        "--fail-on-blockers",
+        action="store_true",
+        help="exit with status 4 while Pamestoixima acquisition or replay blockers remain",
     )
     train = commands.add_parser("train-poisson", help="train a versioned Poisson baseline")
     train.add_argument("competition_id", type=int)
@@ -305,6 +319,8 @@ def main() -> int:
                 )
             elif args.command == "audit-market-edge-coverage":
                 result = market_edge_coverage(session)
+            elif args.command == "audit-pamestoixima-edge-coverage":
+                result = pamestoixima_edge_coverage(session)
             elif args.command == "train-poisson":
                 result = train_poisson_model(
                     session,
@@ -386,7 +402,7 @@ def main() -> int:
     if isinstance(result, CollectionMonitoringView) and args.fail_on_alerts and result.alerts:
         return 3
     if (
-        isinstance(result, MarketEdgeCoverageView)
+        isinstance(result, (MarketEdgeCoverageView, PamestoiximaEdgeCoverageView))
         and args.fail_on_blockers
         and (result.blockers or not result.acquisition_ready or not result.replay_authorized)
     ):

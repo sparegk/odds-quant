@@ -138,8 +138,13 @@ def test_market_edge_coverage_is_outcome_blind_and_contract_specific(
     competition.season = "2026/27"
     for provider in session.scalars(select(Provider)).all():
         provider.is_demo = False
-    for bookmaker in session.scalars(select(Bookmaker)).all():
+    bookmakers = session.scalars(select(Bookmaker).order_by(Bookmaker.id)).all()
+    for bookmaker in bookmakers:
         bookmaker.is_demo = False
+    bookmakers[0].slug = "allwyn-pamestoixima"
+    bookmakers[0].name = "Allwyn / Pamestoixima"
+    bookmakers[1].slug = "novibet"
+    bookmakers[1].name = "Novibet"
     for event in session.scalars(select(Event)).all():
         event.is_demo = False
         event.kickoff_at = as_of + timedelta(hours=2)
@@ -222,6 +227,31 @@ def test_market_edge_coverage_is_outcome_blind_and_contract_specific(
     assert "roi" not in payload
     assert "clv" not in payload
     assert "returns" not in payload
+
+    pamestoixima_response = client.get("/api/v1/data/pamestoixima-edge-coverage")
+    assert pamestoixima_response.status_code == 200
+    pamestoixima = pamestoixima_response.json()
+    assert pamestoixima["contract_version"] == "cold-start-v2-pamestoixima-edge-validation-v1"
+    assert pamestoixima["stored_events"] == 4
+    assert pamestoixima["permitted_snapshots"] == 4
+    assert pamestoixima["permitted_snapshot_events"] == 4
+    assert pamestoixima["decision_window_events"] == 4
+    assert pamestoixima["explicit_closing_events"] == 1
+    assert pamestoixima["cost_profile_events"] == 0
+    assert pamestoixima["market_consensus_authorized"] is False
+    assert pamestoixima["acquisition_ready"] is False
+    assert pamestoixima["replay_authorized"] is False
+    assert pamestoixima["blockers"] == [
+        "incomplete_candidate_universe",
+        "insufficient_decision_window_market_observations",
+        "insufficient_decision_window_market_coverage",
+        "insufficient_explicit_closing_coverage",
+        "incomplete_final_results",
+        "incomplete_cost_profiles",
+    ]
+    assert "two_bookmaker_events" not in pamestoixima
+    assert "roi" not in pamestoixima
+    assert "clv" not in pamestoixima
 
 
 def test_collection_monitoring_requires_two_fresh_completed_jobs(

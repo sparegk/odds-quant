@@ -10,6 +10,9 @@ parked. It does not modify, replace, or satisfy the frozen two-book market-conse
   inspecting any cohort outcome, CLV, or return. Bind model 12, complete full-time 1X2 evidence,
   the existing explainable-value policy, fixed coverage/sample thresholds, moving-block bootstrap
   intervals, and the original probability-activation hashes.
+- [x] Add one typed, outcome-blind coverage audit through the Pamestoixima API endpoint and CLI
+  command. It reports only aggregate single-book acquisition fields, cannot authorize
+  market-consensus validation, and exits 4 while any frozen single-book blocker remains.
 - [ ] Collect complete Pamestoixima 1X2 snapshots between 24 hours and 60 minutes before kickoff
   for at least 160 events and 80% of the fixed 380-event cohort.
 - [ ] Acquire explicitly designated Pamestoixima closing snapshots with original source timestamps

@@ -15,6 +15,7 @@ from app.schemas.api import (
     EventSummary,
     MarketComparison,
     MarketEdgeCoverageView,
+    PamestoiximaEdgeCoverageView,
     ProviderJobView,
     ProviderSummary,
     ReadinessCounts,
@@ -29,6 +30,7 @@ from app.services.catalog import (
 from app.services.collection_monitoring import collection_monitoring
 from app.services.data_coverage import data_coverage
 from app.services.market_edge_coverage import market_edge_coverage
+from app.services.pamestoixima_edge_coverage import pamestoixima_edge_coverage
 from app.services.readiness import readiness_counts
 
 router = APIRouter()
@@ -52,6 +54,15 @@ def coverage(database: Database) -> DataCoverageView:
 )
 def market_edge_coverage_audit(database: Database) -> MarketEdgeCoverageView:
     return market_edge_coverage(database)
+
+
+@router.get(
+    "/data/pamestoixima-edge-coverage",
+    response_model=PamestoiximaEdgeCoverageView,
+    tags=["data"],
+)
+def pamestoixima_edge_coverage_audit(database: Database) -> PamestoiximaEdgeCoverageView:
+    return pamestoixima_edge_coverage(database)
 
 
 @router.get("/data/monitoring", response_model=CollectionMonitoringView, tags=["data"])

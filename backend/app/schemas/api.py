@@ -119,6 +119,33 @@ class MarketEdgeCoverageView(BaseModel):
     blockers: list[str]
 
 
+class PamestoiximaEdgeCoverageView(BaseModel):
+    contract_version: str
+    cohort_selection_id: str
+    observed_at: datetime
+    activated_model_id: int
+    activated_model_version: str
+    expected_events: int
+    stored_events: int
+    final_result_events: int
+    prediction_events: int
+    permitted_snapshots: int
+    permitted_snapshot_events: int
+    decision_window_events: int
+    explicit_closing_events: int
+    cost_profile_events: int
+    decision_window_coverage: float
+    closing_coverage: float
+    cost_profile_coverage: float
+    minimum_observations: int
+    minimum_candidate_coverage: float
+    minimum_closing_coverage: float
+    market_consensus_authorized: bool
+    acquisition_ready: bool
+    replay_authorized: bool
+    blockers: list[str]
+
+
 class ProviderCollectionHealth(BaseModel):
     provider_id: int
     provider: str
