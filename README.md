@@ -298,6 +298,7 @@ Import a user-provided UTF-8 CSV after applying migrations:
 python -m app.cli import-odds data/imports/odds.csv
 python -m app.cli import-results data/imports/results.csv
 python -m app.cli audit-market-edge-coverage
+python -m app.cli audit-market-edge-coverage --fail-on-blockers
 ```
 
 When running from `backend`, place licensed or proprietary input files under `data/imports/`. That local intake directory is git-ignored; raw provider data must never be committed. Files may also remain outside the repository and be referenced by absolute path.

@@ -905,3 +905,6 @@ recommendation and explain why.
 - [x] Add the frozen-cohort receipt to the Data operations dashboard with separate bookmaker rows,
   bounded blockers, endpoint-failure handling, and no performance or price fields. Replay remains
   visibly locked until acquisition is complete.
+- [x] Add a machine-actionable audit-market-edge-coverage --fail-on-blockers mode. It preserves
+  the JSON receipt and exits 4 unless blockers are empty and both acquisition and fixed replay are
+  explicitly authorized; the ordinary reporting command remains exit 0 while collection runs.

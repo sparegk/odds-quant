@@ -125,3 +125,22 @@ def test_market_edge_coverage_cli_serializes_only_audit_fields(
     assert payload["blockers"] == ["incomplete_candidate_universe"]
     assert "roi" not in payload
     assert "clv" not in payload
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["odds-quant", "audit-market-edge-coverage", "--fail-on-blockers"],
+    )
+    assert cli.main() == 4
+    blocked_payload = json.loads(capsys.readouterr().out)
+    assert blocked_payload["replay_authorized"] is False
+    assert blocked_payload["blockers"] == ["incomplete_candidate_universe"]
+
+    ready = result.model_copy(
+        update={"acquisition_ready": True, "replay_authorized": True, "blockers": []}
+    )
+    monkeypatch.setattr(cli, "market_edge_coverage", lambda *args, **kwargs: ready)
+    assert cli.main() == 0
+    ready_payload = json.loads(capsys.readouterr().out)
+    assert ready_payload["replay_authorized"] is True
+    assert ready_payload["blockers"] == []

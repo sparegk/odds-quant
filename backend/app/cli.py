@@ -19,7 +19,7 @@ from app.providers.openfootball import (
     normalize_openfootball_results,
     normalize_openfootball_text_results,
 )
-from app.schemas.api import CollectionMonitoringView
+from app.schemas.api import CollectionMonitoringView, MarketEdgeCoverageView
 from app.schemas.models import (
     EvaluateModelRequest,
     PredictEventRequest,
@@ -118,9 +118,14 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="exit with status 3 when collection alerts are present",
     )
-    commands.add_parser(
+    market_edge_audit = commands.add_parser(
         "audit-market-edge-coverage",
         help="report outcome-blind coverage for the frozen market-edge cohort",
+    )
+    market_edge_audit.add_argument(
+        "--fail-on-blockers",
+        action="store_true",
+        help="exit with status 4 while acquisition or replay blockers remain",
     )
     train = commands.add_parser("train-poisson", help="train a versioned Poisson baseline")
     train.add_argument("competition_id", type=int)
@@ -380,6 +385,12 @@ def main() -> int:
     print(result.model_dump_json())
     if isinstance(result, CollectionMonitoringView) and args.fail_on_alerts and result.alerts:
         return 3
+    if (
+        isinstance(result, MarketEdgeCoverageView)
+        and args.fail_on_blockers
+        and (result.blockers or not result.acquisition_ready or not result.replay_authorized)
+    ):
+        return 4
     return 0
 
 

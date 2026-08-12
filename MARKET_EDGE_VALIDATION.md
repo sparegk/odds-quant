@@ -70,3 +70,6 @@ cost-covered decision pairs. This is collection-readiness evidence only.
 - [x] Expose that same typed receipt in Data operations. The dashboard keeps Pamestoixima and
   Novibet separate, renders bounded acquisition blockers, and keeps fixed replay visibly locked
   on both incomplete evidence and endpoint failure. It does not load performance or price fields.
+- [x] Add audit-market-edge-coverage --fail-on-blockers for machine-actionable acquisition
+  enforcement. It emits the same outcome-blind receipt and exits with status 4 until the frozen
+  audit has no blockers and explicitly authorizes both acquisition completion and fixed replay.
