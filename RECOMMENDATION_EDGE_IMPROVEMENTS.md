@@ -5,7 +5,7 @@ conditional decisions from timestamp-valid evidence, never guarantees.
 
 - [x] Require exact fresh quote identity, sourced costs, valid rounded stakes, and positive lower
   net EV before a candidate can appear as an executable recommendation.
-- [ ] Add an actionable minimum-odds threshold after costs so users can reject a moved price.
+- [x] Add an actionable minimum-odds threshold after costs so users can reject a moved price.
 - [ ] Add a decomposed recommendation-quality score that keeps probability reliability, market
   disagreement, price freshness, and net economics separate.
 - [ ] Add prospective recommendation tracking with immutable decision-time snapshots and explicit
@@ -22,3 +22,11 @@ when pre-cost EV is positive.
 
 Builder quotes remain visible for research but cannot be recommendations until their exact quote,
 bookmaker identity, currency, settlement, and cost evidence can be joined and validated.
+
+## Minimum acceptable odds
+
+For the displayed valid stake, the app algebraically solves the decimal odds at which expected net
+profit using the lower probability bound equals zero. The equation includes stake tax, fixed fee,
+winnings tax, payout withholding, and commission. The recommendation card shows this threshold and
+instructs the user to reject a moved live price unless it is strictly greater. Equality is break-even,
+not positive advantage. The threshold is recalculated from the same sourced terms used by net EV.

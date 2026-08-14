@@ -753,6 +753,7 @@ export interface MatchSuggestion {
   cost_calculation_stake: number
   cost_calculation_cash_outlay: number
   cost_currency: string
+  minimum_odds_for_positive_lower_net_ev: number
   confidence: number | null
   conservative_score: number
   price_observed_at: string

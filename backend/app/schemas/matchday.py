@@ -101,6 +101,7 @@ class MatchSuggestionView(BaseModel):
     cost_calculation_stake: float
     cost_calculation_cash_outlay: float
     cost_currency: str
+    minimum_odds_for_positive_lower_net_ev: float
     confidence: float | None
     conservative_score: float
     price_observed_at: datetime

@@ -86,6 +86,8 @@ def test_builds_ranked_api_view_from_qualified_signal() -> None:
     assert suggestion.lower_net_expected_value == pytest.approx(0.116)
     assert suggestion.cost_calculation_stake == 100
     assert suggestion.cost_currency == "EUR"
+    assert suggestion.minimum_odds_for_positive_lower_net_ev == pytest.approx(1 / 0.62)
+    assert suggestion.offered_odds > suggestion.minimum_odds_for_positive_lower_net_ev
     assert suggestion.conservative_score == pytest.approx(0.0928)
     assert suggestion.price_observed_at < suggestion.generated_at
 

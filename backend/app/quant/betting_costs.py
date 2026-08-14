@@ -70,3 +70,19 @@ def cost_adjusted_expected_value(
         expected_net_profit=expected_profit,
         expected_net_roi=expected_profit / cash_outlay,
     )
+
+
+def minimum_decimal_odds_for_positive_net_ev(
+    *, probability: Decimal, stake: Decimal, tax: TaxTerms
+) -> Decimal:
+    """Return the strict break-even odds threshold after all configured costs."""
+    if not ZERO < probability <= ONE:
+        raise ArbitrageMathError("probability must be in (0, 1]")
+    if stake <= ZERO:
+        raise ArbitrageMathError("stake must be positive")
+    winnings_rate = tax.winnings_tax_rate + tax.commission_rate
+    odds_multiplier = ONE - winnings_rate - tax.payout_withholding_rate
+    if odds_multiplier <= ZERO:
+        raise ArbitrageMathError("configured deductions eliminate odds-linked payout")
+    cash_outlay = stake * (ONE + tax.stake_tax_rate) + tax.fixed_fee
+    return (cash_outlay / (probability * stake) - winnings_rate) / odds_multiplier

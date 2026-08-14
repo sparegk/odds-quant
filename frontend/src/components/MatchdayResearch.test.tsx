@@ -357,6 +357,7 @@ const detail: MatchdayEventDetail = {
       cost_calculation_stake: 100,
       cost_calculation_cash_outlay: 102,
       cost_currency: 'EUR',
+      minimum_odds_for_positive_lower_net_ev: 1.65,
       confidence: 0.8,
       conservative_score: 0.0928,
       price_observed_at: '2026-07-21T12:03:00Z',
@@ -649,6 +650,9 @@ describe('MatchdayResearch', () => {
     expect(screen.getAllByText('Lower net EV/cash unit').length).toBeGreaterThanOrEqual(2)
     expect(screen.getByText('+7.2%')).toBeInTheDocument()
     expect(screen.getByText('100.00 stake / 102.00 EUR outlay')).toBeInTheDocument()
+    expect(screen.getByText('Minimum acceptable odds')).toBeInTheDocument()
+    expect(screen.getByText('>1.650')).toBeInTheDocument()
+    expect(screen.getByText(/Reject the bet if the live decimal price/)).toBeInTheDocument()
     expect(screen.getByText(/Recommendation requires complete sourced costs/)).toBeInTheDocument()
   })
 

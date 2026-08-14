@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
-from app.quant.betting_costs import cost_adjusted_expected_value, valid_reference_stake
+from app.quant.betting_costs import (
+    cost_adjusted_expected_value,
+    minimum_decimal_odds_for_positive_net_ev,
+    valid_reference_stake,
+)
 from app.quant.match_suggestions import (
     BOOKMAKER_NAMES,
     BookmakerCode,
@@ -27,6 +32,16 @@ from app.schemas.signals import ValueSignalView
 from app.services.betting_costs import QuoteCostEvidence
 
 BOOKMAKER_CODES: tuple[BookmakerCode, BookmakerCode] = ("allwyn", "novibet")
+
+
+@dataclass(frozen=True)
+class SuggestionEconomics:
+    net_expected_value: float
+    lower_net_expected_value: float
+    stake: float
+    cash_outlay: float
+    currency: str
+    minimum_odds_for_positive_lower_net_ev: float
 
 
 def build_model_market_comparisons(
@@ -409,7 +424,7 @@ def _suggestion_view(
     ranked: RankedSuggestion,
     *,
     signals: list[ValueSignalView],
-    signal_economics: dict[int, tuple[float, float, float, float, str] | None],
+    signal_economics: dict[int, SuggestionEconomics | None],
     rank: int,
 ) -> MatchSuggestionView:
     candidate = ranked.candidate
@@ -417,7 +432,6 @@ def _suggestion_view(
         signal = next(item for item in signals if item.id == candidate.source_id)
         economics = signal_economics[signal.id]
         assert economics is not None
-        net_ev, lower_net_ev, stake, cash_outlay, currency = economics
         return MatchSuggestionView(
             rank=rank,
             source_kind="single",
@@ -435,11 +449,14 @@ def _suggestion_view(
             market_fair_probability=signal.market_fair_probability,
             expected_value=signal.expected_value,
             lower_expected_value=signal.lower_expected_value,
-            net_expected_value=net_ev,
-            lower_net_expected_value=lower_net_ev,
-            cost_calculation_stake=stake,
-            cost_calculation_cash_outlay=cash_outlay,
-            cost_currency=currency,
+            net_expected_value=economics.net_expected_value,
+            lower_net_expected_value=economics.lower_net_expected_value,
+            cost_calculation_stake=economics.stake,
+            cost_calculation_cash_outlay=economics.cash_outlay,
+            cost_currency=economics.currency,
+            minimum_odds_for_positive_lower_net_ev=(
+                economics.minimum_odds_for_positive_lower_net_ev
+            ),
             confidence=signal.confidence,
             conservative_score=ranked.conservative_score,
             price_observed_at=_utc(signal.generated_at)
@@ -462,7 +479,7 @@ def _signal_cost_economics(
     *,
     evidence: QuoteCostEvidence | None,
     currency: str | None,
-) -> tuple[float, float, float, float, str] | None:
+) -> SuggestionEconomics | None:
     if (
         evidence is None
         or evidence.blockers
@@ -486,16 +503,22 @@ def _signal_cost_economics(
         tax=evidence.tax,
         constraint=evidence.constraint,
     )
-    return (
-        float(central.expected_net_roi),
-        float(lower.expected_net_roi),
-        float(stake),
-        float(central.cash_outlay),
-        currency,
+    threshold = minimum_decimal_odds_for_positive_net_ev(
+        probability=Decimal(str(signal.lower_probability)),
+        stake=stake,
+        tax=evidence.tax,
+    )
+    return SuggestionEconomics(
+        net_expected_value=float(central.expected_net_roi),
+        lower_net_expected_value=float(lower.expected_net_roi),
+        stake=float(stake),
+        cash_outlay=float(central.cash_outlay),
+        currency=currency,
+        minimum_odds_for_positive_lower_net_ev=float(threshold),
     )
 
 
 def _lower_net_expected_value(
-    economics: tuple[float, float, float, float, str] | None,
+    economics: SuggestionEconomics | None,
 ) -> float | None:
-    return economics[1] if economics is not None else None
+    return economics.lower_net_expected_value if economics is not None else None
