@@ -1,9 +1,27 @@
 from datetime import UTC, datetime
+from decimal import Decimal
 
 import pytest
 
+from app.quant.arbitrage import StakeConstraint, TaxTerms
 from app.schemas.signals import ValueSignalView
+from app.services.betting_costs import QuoteCostEvidence
 from app.services.match_suggestions import build_match_suggestions
+
+
+def cost_evidence() -> QuoteCostEvidence:
+    return QuoteCostEvidence(
+        tax=TaxTerms(),
+        constraint=StakeConstraint(
+            minimum_stake=Decimal("1"),
+            maximum_stake=Decimal("1000"),
+            stake_increment=Decimal("0.01"),
+        ),
+        tax_profile_id=1,
+        tax_verified_at=datetime(2026, 7, 23, 12, tzinfo=UTC),
+        constraint_observed_at=datetime(2026, 7, 24, 11, tzinfo=UTC),
+        blockers=(),
+    )
 
 
 def test_builds_ranked_api_view_from_qualified_signal() -> None:
@@ -52,6 +70,8 @@ def test_builds_ranked_api_view_from_qualified_signal() -> None:
         cutoff=generated_at,
         max_price_age_minutes=5,
         event_is_demo=False,
+        cost_evidence_by_snapshot_id={12: cost_evidence()},
+        market_currency_by_id={9: "EUR"},
     )
 
     assert len(ranked) == 1
@@ -63,8 +83,44 @@ def test_builds_ranked_api_view_from_qualified_signal() -> None:
     assert suggestion.offered_odds == 1.8
     assert suggestion.lower_probability == 0.62
     assert suggestion.lower_expected_value == 0.116
+    assert suggestion.lower_net_expected_value == pytest.approx(0.116)
+    assert suggestion.cost_calculation_stake == 100
+    assert suggestion.cost_currency == "EUR"
     assert suggestion.conservative_score == pytest.approx(0.0928)
     assert suggestion.price_observed_at < suggestion.generated_at
+
+    missing_cost_views, _ = build_match_suggestions(
+        signals=[signal],
+        builder_quotes=[],
+        selected_bookmakers={"novibet"},
+        cutoff=generated_at,
+        max_price_age_minutes=5,
+        event_is_demo=False,
+        cost_evidence_by_snapshot_id={},
+        market_currency_by_id={9: "EUR"},
+    )
+    expensive = cost_evidence()
+    expensive = QuoteCostEvidence(
+        tax=TaxTerms(fixed_fee=Decimal("50")),
+        constraint=expensive.constraint,
+        tax_profile_id=expensive.tax_profile_id,
+        tax_verified_at=expensive.tax_verified_at,
+        constraint_observed_at=expensive.constraint_observed_at,
+        blockers=(),
+    )
+    negative_net_views, _ = build_match_suggestions(
+        signals=[signal],
+        builder_quotes=[],
+        selected_bookmakers={"novibet"},
+        cutoff=generated_at,
+        max_price_age_minutes=5,
+        event_is_demo=False,
+        cost_evidence_by_snapshot_id={12: expensive},
+        market_currency_by_id={9: "EUR"},
+    )
+
+    assert missing_cost_views == []
+    assert negative_net_views == []
 
 
 def test_api_view_builder_respects_bookmaker_filter() -> None:
@@ -113,6 +169,8 @@ def test_api_view_builder_respects_bookmaker_filter() -> None:
         cutoff=generated_at,
         max_price_age_minutes=5,
         event_is_demo=False,
+        cost_evidence_by_snapshot_id={},
+        market_currency_by_id={9: "EUR"},
     )
 
     assert views == []

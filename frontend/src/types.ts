@@ -748,6 +748,11 @@ export interface MatchSuggestion {
   market_fair_probability: number | null
   expected_value: number
   lower_expected_value: number
+  net_expected_value: number
+  lower_net_expected_value: number
+  cost_calculation_stake: number
+  cost_calculation_cash_outlay: number
+  cost_currency: string
   confidence: number | null
   conservative_score: number
   price_observed_at: string

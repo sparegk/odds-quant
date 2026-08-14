@@ -352,6 +352,11 @@ const detail: MatchdayEventDetail = {
       market_fair_probability: 0.56,
       expected_value: 0.224,
       lower_expected_value: 0.116,
+      net_expected_value: 0.18,
+      lower_net_expected_value: 0.072,
+      cost_calculation_stake: 100,
+      cost_calculation_cash_outlay: 102,
+      cost_currency: 'EUR',
       confidence: 0.8,
       conservative_score: 0.0928,
       price_observed_at: '2026-07-21T12:03:00Z',
@@ -636,6 +641,15 @@ describe('MatchdayResearch', () => {
     expect(screen.getByText(/2.15 · raw EV \+11.8%/)).toBeInTheDocument()
     expect(screen.getAllByText(/no calibrated VALUE signal is stored/i).length).toBeGreaterThan(0)
     expect(screen.getByText('Outcome likelihoods—not betting edges')).toBeInTheDocument()
+  })
+
+  it('labels recommendations with executable lower net EV and cost basis', () => {
+    render(<MatchDetail detail={detail} />)
+
+    expect(screen.getAllByText('Lower net EV/cash unit').length).toBeGreaterThanOrEqual(2)
+    expect(screen.getByText('+7.2%')).toBeInTheDocument()
+    expect(screen.getByText('100.00 stake / 102.00 EUR outlay')).toBeInTheDocument()
+    expect(screen.getByText(/Recommendation requires complete sourced costs/)).toBeInTheDocument()
   })
 
   it('shows pre-registered de-vig sensitivity without changing the frozen replay', () => {

@@ -515,6 +515,18 @@ def get_matchday_event_detail(
         as_of=cutoff,
         stale_after_seconds=stale_after_seconds,
     )
+    cost_evidence_by_snapshot_id = {
+        snapshot.snapshot_id: resolve_quote_cost_evidence(
+            session,
+            bookmaker_id=snapshot.bookmaker_id,
+            bookmaker_name=snapshot.bookmaker,
+            currency=market.currency,
+            reference=cutoff,
+        )
+        for market in markets
+        for snapshot in market.snapshots
+        if not snapshot.is_stale and bookmaker_code(snapshot.bookmaker) in selected
+    }
     suggestions, ranked_suggestions = build_match_suggestions(
         signals=signals,
         builder_quotes=builder_quotes,
@@ -522,23 +534,14 @@ def get_matchday_event_detail(
         cutoff=cutoff,
         max_price_age_minutes=stale_after_seconds / 60,
         event_is_demo=event.is_demo,
+        cost_evidence_by_snapshot_id=cost_evidence_by_snapshot_id,
+        market_currency_by_id={market.market_id: market.currency for market in markets},
     )
     model_market_comparisons = build_model_market_comparisons(
         latest_prediction=latest_prediction,
         markets=markets,
         selected_bookmakers=selected,
-        cost_evidence_by_snapshot_id={
-            snapshot.snapshot_id: resolve_quote_cost_evidence(
-                session,
-                bookmaker_id=snapshot.bookmaker_id,
-                bookmaker_name=snapshot.bookmaker,
-                currency=market.currency,
-                reference=cutoff,
-            )
-            for market in markets
-            for snapshot in market.snapshots
-            if not snapshot.is_stale and bookmaker_code(snapshot.bookmaker) in selected
-        },
+        cost_evidence_by_snapshot_id=cost_evidence_by_snapshot_id,
     )
 
     player_records = (

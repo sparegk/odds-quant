@@ -219,7 +219,17 @@ def build_match_suggestions(
     cutoff: datetime,
     max_price_age_minutes: float,
     event_is_demo: bool,
+    cost_evidence_by_snapshot_id: dict[int, QuoteCostEvidence],
+    market_currency_by_id: dict[int, str],
 ) -> tuple[list[MatchSuggestionView], list[RankedSuggestion]]:
+    signal_economics = {
+        signal.id: _signal_cost_economics(
+            signal,
+            evidence=cost_evidence_by_snapshot_id.get(signal.odds_snapshot_id),
+            currency=market_currency_by_id.get(signal.market_id),
+        )
+        for signal in signals
+    }
     candidates = [
         SuggestionCandidate(
             source_id=signal.id,
@@ -229,6 +239,8 @@ def build_match_suggestions(
             offered_odds=signal.offered_odds,
             lower_probability=signal.lower_probability,
             lower_expected_value=signal.lower_expected_value,
+            lower_net_expected_value=_lower_net_expected_value(signal_economics[signal.id]),
+            cost_evidence_complete=signal_economics[signal.id] is not None,
             confidence=signal.confidence,
             price_observed_at=_utc(signal.generated_at)
             - timedelta(minutes=signal.odds_age_minutes),
@@ -248,6 +260,8 @@ def build_match_suggestions(
             offered_odds=quote.offered_odds,
             lower_probability=quote.lower_joint_probability,
             lower_expected_value=quote.lower_expected_value,
+            lower_net_expected_value=None,
+            cost_evidence_complete=False,
             confidence=1.0,
             price_observed_at=quote.offered_odds_observed_at,
             generated_at=_utc(quote.quoted_at),
@@ -263,7 +277,12 @@ def build_match_suggestions(
         max_price_age_minutes=max_price_age_minutes,
     )
     views = [
-        _suggestion_view(item, signals=signals, builder_quotes=builder_quotes, rank=index)
+        _suggestion_view(
+            item,
+            signals=signals,
+            signal_economics=signal_economics,
+            rank=index,
+        )
         for index, item in enumerate(ranked, start=1)
     ]
     return views, ranked
@@ -390,12 +409,15 @@ def _suggestion_view(
     ranked: RankedSuggestion,
     *,
     signals: list[ValueSignalView],
-    builder_quotes: list[BetBuilderQuoteView],
+    signal_economics: dict[int, tuple[float, float, float, float, str] | None],
     rank: int,
 ) -> MatchSuggestionView:
     candidate = ranked.candidate
     if candidate.kind == "single":
         signal = next(item for item in signals if item.id == candidate.source_id)
+        economics = signal_economics[signal.id]
+        assert economics is not None
+        net_ev, lower_net_ev, stake, cash_outlay, currency = economics
         return MatchSuggestionView(
             rank=rank,
             source_kind="single",
@@ -413,6 +435,11 @@ def _suggestion_view(
             market_fair_probability=signal.market_fair_probability,
             expected_value=signal.expected_value,
             lower_expected_value=signal.lower_expected_value,
+            net_expected_value=net_ev,
+            lower_net_expected_value=lower_net_ev,
+            cost_calculation_stake=stake,
+            cost_calculation_cash_outlay=cash_outlay,
+            cost_currency=currency,
             confidence=signal.confidence,
             conservative_score=ranked.conservative_score,
             price_observed_at=_utc(signal.generated_at)
@@ -421,46 +448,54 @@ def _suggestion_view(
             reasons=signal.reasons,
             risks=signal.risks,
         )
-    quote = next(item for item in builder_quotes if item.id == candidate.source_id)
-    selection_name = " + ".join(
-        f"{leg.market_type} {leg.selection}" + (f" {leg.line:g}" if leg.line is not None else "")
-        for leg in quote.legs
-    )
-    assert quote.offered_odds is not None
-    assert quote.expected_value is not None
-    assert quote.lower_expected_value is not None
-    assert quote.offered_odds_observed_at is not None
-    return MatchSuggestionView(
-        rank=rank,
-        source_kind="builder",
-        source_id=quote.id,
-        bookmaker_code=ranked.bookmaker_code,
-        bookmaker=quote.offered_odds_source or "",
-        market_type="BET_BUILDER",
-        selection_code="BUILDER",
-        selection_name=selection_name,
-        line=None,
-        legs=quote.legs,
-        offered_odds=quote.offered_odds,
-        model_probability=quote.joint_probability,
-        lower_probability=quote.lower_joint_probability,
-        market_fair_probability=None,
-        expected_value=quote.expected_value,
-        lower_expected_value=quote.lower_expected_value,
-        confidence=None,
-        conservative_score=ranked.conservative_score,
-        price_observed_at=quote.offered_odds_observed_at,
-        generated_at=_utc(quote.quoted_at),
-        reasons=[
-            "The identical stored builder quote remains positive value at the lower "
-            "joint-probability bound."
-        ],
-        risks=quote.warnings
-        + ["Recheck every leg, line, period, and settlement rule in the bookmaker app."],
-    )
+    raise AssertionError("builder recommendations require exact validated cost economics")
 
 
 def _utc(value: datetime) -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
         return value.replace(tzinfo=UTC)
     return value.astimezone(UTC)
+
+
+def _signal_cost_economics(
+    signal: ValueSignalView,
+    *,
+    evidence: QuoteCostEvidence | None,
+    currency: str | None,
+) -> tuple[float, float, float, float, str] | None:
+    if (
+        evidence is None
+        or evidence.blockers
+        or evidence.tax is None
+        or evidence.constraint is None
+        or currency is None
+    ):
+        return None
+    stake = valid_reference_stake(evidence.constraint)
+    central = cost_adjusted_expected_value(
+        probability=Decimal(str(signal.model_probability)),
+        decimal_odds=Decimal(str(signal.offered_odds)),
+        stake=stake,
+        tax=evidence.tax,
+        constraint=evidence.constraint,
+    )
+    lower = cost_adjusted_expected_value(
+        probability=Decimal(str(signal.lower_probability)),
+        decimal_odds=Decimal(str(signal.offered_odds)),
+        stake=stake,
+        tax=evidence.tax,
+        constraint=evidence.constraint,
+    )
+    return (
+        float(central.expected_net_roi),
+        float(lower.expected_net_roi),
+        float(stake),
+        float(central.cash_outlay),
+        currency,
+    )
+
+
+def _lower_net_expected_value(
+    economics: tuple[float, float, float, float, str] | None,
+) -> float | None:
+    return economics[1] if economics is not None else None

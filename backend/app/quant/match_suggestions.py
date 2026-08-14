@@ -33,6 +33,8 @@ class SuggestionCandidate:
     offered_odds: float | None
     lower_probability: float
     lower_expected_value: float | None
+    lower_net_expected_value: float | None
+    cost_evidence_complete: bool
     confidence: float
     price_observed_at: datetime | None
     generated_at: datetime
@@ -105,6 +107,9 @@ def rank_match_suggestions(
             or candidate.offered_odds <= 1
             or candidate.lower_expected_value is None
             or candidate.lower_expected_value <= 0
+            or not candidate.cost_evidence_complete
+            or candidate.lower_net_expected_value is None
+            or candidate.lower_net_expected_value <= 0
             or not 0 <= candidate.confidence <= 1
             or candidate.confidence <= 0
             or not 0 <= candidate.lower_probability <= 1
@@ -117,7 +122,7 @@ def rank_match_suggestions(
             RankedSuggestion(
                 candidate=candidate,
                 bookmaker_code=code,
-                conservative_score=candidate.lower_expected_value * candidate.confidence,
+                conservative_score=candidate.lower_net_expected_value * candidate.confidence,
             )
         )
 

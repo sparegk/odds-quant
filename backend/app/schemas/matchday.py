@@ -96,6 +96,11 @@ class MatchSuggestionView(BaseModel):
     market_fair_probability: float | None
     expected_value: float
     lower_expected_value: float
+    net_expected_value: float
+    lower_net_expected_value: float
+    cost_calculation_stake: float
+    cost_calculation_cash_outlay: float
+    cost_currency: str
     confidence: float | None
     conservative_score: float
     price_observed_at: datetime
