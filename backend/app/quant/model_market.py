@@ -14,6 +14,18 @@ from app.quant.odds import (
 
 
 @dataclass(frozen=True)
+class DevigSensitivityMetrics:
+    method: str
+    market_consensus_probability: float
+    market_probability_low: float
+    market_probability_high: float
+    model_probability_edge: float
+    conservative_probability_edge: float
+    edge_positive: bool
+    conservative_edge_positive: bool
+
+
+@dataclass(frozen=True)
 class ModelMarketMetrics:
     market_consensus_probability: float
     market_probability_low: float
@@ -31,6 +43,8 @@ class ModelMarketMetrics:
     model_uncertainty_width: float
     market_uncertainty_width: float
     pre_cost_advantage_survives_uncertainty: bool
+    devig_sensitivity: tuple[DevigSensitivityMetrics, DevigSensitivityMetrics]
+    devig_conclusion_stable: bool
 
 
 def compare_model_to_market(
@@ -75,6 +89,26 @@ def compare_model_to_market(
     break_even = implied_probability(best_odds)
     lower_expected_value = expected_value(lower_probability, best_odds)
     conservative_edge = probability_edge(lower_probability, market_high)
+    proportional_estimates = [item[0] for item in estimates]
+    power_estimates = [item[1] for item in estimates]
+    sensitivity = tuple(
+        _method_sensitivity(
+            method=method,
+            estimates=values,
+            model_probability=model_probability,
+            lower_probability=lower_probability,
+        )
+        for method, values in (
+            ("proportional", proportional_estimates),
+            ("power", power_estimates),
+        )
+    )
+    proportional_sensitivity, power_sensitivity = sensitivity
+    conclusion_stable = (
+        proportional_sensitivity.edge_positive == power_sensitivity.edge_positive
+        and proportional_sensitivity.conservative_edge_positive
+        == power_sensitivity.conservative_edge_positive
+    )
     return ModelMarketMetrics(
         market_consensus_probability=consensus,
         market_probability_low=market_low,
@@ -94,6 +128,26 @@ def compare_model_to_market(
         pre_cost_advantage_survives_uncertainty=(
             conservative_edge > 0 and lower_expected_value > 0
         ),
+        devig_sensitivity=(proportional_sensitivity, power_sensitivity),
+        devig_conclusion_stable=conclusion_stable,
+    )
+
+
+def _method_sensitivity(
+    *, method: str, estimates: list[float], model_probability: float, lower_probability: float
+) -> DevigSensitivityMetrics:
+    consensus = sum(estimates) / len(estimates)
+    model_edge = probability_edge(model_probability, consensus)
+    conservative_method_edge = probability_edge(lower_probability, max(estimates))
+    return DevigSensitivityMetrics(
+        method=method,
+        market_consensus_probability=consensus,
+        market_probability_low=min(estimates),
+        market_probability_high=max(estimates),
+        model_probability_edge=model_edge,
+        conservative_probability_edge=conservative_method_edge,
+        edge_positive=model_edge > 0,
+        conservative_edge_positive=conservative_method_edge > 0,
     )
 
 

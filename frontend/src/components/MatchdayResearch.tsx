@@ -514,6 +514,18 @@ function ModelMarketLab({ detail }: { detail: MatchdayEventDetail }) {
               <LabMetric label="Book / method spread" value={`${signedPoints(comparison.bookmaker_disagreement).replace('+', '')} / ${signedPoints(comparison.devig_method_spread).replace('+', '')}`} />
               <LabMetric label="Market uncertainty width" value={signedPoints(comparison.market_uncertainty_width).replace('+', '')} />
             </dl>
+            <div className="border-t border-zinc-200 p-3">
+              <p className="text-xs font-bold uppercase text-zinc-500">Pre-registered de-vig sensitivity</p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {comparison.devig_sensitivity.map((item) => <div className="border border-zinc-200 bg-white p-2" key={item.method}>
+                  <div className="flex items-center justify-between gap-2"><span className="font-semibold capitalize">{item.method}</span><span className="text-[10px] font-bold uppercase text-zinc-500">{item.frozen_replay_primary ? 'Frozen replay primary' : 'Sensitivity only'}</span></div>
+                  <p className="mt-1 font-mono">Consensus {percentage(item.market_consensus_probability)} / edge {signedPoints(item.model_probability_edge)}</p>
+                  <p className="text-zinc-600">Conservative edge {signedPoints(item.conservative_probability_edge)} / range {percentage(item.market_probability_low)}-{percentage(item.market_probability_high)}</p>
+                </div>)}
+              </div>
+              <p className={`mt-2 text-xs font-semibold ${comparison.devig_conclusion_stable ? 'text-emerald-800' : 'text-amber-800'}`}>Method conclusion: {comparison.devig_conclusion_stable ? 'stable across proportional and power de-vigging' : 'method-sensitive; edge sign or conservative conclusion changes'}.</p>
+              <p className="mt-1 text-xs text-zinc-500">This robustness view cannot rewrite the frozen proportional replay or create a VALUE signal.</p>
+            </div>
             <div className="p-3 text-xs leading-5 text-zinc-600">
               <p>{comparison.bookmaker_count} selected bookmaker{comparison.bookmaker_count === 1 ? '' : 's'} included. Best price observed {formatDateTime(comparison.best_price_observed_at)}.</p>
               <p className={comparison.pre_cost_advantage_survives_uncertainty ? 'font-semibold text-emerald-800' : 'font-semibold text-amber-800'}>

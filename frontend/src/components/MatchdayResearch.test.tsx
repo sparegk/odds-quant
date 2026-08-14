@@ -277,6 +277,33 @@ const detail: MatchdayEventDetail = {
       constraint_observed_at: '2026-07-21T11:30:00Z',
       cost_adjusted_advantage_survives_uncertainty: false,
       cost_evidence_blockers: [],
+      devig_sensitivity: [
+        {
+          method: 'proportional',
+          market_consensus_probability: 0.49,
+          market_probability_low: 0.48,
+          market_probability_high: 0.50,
+          model_probability_edge: 0.03,
+          conservative_probability_edge: -0.03,
+          edge_positive: true,
+          conservative_edge_positive: false,
+          pre_registered: true,
+          frozen_replay_primary: true,
+        },
+        {
+          method: 'power',
+          market_consensus_probability: 0.46,
+          market_probability_low: 0.45,
+          market_probability_high: 0.47,
+          model_probability_edge: 0.06,
+          conservative_probability_edge: 0,
+          edge_positive: true,
+          conservative_edge_positive: false,
+          pre_registered: true,
+          frozen_replay_primary: false,
+        },
+      ],
+      devig_conclusion_stable: true,
       research_only: true,
       qualification_blockers: [
         'Descriptive comparison only; no calibrated VALUE signal is stored at this cutoff.',
@@ -609,6 +636,22 @@ describe('MatchdayResearch', () => {
     expect(screen.getByText(/2.15 · raw EV \+11.8%/)).toBeInTheDocument()
     expect(screen.getAllByText(/no calibrated VALUE signal is stored/i).length).toBeGreaterThan(0)
     expect(screen.getByText('Outcome likelihoods—not betting edges')).toBeInTheDocument()
+  })
+
+  it('shows pre-registered de-vig sensitivity without changing the frozen replay', () => {
+    render(<MatchDetail detail={detail} />)
+
+    expect(screen.getByText('Pre-registered de-vig sensitivity')).toBeInTheDocument()
+    expect(screen.getByText('Frozen replay primary')).toBeInTheDocument()
+    expect(screen.getByText('Sensitivity only')).toBeInTheDocument()
+    expect(screen.getByText(/cannot rewrite the frozen proportional replay/)).toBeInTheDocument()
+  })
+
+  it('warns when the de-vig method changes the edge conclusion', () => {
+    const comparison = detail.model_market_comparisons[0]!
+    render(<MatchDetail detail={{ ...detail, model_market_comparisons: [{ ...comparison, devig_conclusion_stable: false }] }} />)
+
+    expect(screen.getByText(/method-sensitive; edge sign or conservative conclusion changes/)).toBeInTheDocument()
   })
 
   it('shows chronological calibration separately from edge and returns', () => {

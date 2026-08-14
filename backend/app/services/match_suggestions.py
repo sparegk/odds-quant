@@ -16,6 +16,7 @@ from app.quant.model_market import compare_model_to_market
 from app.schemas.api import MarketComparison, PriceComparison, SnapshotComparison
 from app.schemas.builder import BetBuilderQuoteView
 from app.schemas.matchday import (
+    DevigSensitivityView,
     MatchdayBookmakerOptionView,
     MatchSuggestionView,
     ModelMarketComparisonView,
@@ -184,6 +185,21 @@ def build_model_market_comparisons(
                 cost_currency=market.currency,
                 settlement_rule_key=market.settlement_rule_key,
                 cost_evidence_blockers=cost_blockers,
+                devig_sensitivity=[
+                    DevigSensitivityView(
+                        method=item.method,
+                        market_consensus_probability=item.market_consensus_probability,
+                        market_probability_low=item.market_probability_low,
+                        market_probability_high=item.market_probability_high,
+                        model_probability_edge=item.model_probability_edge,
+                        conservative_probability_edge=item.conservative_probability_edge,
+                        edge_positive=item.edge_positive,
+                        conservative_edge_positive=item.conservative_edge_positive,
+                        frozen_replay_primary=item.method == "proportional",
+                    )
+                    for item in metrics.devig_sensitivity
+                ],
+                devig_conclusion_stable=metrics.devig_conclusion_stable,
                 qualification_blockers=[
                     "Descriptive comparison only; no calibrated VALUE signal is stored "
                     "at this cutoff.",

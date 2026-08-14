@@ -268,6 +268,10 @@ def test_model_market_comparison_uses_only_fresh_selected_bookmakers() -> None:
     assert comparison.pre_cost_advantage_survives_uncertainty is False
     assert comparison.cost_adjusted_expected_value is None
     assert comparison.cost_evidence_blockers
+    assert [item.method for item in comparison.devig_sensitivity] == ["proportional", "power"]
+    assert comparison.devig_sensitivity[0].frozen_replay_primary is True
+    assert comparison.devig_sensitivity[1].frozen_replay_primary is False
+    assert all(item.pre_registered is True for item in comparison.devig_sensitivity)
     assert comparison.research_only is True
     assert "no calibrated VALUE signal" in comparison.qualification_blockers[0]
 

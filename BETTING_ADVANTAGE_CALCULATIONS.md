@@ -13,7 +13,7 @@ remains conditional on timestamp-valid pre-kickoff model and market evidence.
   rounding rules. Missing or stale cost evidence must return unavailable, never zero cost.
 - [x] Add calibration reliability details using chronological out-of-sample evidence. Keep
   probability calibration separate from market-edge and return validation.
-- [ ] Add pre-registered de-vig sensitivity views. The frozen Pamestoixima replay retains its
+- [x] Add pre-registered de-vig sensitivity views. The frozen Pamestoixima replay retains its
   proportional method; robustness views cannot rewrite that primary result.
 
 ## Definitions
@@ -51,3 +51,11 @@ remains conditional on timestamp-valid pre-kickoff model and market evidence.
   replaced with optimistic defaults.
 - Calibration reliability describes probability quality only. Its response explicitly excludes
   market-edge evidence and betting-return evidence, which remain independently gated.
+- De-vig sensitivity is pre-registered to exactly two methods in fixed order: proportional and
+  power. Each method reports its equal-bookmaker consensus, range, central model edge, and
+  conservative lower-bound edge.
+- The sensitivity conclusion is stable only when both the central-edge sign and conservative-edge
+  sign agree across the two methods. A disagreement is displayed as method-sensitive rather than
+  selecting the more favorable result.
+- Proportional remains labeled as the frozen replay primary and power remains sensitivity-only.
+  These views cannot rewrite the replay, historical results, or VALUE signals.

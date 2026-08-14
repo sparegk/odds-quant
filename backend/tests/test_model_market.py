@@ -28,6 +28,31 @@ def test_model_market_consensus_weights_each_bookmaker_once() -> None:
     assert result.model_uncertainty_width == pytest.approx(0.12)
     assert result.market_uncertainty_width == pytest.approx(0.06)
     assert result.pre_cost_advantage_survives_uncertainty is False
+    proportional, power = result.devig_sensitivity
+    assert proportional.method == "proportional"
+    assert proportional.market_consensus_probability == pytest.approx(0.52)
+    assert proportional.model_probability_edge == pytest.approx(0.06)
+    assert proportional.conservative_probability_edge == pytest.approx(-0.02)
+    assert power.method == "power"
+    assert power.market_consensus_probability == pytest.approx(0.5)
+    assert power.model_probability_edge == pytest.approx(0.08)
+    assert power.conservative_probability_edge == pytest.approx(0.0)
+    assert result.devig_conclusion_stable is True
+
+
+def test_devig_sensitivity_flags_a_method_dependent_edge_conclusion() -> None:
+    result = compare_model_to_market(
+        model_probability=0.51,
+        lower_probability=0.49,
+        upper_probability=0.53,
+        market_estimates=[(0.52, 0.48), (0.52, 0.48)],
+        best_odds=2.0,
+    )
+
+    proportional, power = result.devig_sensitivity
+    assert proportional.edge_positive is False
+    assert power.edge_positive is True
+    assert result.devig_conclusion_stable is False
 
 
 def test_pre_cost_advantage_requires_both_uncertainty_bounds_to_pass() -> None:

@@ -866,8 +866,23 @@ export interface ModelMarketComparison {
   constraint_observed_at: string | null
   cost_adjusted_advantage_survives_uncertainty: boolean | null
   cost_evidence_blockers: string[]
+  devig_sensitivity: DevigSensitivity[]
+  devig_conclusion_stable: boolean
   research_only: true
   qualification_blockers: string[]
+}
+
+export interface DevigSensitivity {
+  method: 'proportional' | 'power'
+  market_consensus_probability: number
+  market_probability_low: number
+  market_probability_high: number
+  model_probability_edge: number
+  conservative_probability_edge: number
+  edge_positive: boolean
+  conservative_edge_positive: boolean
+  pre_registered: true
+  frozen_replay_primary: boolean
 }
 
 export interface CalibrationReliability {

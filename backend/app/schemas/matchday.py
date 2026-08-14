@@ -175,8 +175,23 @@ class ModelMarketComparisonView(BaseModel):
     constraint_observed_at: datetime | None
     cost_adjusted_advantage_survives_uncertainty: bool | None
     cost_evidence_blockers: list[str]
+    devig_sensitivity: list[DevigSensitivityView]
+    devig_conclusion_stable: bool
     research_only: Literal[True] = True
     qualification_blockers: list[str]
+
+
+class DevigSensitivityView(BaseModel):
+    method: Literal["proportional", "power"]
+    market_consensus_probability: float
+    market_probability_low: float
+    market_probability_high: float
+    model_probability_edge: float
+    conservative_probability_edge: float
+    edge_positive: bool
+    conservative_edge_positive: bool
+    pre_registered: Literal[True] = True
+    frozen_replay_primary: bool
 
 
 class CalibrationReliabilityView(BaseModel):
