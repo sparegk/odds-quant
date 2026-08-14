@@ -934,3 +934,17 @@ recommendation and explain why.
 - [ ] Continue the frozen Pamestoixima acquisition box outcome-blind. Current coverage remains
   below its fixed thresholds; do not infer closing status, inspect interim returns, or check the
   acquisition box early.
+
+### Betting advantage calculation detail (2026-08-14)
+
+- [x] Add a research-only pre-cost advantage decomposition without changing
+  `explainable-value-v1` or the frozen prospective replay. Match research now separates
+  best-price break-even probability, point and conservative price edge, model and lower-bound
+  fair odds, model and market uncertainty widths, pre-cost EV per unit, and the existing pure
+  model-versus-market edge.
+- [x] Require the descriptive pre-cost uncertainty test to retain both strictly positive
+  conservative market edge and strictly positive lower-bound EV. It remains blocked from being
+  interpreted as net advantage, a VALUE signal, or profitability evidence until sourced costs,
+  calibration, closing-line evidence, and the prospective gates pass.
+- [x] Verify the calculation expansion with 314 backend tests, 80 frontend tests, Ruff, Ruff
+  formatting, Mypy, ESLint, TypeScript, and the production build.

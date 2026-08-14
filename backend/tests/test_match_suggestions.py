@@ -254,8 +254,15 @@ def test_model_market_comparison_uses_only_fresh_selected_bookmakers() -> None:
     assert comparison.bookmaker_count == 1
     assert comparison.best_bookmaker == "Novibet"
     assert comparison.market_consensus_probability == pytest.approx(0.51)
+    assert comparison.best_price_break_even_probability == pytest.approx(1 / 2.05)
     assert comparison.probability_edge == pytest.approx(0.07)
     assert comparison.conservative_edge == pytest.approx(0.0)
+    assert comparison.price_probability_edge == pytest.approx(0.58 - 1 / 2.05)
+    assert comparison.conservative_price_edge == pytest.approx(0.52 - 1 / 2.05)
+    assert comparison.lower_fair_odds == pytest.approx(1 / 0.52)
+    assert comparison.model_uncertainty_width == pytest.approx(0.12)
+    assert comparison.market_uncertainty_width == pytest.approx(0.02)
+    assert comparison.pre_cost_advantage_survives_uncertainty is False
     assert comparison.research_only is True
     assert "no calibrated VALUE signal" in comparison.qualification_blockers[0]
 

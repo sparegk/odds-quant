@@ -842,10 +842,17 @@ export interface ModelMarketComparison {
   market_probability_high: number
   devig_method_spread: number
   bookmaker_disagreement: number
+  best_price_break_even_probability: number
   probability_edge: number
   conservative_edge: number
+  price_probability_edge: number
+  conservative_price_edge: number
   expected_value: number
   lower_expected_value: number
+  lower_fair_odds: number | null
+  model_uncertainty_width: number
+  market_uncertainty_width: number
+  pre_cost_advantage_survives_uncertainty: boolean
   research_only: true
   qualification_blockers: string[]
 }

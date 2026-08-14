@@ -151,10 +151,17 @@ class ModelMarketComparisonView(BaseModel):
     market_probability_high: float
     devig_method_spread: float
     bookmaker_disagreement: float
+    best_price_break_even_probability: float
     probability_edge: float
     conservative_edge: float
+    price_probability_edge: float
+    conservative_price_edge: float
     expected_value: float
     lower_expected_value: float
+    lower_fair_odds: float | None
+    model_uncertainty_width: float
+    market_uncertainty_width: float
+    pre_cost_advantage_survives_uncertainty: bool
     research_only: Literal[True] = True
     qualification_blockers: list[str]
 

@@ -480,15 +480,25 @@ function ModelMarketLab({ detail }: { detail: MatchdayEventDetail }) {
             <dl className="grid grid-cols-2 gap-px bg-zinc-200 sm:grid-cols-4">
               <LabMetric label="Model probability" value={percentage(comparison.model_probability)} />
               <LabMetric label="Market consensus" value={percentage(comparison.market_consensus_probability)} />
+              <LabMetric label="Best-price break-even" value={percentage(comparison.best_price_break_even_probability)} />
+              <LabMetric label="Model fair odds" value={comparison.model_fair_odds.toFixed(2)} />
               <LabMetric label="Model edge" value={signedPoints(comparison.probability_edge)} />
               <LabMetric label="Conservative edge" value={signedPoints(comparison.conservative_edge)} warning={comparison.conservative_edge <= 0} />
-              <LabMetric label={`Raw EV @ ${comparison.best_odds.toFixed(2)}`} value={signedPercentage(comparison.expected_value)} />
-              <LabMetric label="Lower-bound EV" value={signedPercentage(comparison.lower_expected_value)} warning={comparison.lower_expected_value <= 0} />
+              <LabMetric label="Price edge" value={signedPoints(comparison.price_probability_edge)} />
+              <LabMetric label="Conservative price edge" value={signedPoints(comparison.conservative_price_edge)} warning={comparison.conservative_price_edge <= 0} />
+              <LabMetric label={`Pre-cost EV/unit @ ${comparison.best_odds.toFixed(2)}`} value={signedPercentage(comparison.expected_value)} />
+              <LabMetric label="Lower pre-cost EV/unit" value={signedPercentage(comparison.lower_expected_value)} warning={comparison.lower_expected_value <= 0} />
+              <LabMetric label="Lower-bound fair odds" value={comparison.lower_fair_odds === null ? 'Unavailable' : comparison.lower_fair_odds.toFixed(2)} />
+              <LabMetric label="Model uncertainty width" value={signedPoints(comparison.model_uncertainty_width).replace('+', '')} />
               <LabMetric label="Market range" value={`${percentage(comparison.market_probability_low)}–${percentage(comparison.market_probability_high)}`} />
               <LabMetric label="Book / method spread" value={`${signedPoints(comparison.bookmaker_disagreement).replace('+', '')} / ${signedPoints(comparison.devig_method_spread).replace('+', '')}`} />
+              <LabMetric label="Market uncertainty width" value={signedPoints(comparison.market_uncertainty_width).replace('+', '')} />
             </dl>
             <div className="p-3 text-xs leading-5 text-zinc-600">
               <p>{comparison.bookmaker_count} selected bookmaker{comparison.bookmaker_count === 1 ? '' : 's'} included. Best price observed {formatDateTime(comparison.best_price_observed_at)}.</p>
+              <p className={comparison.pre_cost_advantage_survives_uncertainty ? 'font-semibold text-emerald-800' : 'font-semibold text-amber-800'}>
+                Pre-cost uncertainty test: {comparison.pre_cost_advantage_survives_uncertainty ? 'survives both model and market bounds' : 'does not survive both model and market bounds'}.
+              </p>
               <ul className="mt-1 list-disc pl-4">
                 {comparison.qualification_blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}
               </ul>

@@ -110,10 +110,19 @@ def build_model_market_comparisons(
                 market_probability_high=metrics.market_probability_high,
                 devig_method_spread=metrics.devig_method_spread,
                 bookmaker_disagreement=metrics.bookmaker_disagreement,
+                best_price_break_even_probability=(metrics.best_price_break_even_probability),
                 probability_edge=metrics.probability_edge,
                 conservative_edge=metrics.conservative_edge,
+                price_probability_edge=metrics.price_probability_edge,
+                conservative_price_edge=metrics.conservative_price_edge,
                 expected_value=metrics.expected_value,
                 lower_expected_value=metrics.lower_expected_value,
+                lower_fair_odds=metrics.lower_fair_odds,
+                model_uncertainty_width=metrics.model_uncertainty_width,
+                market_uncertainty_width=metrics.market_uncertainty_width,
+                pre_cost_advantage_survives_uncertainty=(
+                    metrics.pre_cost_advantage_survives_uncertainty
+                ),
                 qualification_blockers=[
                     "Descriptive comparison only; no calibrated VALUE signal is stored "
                     "at this cutoff.",

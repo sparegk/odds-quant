@@ -4,7 +4,13 @@ import math
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from app.quant.odds import expected_value, probability_edge, validate_decimal_odds
+from app.quant.odds import (
+    expected_value,
+    fair_odds,
+    implied_probability,
+    probability_edge,
+    validate_decimal_odds,
+)
 
 
 @dataclass(frozen=True)
@@ -14,10 +20,17 @@ class ModelMarketMetrics:
     market_probability_high: float
     devig_method_spread: float
     bookmaker_disagreement: float
+    best_price_break_even_probability: float
     probability_edge: float
     conservative_edge: float
+    price_probability_edge: float
+    conservative_price_edge: float
     expected_value: float
     lower_expected_value: float
+    lower_fair_odds: float | None
+    model_uncertainty_width: float
+    market_uncertainty_width: float
+    pre_cost_advantage_survives_uncertainty: bool
 
 
 def compare_model_to_market(
@@ -57,17 +70,30 @@ def compare_model_to_market(
         method_spreads.append(abs(proportional - power))
 
     consensus = sum(bookmaker_midpoints) / len(bookmaker_midpoints)
+    market_low = min(all_estimates)
     market_high = max(all_estimates)
+    break_even = implied_probability(best_odds)
+    lower_expected_value = expected_value(lower_probability, best_odds)
+    conservative_edge = probability_edge(lower_probability, market_high)
     return ModelMarketMetrics(
         market_consensus_probability=consensus,
-        market_probability_low=min(all_estimates),
+        market_probability_low=market_low,
         market_probability_high=market_high,
         devig_method_spread=max(method_spreads),
         bookmaker_disagreement=max(bookmaker_midpoints) - min(bookmaker_midpoints),
+        best_price_break_even_probability=break_even,
         probability_edge=probability_edge(model_probability, consensus),
-        conservative_edge=probability_edge(lower_probability, market_high),
+        conservative_edge=conservative_edge,
+        price_probability_edge=probability_edge(model_probability, break_even),
+        conservative_price_edge=probability_edge(lower_probability, break_even),
         expected_value=expected_value(model_probability, best_odds),
-        lower_expected_value=expected_value(lower_probability, best_odds),
+        lower_expected_value=lower_expected_value,
+        lower_fair_odds=fair_odds(lower_probability) if lower_probability > 0 else None,
+        model_uncertainty_width=upper_probability - lower_probability,
+        market_uncertainty_width=market_high - market_low,
+        pre_cost_advantage_survives_uncertainty=(
+            conservative_edge > 0 and lower_expected_value > 0
+        ),
     )
 
 

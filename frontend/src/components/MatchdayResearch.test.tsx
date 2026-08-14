@@ -253,10 +253,17 @@ const detail: MatchdayEventDetail = {
       market_probability_high: 0.49,
       devig_method_spread: 0.02,
       bookmaker_disagreement: 0.03,
+      best_price_break_even_probability: 1 / 2.15,
       probability_edge: 0.045,
       conservative_edge: -0.02,
+      price_probability_edge: 0.52 - 1 / 2.15,
+      conservative_price_edge: 0.47 - 1 / 2.15,
       expected_value: 0.118,
       lower_expected_value: 0.0105,
+      lower_fair_odds: 1 / 0.47,
+      model_uncertainty_width: 0.1,
+      market_uncertainty_width: 0.03,
+      pre_cost_advantage_survives_uncertainty: false,
       research_only: true,
       qualification_blockers: [
         'Descriptive comparison only; no calibrated VALUE signal is stored at this cutoff.',
@@ -498,6 +505,13 @@ describe('MatchdayResearch', () => {
     expect(screen.getByText('+4.5 pp')).toBeInTheDocument()
     expect(screen.getByText('-2.0 pp')).toBeInTheDocument()
     expect(screen.getByText('11.8%', { exact: false })).toBeInTheDocument()
+    expect(screen.getByText('Best-price break-even')).toBeInTheDocument()
+    expect(screen.getByText('Price edge')).toBeInTheDocument()
+    expect(screen.getByText('Conservative price edge')).toBeInTheDocument()
+    expect(screen.getByText('Lower-bound fair odds')).toBeInTheDocument()
+    expect(screen.getByText('Model uncertainty width')).toBeInTheDocument()
+    expect(screen.getByText('Market uncertainty width')).toBeInTheDocument()
+    expect(screen.getByText(/Pre-cost uncertainty test: does not survive/)).toBeInTheDocument()
     expect(screen.getByText(/does not create a VALUE signal/)).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Availability evidence explorer' })).toBeInTheDocument()
     expect(screen.getAllByTestId('availability-audit-item')).toHaveLength(5)
