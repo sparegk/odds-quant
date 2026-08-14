@@ -454,12 +454,28 @@ function BetRecommendations({ detail }: { detail: MatchdayEventDetail }) {
 
 function ModelMarketLab({ detail }: { detail: MatchdayEventDetail }) {
   const comparisons = detail.model_market_comparisons
+  const calibration = detail.calibration_reliability
   return <section>
     <DetailHeading eyebrow="Transparent arithmetic" title="Model vs market lab" />
     <div className="mb-3 border-l-4 border-sky-500 bg-sky-50 px-3 py-2 text-xs leading-5 text-sky-950">
       <strong>Research-only arithmetic.</strong> This joins the stored model interval to fresh,
       exact prices from the selected bookmakers. It does not create a VALUE signal, use a closing
       line, or make a staking recommendation.
+    </div>
+    <div className={`mb-3 border-l-4 px-3 py-3 text-xs leading-5 ${calibration.status === 'available' ? 'border-emerald-500 bg-emerald-50 text-emerald-950' : 'border-amber-400 bg-amber-50 text-amber-950'}`}>
+      <p className="font-bold">Chronological probability calibration reliability</p>
+      <dl className="mt-2 grid grid-cols-2 gap-px bg-zinc-200 sm:grid-cols-4">
+        <LabMetric label="Calibration status" value={calibration.status === 'available' ? 'Validated before cutoff' : 'Unavailable'} />
+        <LabMetric label="Expected calibration error" value={calibration.expected_calibration_error === null ? 'Unavailable' : percentage(calibration.expected_calibration_error)} />
+        <LabMetric label="Brier score" value={calibration.brier_score === null ? 'Unavailable' : calibration.brier_score.toFixed(4)} />
+        <LabMetric label="Log loss" value={calibration.log_loss === null ? 'Unavailable' : calibration.log_loss.toFixed(4)} />
+        <LabMetric label="Calibration sample" value={calibration.sample_size.toLocaleString()} />
+        <LabMetric label="Temperature" value={calibration.temperature === null ? 'Unavailable' : calibration.temperature.toFixed(4)} />
+        <LabMetric label="Evaluation run" value={calibration.evaluation_run_id === null ? 'Unavailable' : `#${calibration.evaluation_run_id}`} />
+        <LabMetric label="Fit through" value={calibration.fit_through === null ? 'Unavailable' : formatDateTime(calibration.fit_through)} />
+      </dl>
+      <p className="mt-2">Probability reliability only: market-edge evidence included = no; betting-return evidence included = no.</p>
+      {calibration.blockers.length > 0 && <ul className="mt-1 list-disc pl-4">{calibration.blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}</ul>}
     </div>
     {comparisons.length ? (
       <div className="space-y-3">

@@ -11,7 +11,7 @@ remains conditional on timestamp-valid pre-kickoff model and market evidence.
   market uncertainty widths, EV per unit, and whether both conservative uncertainty tests pass.
 - [x] Add net EV after sourced currency, settlement, tax, fee, commission, stake-limit, and
   rounding rules. Missing or stale cost evidence must return unavailable, never zero cost.
-- [ ] Add calibration reliability details using chronological out-of-sample evidence. Keep
+- [x] Add calibration reliability details using chronological out-of-sample evidence. Keep
   probability calibration separate from market-edge and return validation.
 - [ ] Add pre-registered de-vig sensitivity views. The frozen Pamestoixima replay retains its
   proportional method; robustness views cannot rewrite that primary result.
@@ -42,3 +42,12 @@ remains conditional on timestamp-valid pre-kickoff model and market evidence.
   evidence, calibration, or prospective validation.
 - The cost-adjusted uncertainty test passes only when conservative market edge and lower net EV
   are both strictly positive. It remains research-only and cannot create or modify a VALUE signal.
+- Calibration reliability is read only from the evaluation run explicitly referenced by the stored
+  prediction. The run must belong to the same model version, be completed, non-demo, probability-
+  validated, and end before the prediction input cutoff; the calibrator fit cutoff must also predate
+  that input cutoff.
+- Expected calibration error, Brier score, and log loss come from the run's overall temperature-
+  scaled out-of-sample result. Missing or invalid metrics block reliability instead of being
+  replaced with optimistic defaults.
+- Calibration reliability describes probability quality only. Its response explicitly excludes
+  market-edge evidence and betting-return evidence, which remain independently gated.

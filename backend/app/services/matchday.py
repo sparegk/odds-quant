@@ -39,6 +39,7 @@ from app.schemas.models import ModelOutputView
 from app.schemas.signals import ValueSignalView
 from app.services.betting_costs import resolve_quote_cost_evidence
 from app.services.builder import list_bet_builder_quotes
+from app.services.calibration_reliability import calibration_reliability
 from app.services.catalog import get_event, odds_comparison
 from app.services.lineup_projection import latest_stored_lineups, project_expected_lineups
 from app.services.match_suggestions import (
@@ -718,6 +719,7 @@ def get_matchday_event_detail(
         markets=markets,
         latest_prediction=latest_prediction,
         model_market_comparisons=model_market_comparisons,
+        calibration_reliability=calibration_reliability(session, latest_prediction),
         signals=signals,
         builder_quotes=builder_quotes,
         suggestions=suggestions,

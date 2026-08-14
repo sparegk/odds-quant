@@ -284,6 +284,27 @@ const detail: MatchdayEventDetail = {
       ],
     },
   ],
+  calibration_reliability: {
+    status: 'available',
+    calibration_method: 'scalar_temperature_scaling',
+    calibration_version: 'development-selected-calibration-v2',
+    calibration_applied: true,
+    temperature: 1.1,
+    sample_size: 250,
+    fit_through: '2026-07-20T12:00:00Z',
+    evaluation_run_id: 31,
+    prediction_inputs_as_of: '2026-07-21T12:00:00Z',
+    evaluation_test_end: '2026-07-20T12:00:00Z',
+    evaluation_fingerprint: 'a'.repeat(64),
+    probability_evaluation_status: 'probability_validated',
+    expected_calibration_error: 0.04,
+    brier_score: 0.55,
+    log_loss: 0.9,
+    chronological_out_of_sample: true,
+    market_edge_evidence_included: false,
+    return_evidence_included: false,
+    blockers: [],
+  },
   signals: [],
   builder_quotes: [],
   suggestions: [
@@ -588,6 +609,33 @@ describe('MatchdayResearch', () => {
     expect(screen.getByText(/2.15 · raw EV \+11.8%/)).toBeInTheDocument()
     expect(screen.getAllByText(/no calibrated VALUE signal is stored/i).length).toBeGreaterThan(0)
     expect(screen.getByText('Outcome likelihoods—not betting edges')).toBeInTheDocument()
+  })
+
+  it('shows chronological calibration separately from edge and returns', () => {
+    render(<MatchDetail detail={detail} />)
+
+    expect(screen.getByText('Chronological probability calibration reliability')).toBeInTheDocument()
+    expect(screen.getByText('Validated before cutoff')).toBeInTheDocument()
+    expect(screen.getByText('4.0%')).toBeInTheDocument()
+    expect(screen.getByText(/market-edge evidence included = no/)).toBeInTheDocument()
+  })
+
+  it('shows calibration blockers without hiding model-market arithmetic', () => {
+    render(<MatchDetail detail={{
+      ...detail,
+      calibration_reliability: {
+        ...detail.calibration_reliability,
+        status: 'blocked',
+        chronological_out_of_sample: false,
+        expected_calibration_error: null,
+        brier_score: null,
+        log_loss: null,
+        blockers: ['The calibration test window ends after the prediction input cutoff.'],
+      },
+    }} />)
+
+    expect(screen.getByText('The calibration test window ends after the prediction input cutoff.')).toBeInTheDocument()
+    expect(screen.getByText('Model vs market lab')).toBeInTheDocument()
   })
 
   it('shows cost-adjusted EV with its stake-dependent basis', () => {

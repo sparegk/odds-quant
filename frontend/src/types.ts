@@ -870,6 +870,28 @@ export interface ModelMarketComparison {
   qualification_blockers: string[]
 }
 
+export interface CalibrationReliability {
+  status: 'available' | 'blocked'
+  calibration_method: string
+  calibration_version: string
+  calibration_applied: boolean
+  temperature: number | null
+  sample_size: number
+  fit_through: string | null
+  evaluation_run_id: number | null
+  prediction_inputs_as_of: string | null
+  evaluation_test_end: string | null
+  evaluation_fingerprint: string | null
+  probability_evaluation_status: string | null
+  expected_calibration_error: number | null
+  brier_score: number | null
+  log_loss: number | null
+  chronological_out_of_sample: boolean
+  market_edge_evidence_included: false
+  return_evidence_included: false
+  blockers: string[]
+}
+
 export interface StoredLineupMember {
   player_id: number
   player: string
@@ -932,6 +954,7 @@ export interface MatchdayEventDetail {
   markets: MarketComparison[]
   latest_prediction: ModelOutput | null
   model_market_comparisons: ModelMarketComparison[]
+  calibration_reliability: CalibrationReliability
   signals: ValueSignal[]
   builder_quotes: BetBuilderQuote[]
   suggestions: MatchSuggestion[]

@@ -179,6 +179,28 @@ class ModelMarketComparisonView(BaseModel):
     qualification_blockers: list[str]
 
 
+class CalibrationReliabilityView(BaseModel):
+    status: Literal["available", "blocked"]
+    calibration_method: str
+    calibration_version: str
+    calibration_applied: bool
+    temperature: float | None
+    sample_size: int
+    fit_through: datetime | None
+    evaluation_run_id: int | None
+    prediction_inputs_as_of: datetime | None
+    evaluation_test_end: datetime | None
+    evaluation_fingerprint: str | None
+    probability_evaluation_status: str | None
+    expected_calibration_error: float | None
+    brier_score: float | None
+    log_loss: float | None
+    chronological_out_of_sample: bool
+    market_edge_evidence_included: Literal[False] = False
+    return_evidence_included: Literal[False] = False
+    blockers: list[str]
+
+
 class MatchdayEventDetailView(BaseModel):
     event: EventSummary
     competition_group: str
@@ -188,6 +210,7 @@ class MatchdayEventDetailView(BaseModel):
     markets: list[MarketComparison]
     latest_prediction: ModelOutputView | None
     model_market_comparisons: list[ModelMarketComparisonView]
+    calibration_reliability: CalibrationReliabilityView
     signals: list[ValueSignalView]
     builder_quotes: list[BetBuilderQuoteView]
     suggestions: list[MatchSuggestionView]
