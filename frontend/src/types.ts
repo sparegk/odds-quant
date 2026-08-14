@@ -853,6 +853,19 @@ export interface ModelMarketComparison {
   model_uncertainty_width: number
   market_uncertainty_width: number
   pre_cost_advantage_survives_uncertainty: boolean
+  cost_adjusted_expected_value: number | null
+  lower_cost_adjusted_expected_value: number | null
+  cost_adjusted_expected_profit: number | null
+  lower_cost_adjusted_expected_profit: number | null
+  cost_calculation_stake: number | null
+  cost_calculation_cash_outlay: number | null
+  cost_currency: string
+  settlement_rule_key: string
+  tax_profile_id: number | null
+  tax_profile_verified_at: string | null
+  constraint_observed_at: string | null
+  cost_adjusted_advantage_survives_uncertainty: boolean | null
+  cost_evidence_blockers: string[]
   research_only: true
   qualification_blockers: string[]
 }

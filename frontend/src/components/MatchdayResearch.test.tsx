@@ -264,6 +264,19 @@ const detail: MatchdayEventDetail = {
       model_uncertainty_width: 0.1,
       market_uncertainty_width: 0.03,
       pre_cost_advantage_survives_uncertainty: false,
+      cost_adjusted_expected_value: 0.062,
+      lower_cost_adjusted_expected_value: -0.048,
+      cost_adjusted_expected_profit: 3.2,
+      lower_cost_adjusted_expected_profit: -2.5,
+      cost_calculation_stake: 50,
+      cost_calculation_cash_outlay: 52,
+      cost_currency: 'EUR',
+      settlement_rule_key: 'football.match-result.v1',
+      tax_profile_id: 9,
+      tax_profile_verified_at: '2026-07-20T12:00:00Z',
+      constraint_observed_at: '2026-07-21T11:30:00Z',
+      cost_adjusted_advantage_survives_uncertainty: false,
+      cost_evidence_blockers: [],
       research_only: true,
       qualification_blockers: [
         'Descriptive comparison only; no calibrated VALUE signal is stored at this cutoff.',
@@ -575,6 +588,39 @@ describe('MatchdayResearch', () => {
     expect(screen.getByText(/2.15 · raw EV \+11.8%/)).toBeInTheDocument()
     expect(screen.getAllByText(/no calibrated VALUE signal is stored/i).length).toBeGreaterThan(0)
     expect(screen.getByText('Outcome likelihoods—not betting edges')).toBeInTheDocument()
+  })
+
+  it('shows cost-adjusted EV with its stake-dependent basis', () => {
+    render(<MatchDetail detail={{ ...detail, suggestions: [] }} />)
+
+    expect(screen.getByText('Net EV/cash unit')).toBeInTheDocument()
+    expect(screen.getByText('+6.2%')).toBeInTheDocument()
+    expect(screen.getByText(/Cost ROI uses the displayed valid rounded stake/)).toBeInTheDocument()
+  })
+
+  it('fails closed when sourced cost evidence is unavailable', () => {
+    const comparison = detail.model_market_comparisons[0]!
+    render(<MatchDetail detail={{
+      ...detail,
+      model_market_comparisons: [{
+        ...comparison,
+        cost_adjusted_expected_value: null,
+        lower_cost_adjusted_expected_value: null,
+        cost_adjusted_expected_profit: null,
+        lower_cost_adjusted_expected_profit: null,
+        cost_calculation_stake: null,
+        cost_calculation_cash_outlay: null,
+        tax_profile_id: null,
+        tax_profile_verified_at: null,
+        constraint_observed_at: null,
+        cost_adjusted_advantage_survives_uncertainty: null,
+        cost_evidence_blockers: ['Stake limits are stale for Novibet.'],
+      }],
+    }} />)
+
+    expect(screen.getAllByText('Unavailable').length).toBeGreaterThanOrEqual(4)
+    expect(screen.getByText('Stake limits are stale for Novibet.')).toBeInTheDocument()
+    expect(screen.getByText(/unavailable until sourced cost evidence/)).toBeInTheDocument()
   })
 
   it('retries a failed matchday without losing the selected date', async () => {

@@ -30,6 +30,7 @@ from app.services.arbitrage import (
     calculate_arbitrage,
     list_arbitrage_opportunities,
 )
+from app.services.betting_costs import resolve_quote_cost_evidence
 from app.services.demo_seed import seed_demo_data
 
 AS_OF = datetime(2026, 7, 19, 10, 0, tzinfo=UTC)
@@ -129,6 +130,64 @@ def test_verified_fresh_opportunity_is_executable_and_idempotent(session: Sessio
     assert opportunity.total_cash_outlay <= Decimal("100")
     assert len(opportunity.legs) == 3
     assert repeated.opportunities[0].id == opportunity.id
+
+
+def test_cost_evidence_resolver_fails_closed_when_constraints_become_stale(
+    session: Session,
+) -> None:
+    _add_verified_terms(session)
+    bookmaker = session.scalar(select(Bookmaker).order_by(Bookmaker.id))
+    assert bookmaker is not None
+
+    fresh = resolve_quote_cost_evidence(
+        session,
+        bookmaker_id=bookmaker.id,
+        bookmaker_name=bookmaker.name,
+        currency="EUR",
+        reference=AS_OF + timedelta(minutes=1),
+    )
+    stale = resolve_quote_cost_evidence(
+        session,
+        bookmaker_id=bookmaker.id,
+        bookmaker_name=bookmaker.name,
+        currency="EUR",
+        reference=AS_OF + timedelta(days=2),
+    )
+
+    assert fresh.blockers == ()
+    assert fresh.tax is not None
+    assert fresh.constraint is not None
+    assert stale.constraint is None
+    assert stale.blockers == (f"Stake limits are stale for {bookmaker.name}.",)
+
+
+def test_cost_evidence_resolver_fails_closed_for_impossible_rounding(
+    session: Session,
+) -> None:
+    _add_verified_terms(session)
+    bookmaker = session.scalar(select(Bookmaker).order_by(Bookmaker.id))
+    assert bookmaker is not None
+    constraint = session.scalar(
+        select(BookmakerConstraint).where(BookmakerConstraint.bookmaker_id == bookmaker.id)
+    )
+    assert constraint is not None
+    constraint.minimum_stake = Decimal("10.01")
+    constraint.maximum_stake = Decimal("10.02")
+    constraint.stake_increment = Decimal("1")
+    session.commit()
+
+    evidence = resolve_quote_cost_evidence(
+        session,
+        bookmaker_id=bookmaker.id,
+        bookmaker_name=bookmaker.name,
+        currency="EUR",
+        reference=AS_OF + timedelta(minutes=1),
+    )
+
+    assert evidence.constraint is None
+    assert evidence.blockers == (
+        f"Stake limits cannot produce a valid rounded stake for {bookmaker.name}.",
+    )
 
 
 def test_unknown_tax_and_constraints_block_execution(session: Session) -> None:

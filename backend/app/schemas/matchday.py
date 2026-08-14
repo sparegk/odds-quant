@@ -162,6 +162,19 @@ class ModelMarketComparisonView(BaseModel):
     model_uncertainty_width: float
     market_uncertainty_width: float
     pre_cost_advantage_survives_uncertainty: bool
+    cost_adjusted_expected_value: float | None
+    lower_cost_adjusted_expected_value: float | None
+    cost_adjusted_expected_profit: float | None
+    lower_cost_adjusted_expected_profit: float | None
+    cost_calculation_stake: float | None
+    cost_calculation_cash_outlay: float | None
+    cost_currency: str
+    settlement_rule_key: str
+    tax_profile_id: int | None
+    tax_profile_verified_at: datetime | None
+    constraint_observed_at: datetime | None
+    cost_adjusted_advantage_survives_uncertainty: bool | None
+    cost_evidence_blockers: list[str]
     research_only: Literal[True] = True
     qualification_blockers: list[str]
 

@@ -1,10 +1,13 @@
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 
 import pytest
 
+from app.quant.arbitrage import StakeConstraint, TaxTerms
 from app.quant.match_suggestions import SuggestionCandidate, rank_match_suggestions
 from app.schemas.api import MarketComparison, PriceComparison, SnapshotComparison
 from app.schemas.models import ModelOutputView, SelectionPredictionView
+from app.services.betting_costs import QuoteCostEvidence
 from app.services.match_suggestions import build_model_market_comparisons
 
 NOW = datetime(2026, 7, 24, 12, tzinfo=UTC)
@@ -263,8 +266,47 @@ def test_model_market_comparison_uses_only_fresh_selected_bookmakers() -> None:
     assert comparison.model_uncertainty_width == pytest.approx(0.12)
     assert comparison.market_uncertainty_width == pytest.approx(0.02)
     assert comparison.pre_cost_advantage_survives_uncertainty is False
+    assert comparison.cost_adjusted_expected_value is None
+    assert comparison.cost_evidence_blockers
     assert comparison.research_only is True
     assert "no calibrated VALUE signal" in comparison.qualification_blockers[0]
+
+
+def test_model_market_comparison_exposes_cost_adjusted_ev_for_verified_terms() -> None:
+    evidence = QuoteCostEvidence(
+        tax=TaxTerms(
+            stake_tax_rate=Decimal("0.02"),
+            winnings_tax_rate=Decimal("0.10"),
+            payout_withholding_rate=Decimal("0.01"),
+            commission_rate=Decimal("0.02"),
+            fixed_fee=Decimal("1"),
+        ),
+        constraint=StakeConstraint(
+            minimum_stake=Decimal("1"),
+            maximum_stake=Decimal("50"),
+            stake_increment=Decimal("0.25"),
+        ),
+        tax_profile_id=9,
+        tax_verified_at=NOW - timedelta(days=1),
+        constraint_observed_at=NOW - timedelta(minutes=30),
+        blockers=(),
+    )
+    comparisons = build_model_market_comparisons(
+        latest_prediction=prediction_output(),
+        markets=[comparison_market(market_price(bookmaker="Novibet", probability=0.52, odds=2.05))],
+        selected_bookmakers={"novibet"},
+        cost_evidence_by_snapshot_id={1: evidence},
+    )
+
+    comparison = comparisons[0]
+    assert comparison.cost_calculation_stake == 50.0
+    assert comparison.cost_calculation_cash_outlay == 52.0
+    assert comparison.cost_adjusted_expected_profit == pytest.approx(3.2015)
+    assert comparison.cost_adjusted_expected_value == pytest.approx(3.2015 / 52)
+    assert comparison.lower_cost_adjusted_expected_value == pytest.approx(-2.509 / 52)
+    assert comparison.cost_evidence_blockers == []
+    assert comparison.tax_profile_id == 9
+    assert comparison.cost_adjusted_advantage_survives_uncertainty is False
 
 
 def test_model_market_comparison_fails_closed_without_fresh_exact_price() -> None:

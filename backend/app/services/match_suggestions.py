@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 
+from app.quant.betting_costs import cost_adjusted_expected_value, valid_reference_stake
 from app.quant.match_suggestions import (
     BOOKMAKER_NAMES,
     BookmakerCode,
@@ -21,6 +23,7 @@ from app.schemas.matchday import (
 )
 from app.schemas.models import ModelOutputView
 from app.schemas.signals import ValueSignalView
+from app.services.betting_costs import QuoteCostEvidence
 
 BOOKMAKER_CODES: tuple[BookmakerCode, BookmakerCode] = ("allwyn", "novibet")
 
@@ -30,6 +33,7 @@ def build_model_market_comparisons(
     latest_prediction: ModelOutputView | None,
     markets: list[MarketComparison],
     selected_bookmakers: set[BookmakerCode],
+    cost_evidence_by_snapshot_id: dict[int, QuoteCostEvidence] | None = None,
 ) -> list[ModelMarketComparisonView]:
     if latest_prediction is None:
         return []
@@ -88,6 +92,59 @@ def build_model_market_comparisons(
             ],
             best_odds=best_price.decimal_odds,
         )
+        evidence = (cost_evidence_by_snapshot_id or {}).get(best_snapshot.snapshot_id)
+        cost_blockers = (
+            list(evidence.blockers)
+            if evidence
+            else ["Verified tax and stake-limit evidence was not resolved for this exact quote."]
+        )
+        cost_fields: dict[str, object] = {
+            "cost_adjusted_expected_value": None,
+            "lower_cost_adjusted_expected_value": None,
+            "cost_adjusted_expected_profit": None,
+            "lower_cost_adjusted_expected_profit": None,
+            "cost_calculation_stake": None,
+            "cost_calculation_cash_outlay": None,
+            "tax_profile_id": None,
+            "tax_profile_verified_at": None,
+            "constraint_observed_at": None,
+            "cost_adjusted_advantage_survives_uncertainty": None,
+        }
+        if (
+            evidence is not None
+            and not cost_blockers
+            and evidence.tax is not None
+            and evidence.constraint is not None
+        ):
+            stake = valid_reference_stake(evidence.constraint)
+            central = cost_adjusted_expected_value(
+                probability=Decimal(str(prediction.probability)),
+                decimal_odds=Decimal(str(best_price.decimal_odds)),
+                stake=stake,
+                tax=evidence.tax,
+                constraint=evidence.constraint,
+            )
+            lower = cost_adjusted_expected_value(
+                probability=Decimal(str(prediction.lower_probability)),
+                decimal_odds=Decimal(str(best_price.decimal_odds)),
+                stake=stake,
+                tax=evidence.tax,
+                constraint=evidence.constraint,
+            )
+            cost_fields = {
+                "cost_adjusted_expected_value": float(central.expected_net_roi),
+                "lower_cost_adjusted_expected_value": float(lower.expected_net_roi),
+                "cost_adjusted_expected_profit": float(central.expected_net_profit),
+                "lower_cost_adjusted_expected_profit": float(lower.expected_net_profit),
+                "cost_calculation_stake": float(stake),
+                "cost_calculation_cash_outlay": float(central.cash_outlay),
+                "tax_profile_id": evidence.tax_profile_id,
+                "tax_profile_verified_at": evidence.tax_verified_at,
+                "constraint_observed_at": evidence.constraint_observed_at,
+                "cost_adjusted_advantage_survives_uncertainty": (
+                    metrics.conservative_edge > 0 and lower.expected_net_roi > 0
+                ),
+            }
         comparisons.append(
             ModelMarketComparisonView(
                 market_id=market.market_id,
@@ -123,6 +180,10 @@ def build_model_market_comparisons(
                 pre_cost_advantage_survives_uncertainty=(
                     metrics.pre_cost_advantage_survives_uncertainty
                 ),
+                **cost_fields,
+                cost_currency=market.currency,
+                settlement_rule_key=market.settlement_rule_key,
+                cost_evidence_blockers=cost_blockers,
                 qualification_blockers=[
                     "Descriptive comparison only; no calibrated VALUE signal is stored "
                     "at this cutoff.",

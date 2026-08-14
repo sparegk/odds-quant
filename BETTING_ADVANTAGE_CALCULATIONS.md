@@ -9,7 +9,7 @@ remains conditional on timestamp-valid pre-kickoff model and market evidence.
 - [x] Expose the pre-cost advantage decomposition: best-price break-even probability, model and
   conservative fair odds, model-versus-market edge, model-versus-offered-price edge, model and
   market uncertainty widths, EV per unit, and whether both conservative uncertainty tests pass.
-- [ ] Add net EV after sourced currency, settlement, tax, fee, commission, stake-limit, and
+- [x] Add net EV after sourced currency, settlement, tax, fee, commission, stake-limit, and
   rounding rules. Missing or stale cost evidence must return unavailable, never zero cost.
 - [ ] Add calibration reliability details using chronological out-of-sample evidence. Keep
   probability calibration separate from market-edge and return validation.
@@ -27,6 +27,18 @@ remains conditional on timestamp-valid pre-kickoff model and market evidence.
   includes price and margin effects and therefore must not be called pure model edge.
 - Pre-cost EV per unit is `model probability * offered decimal odds - 1`.
 - Lower pre-cost EV substitutes the model lower probability bound.
+- Cost-adjusted EV is expected net profit divided by cash outlay at a displayed, valid reference
+  stake. Cash outlay includes the stake, stake tax, and fixed fee; winning payout deducts winnings
+  tax, payout withholding, and commission. The lower value substitutes the model lower bound.
+- The reference stake targets 100 currency units, rounds to the configured stake increment, and
+  respects the sourced minimum and maximum. Showing the stake is mandatory because fixed fees make
+  net ROI stake-dependent.
+- Currency and settlement identity come from the exact stored market. Tax mappings must be active,
+  verified before the calculation cutoff, effective for that currency, sourced, and no more than
+  365 days old. Stake constraints must be sourced before the cutoff and no more than 1,440 minutes
+  old. Any failed gate returns unavailable values and explicit blockers; it never assumes zero cost.
 - The pre-cost uncertainty test passes only when conservative market edge and lower pre-cost EV
   are both strictly positive. It is descriptive and never substitutes for costs, closing-line
   evidence, calibration, or prospective validation.
+- The cost-adjusted uncertainty test passes only when conservative market edge and lower net EV
+  are both strictly positive. It remains research-only and cannot create or modify a VALUE signal.

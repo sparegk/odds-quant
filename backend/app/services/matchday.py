@@ -20,7 +20,7 @@ from app.db.models import (
     Team,
     ValueSignal,
 )
-from app.quant.match_suggestions import BookmakerCode
+from app.quant.match_suggestions import BookmakerCode, bookmaker_code
 from app.schemas.api import EventSummary, MarketComparison
 from app.schemas.builder import BetBuilderQuoteView
 from app.schemas.lineups import ExpectedLineupScenarioView, StoredLineupView
@@ -37,6 +37,7 @@ from app.schemas.matchday import (
 )
 from app.schemas.models import ModelOutputView
 from app.schemas.signals import ValueSignalView
+from app.services.betting_costs import resolve_quote_cost_evidence
 from app.services.builder import list_bet_builder_quotes
 from app.services.catalog import get_event, odds_comparison
 from app.services.lineup_projection import latest_stored_lineups, project_expected_lineups
@@ -525,6 +526,18 @@ def get_matchday_event_detail(
         latest_prediction=latest_prediction,
         markets=markets,
         selected_bookmakers=selected,
+        cost_evidence_by_snapshot_id={
+            snapshot.snapshot_id: resolve_quote_cost_evidence(
+                session,
+                bookmaker_id=snapshot.bookmaker_id,
+                bookmaker_name=snapshot.bookmaker,
+                currency=market.currency,
+                reference=cutoff,
+            )
+            for market in markets
+            for snapshot in market.snapshots
+            if not snapshot.is_stale and bookmaker_code(snapshot.bookmaker) in selected
+        },
     )
 
     player_records = (

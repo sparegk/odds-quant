@@ -488,6 +488,10 @@ function ModelMarketLab({ detail }: { detail: MatchdayEventDetail }) {
               <LabMetric label="Conservative price edge" value={signedPoints(comparison.conservative_price_edge)} warning={comparison.conservative_price_edge <= 0} />
               <LabMetric label={`Pre-cost EV/unit @ ${comparison.best_odds.toFixed(2)}`} value={signedPercentage(comparison.expected_value)} />
               <LabMetric label="Lower pre-cost EV/unit" value={signedPercentage(comparison.lower_expected_value)} warning={comparison.lower_expected_value <= 0} />
+              <LabMetric label="Net EV/cash unit" value={comparison.cost_adjusted_expected_value === null ? 'Unavailable' : signedPercentage(comparison.cost_adjusted_expected_value)} />
+              <LabMetric label="Lower net EV/cash unit" value={comparison.lower_cost_adjusted_expected_value === null ? 'Unavailable' : signedPercentage(comparison.lower_cost_adjusted_expected_value)} warning={comparison.lower_cost_adjusted_expected_value !== null && comparison.lower_cost_adjusted_expected_value <= 0} />
+              <LabMetric label="Cost calculation stake" value={comparison.cost_calculation_stake === null ? 'Unavailable' : `${comparison.cost_calculation_stake.toFixed(2)} ${comparison.cost_currency}`} />
+              <LabMetric label="Cash outlay after stake costs" value={comparison.cost_calculation_cash_outlay === null ? 'Unavailable' : `${comparison.cost_calculation_cash_outlay.toFixed(2)} ${comparison.cost_currency}`} />
               <LabMetric label="Lower-bound fair odds" value={comparison.lower_fair_odds === null ? 'Unavailable' : comparison.lower_fair_odds.toFixed(2)} />
               <LabMetric label="Model uncertainty width" value={signedPoints(comparison.model_uncertainty_width).replace('+', '')} />
               <LabMetric label="Market range" value={`${percentage(comparison.market_probability_low)}–${percentage(comparison.market_probability_high)}`} />
@@ -499,6 +503,13 @@ function ModelMarketLab({ detail }: { detail: MatchdayEventDetail }) {
               <p className={comparison.pre_cost_advantage_survives_uncertainty ? 'font-semibold text-emerald-800' : 'font-semibold text-amber-800'}>
                 Pre-cost uncertainty test: {comparison.pre_cost_advantage_survives_uncertainty ? 'survives both model and market bounds' : 'does not survive both model and market bounds'}.
               </p>
+              <p className={comparison.cost_adjusted_advantage_survives_uncertainty ? 'font-semibold text-emerald-800' : 'font-semibold text-amber-800'}>
+                Cost-adjusted uncertainty test: {comparison.cost_adjusted_advantage_survives_uncertainty === null ? 'unavailable until sourced cost evidence is complete and fresh' : comparison.cost_adjusted_advantage_survives_uncertainty ? 'survives the conservative model bound after costs' : 'does not survive the conservative model bound after costs'}.
+              </p>
+              <p>Settlement: {comparison.settlement_rule_key} / currency: {comparison.cost_currency}. Cost ROI uses the displayed valid rounded stake because fixed fees make results stake-dependent.</p>
+              {comparison.cost_evidence_blockers.length > 0 && <ul className="mt-1 list-disc pl-4 text-amber-800">
+                {comparison.cost_evidence_blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}
+              </ul>}
               <ul className="mt-1 list-disc pl-4">
                 {comparison.qualification_blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}
               </ul>
