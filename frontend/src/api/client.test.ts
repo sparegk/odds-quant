@@ -38,7 +38,7 @@ describe('API client', () => {
 
     expect(data.status.automated_betting).toBe(false)
     expect(data.resource_errors).toEqual({})
-    expect(fetchMock).toHaveBeenCalledTimes(14)
+    expect(fetchMock).toHaveBeenCalledTimes(15)
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/api/v1/data/monitoring'),
       expect.any(Object),
@@ -49,6 +49,10 @@ describe('API client', () => {
     )
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/api/v1/signals/research-candidates'),
+      expect.any(Object),
+    )
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/api/v1/recommendations/tracked'),
       expect.any(Object),
     )
   })

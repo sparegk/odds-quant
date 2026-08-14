@@ -29,9 +29,7 @@ from app.quant.calibration import (
     fit_temperature_calibrator,
     walk_forward_temperature_scaling,
 )
-from app.quant.cold_start import (
-    COLD_START_VENUE_HISTORY_TARGET,
-)
+from app.quant.cold_start import COLD_START_VENUE_HISTORY_TARGET
 from app.quant.cold_start import (
     cold_start_uncertainty_class as _cold_start_uncertainty_class,
 )
@@ -65,6 +63,12 @@ from app.quant.team_strength import HistoricalScore, fit_poisson_team_strength
 from app.schemas.models import CalibrationBucketView, EvaluateModelRequest, EvaluationRunView
 from app.services.external_validation import receipt_for_evaluation
 from app.services.modeling import ELO_MODEL_KIND, MODEL_KIND, competition_family_ids
+
+__all__ = (
+    "COLD_START_VENUE_HISTORY_TARGET",
+    "_cold_start_uncertainty_class",
+    "_widen_cold_start_probabilities",
+)
 
 MINIMUM_PROMOTION_OBSERVATIONS = 200
 MINIMUM_PROMOTION_COVERAGE = 0.90

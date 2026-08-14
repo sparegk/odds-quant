@@ -339,6 +339,7 @@ export type DashboardResource =
   | 'models'
   | 'evaluations'
   | 'signals'
+  | 'tracked_recommendations'
   | 'research_candidates'
   | 'underdogs'
   | 'arbitrage'
@@ -741,6 +742,40 @@ export interface RecommendationQuality {
   overall_quality_score: number
 }
 
+export interface RecommendationTracking {
+  closing_line_status: 'PENDING' | 'AVAILABLE' | 'UNAVAILABLE'
+  closing_odds_snapshot_id: number | null
+  closing_odds: number | null
+  closing_observed_at: string | null
+  closing_recorded_at: string | null
+  closing_line_value: number | null
+  settlement_status: 'PENDING' | 'SETTLED'
+  result_id: number | null
+  settlement: 'WIN' | 'LOSS' | 'PUSH' | 'VOID' | null
+  settled_at: string | null
+  profit_units: number | null
+  updated_at: string
+}
+
+export interface RecommendationSnapshot {
+  id: number
+  signal_id: number
+  event_id: number
+  captured_at: string
+  kickoff_at: string
+  market_type: string
+  line: number | null
+  selection_code: string
+  offered_odds: number
+  lower_net_expected_value: number
+  stake: number
+  cash_outlay: number
+  currency: string
+  recommendation_quality: RecommendationQuality
+  fingerprint: string
+  tracking: RecommendationTracking
+}
+
 export interface MatchSuggestion {
   rank: number
   source_kind: 'single' | 'builder'
@@ -1013,6 +1048,7 @@ export interface DashboardData {
   models: ModelVersion[]
   evaluations: EvaluationRun[]
   signals: ValueSignal[]
+  tracked_recommendations?: RecommendationSnapshot[]
   research_candidates?: ResearchValueCandidate[]
   underdogs: ValueSignal[]
   arbitrage: ArbitrageOpportunity[]

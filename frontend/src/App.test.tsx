@@ -314,6 +314,57 @@ describe('ValueOpportunities', () => {
     expect(screen.getByText('Model has no qualifying chronological calibration.')).toBeInTheDocument()
     expect(screen.getByText('No qualified VALUE recommendations yet')).toBeInTheDocument()
   })
+
+  it('shows immutable prospective decisions with separate outcome states', () => {
+    render(<ValueOpportunities dashboard={{
+      ...dashboard,
+      tracked_recommendations: [{
+        id: 1,
+        signal_id: 9,
+        event_id: 7,
+        captured_at: '2026-07-20T17:55:00Z',
+        kickoff_at: '2026-07-20T18:00:00Z',
+        market_type: 'MATCH_RESULT',
+        line: null,
+        selection_code: 'HOME',
+        offered_odds: 2,
+        lower_net_expected_value: 0.08,
+        stake: 100,
+        cash_outlay: 102,
+        currency: 'EUR',
+        recommendation_quality: {
+          probability_interval_retention: 0.9,
+          calibration_quality: 0.8,
+          price_freshness_quality: 0.6,
+          market_agreement_quality: 0.8,
+          net_economics_quality: 0.8,
+          bookmaker_disagreement: 0.02,
+          overall_quality_score: 0.75,
+        },
+        fingerprint: 'abcdef1234567890',
+        tracking: {
+          closing_line_status: 'AVAILABLE',
+          closing_odds_snapshot_id: 31,
+          closing_odds: 1.9,
+          closing_observed_at: '2026-07-20T17:59:00Z',
+          closing_recorded_at: '2026-07-20T18:01:00Z',
+          closing_line_value: 0.0526,
+          settlement_status: 'SETTLED',
+          result_id: 4,
+          settlement: 'WIN',
+          settled_at: '2026-07-20T20:00:00Z',
+          profit_units: 100,
+          updated_at: '2026-07-20T20:00:00Z',
+        },
+      }],
+    }} onOpenEvent={() => undefined} />)
+
+    expect(screen.getByRole('heading', { name: 'Tracked recommendation outcomes' })).toBeInTheDocument()
+    expect(screen.getByText(/decision-time inputs are immutable/i)).toBeInTheDocument()
+    expect(screen.getByText('1.90 / +5.3% CLV')).toBeInTheDocument()
+    expect(screen.getByText('WIN')).toBeInTheDocument()
+    expect(screen.getByText(/fingerprint abcdef123456/)).toBeInTheDocument()
+  })
 })
 
 describe('ArbitrageResearch', () => {

@@ -17,6 +17,9 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
+from sqlalchemy import (
+    event as sqlalchemy_event,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -630,6 +633,80 @@ class ValueSignal(Base):
         CheckConstraint("calibration_error >= 0 AND odds_age_minutes >= 0"),
         CheckConstraint("bookmaker_count > 0"),
     )
+
+
+class RecommendationSnapshot(Base):
+    __tablename__ = "recommendation_snapshots"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    signal_id: Mapped[int] = mapped_column(ForeignKey("value_signals.id"), unique=True)
+    event_id: Mapped[int] = mapped_column(ForeignKey("events.id"))
+    selection_id: Mapped[int] = mapped_column(ForeignKey("selections.id"))
+    bookmaker_id: Mapped[int] = mapped_column(ForeignKey("bookmakers.id"))
+    odds_snapshot_id: Mapped[int] = mapped_column(ForeignKey("odds_snapshots.id"))
+    prediction_id: Mapped[int] = mapped_column(ForeignKey("model_predictions.id"))
+    model_version_id: Mapped[int] = mapped_column(ForeignKey("model_versions.id"))
+    evaluation_run_id: Mapped[int] = mapped_column(ForeignKey("backtest_runs.id"))
+    tax_profile_id: Mapped[int] = mapped_column(ForeignKey("tax_profiles.id"))
+    captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    kickoff_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    price_observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    tax_profile_verified_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    constraint_observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    market_type: Mapped[str] = mapped_column(String(40))
+    line: Mapped[float | None] = mapped_column(Float)
+    selection_code: Mapped[str] = mapped_column(String(40))
+    settlement_rule_key: Mapped[str] = mapped_column(String(80))
+    currency: Mapped[str] = mapped_column(String(3))
+    offered_odds: Mapped[float] = mapped_column(Float)
+    model_probability: Mapped[float] = mapped_column(Float)
+    lower_probability: Mapped[float] = mapped_column(Float)
+    lower_expected_value: Mapped[float] = mapped_column(Float)
+    net_expected_value: Mapped[float] = mapped_column(Float)
+    lower_net_expected_value: Mapped[float] = mapped_column(Float)
+    stake: Mapped[float] = mapped_column(Float)
+    cash_outlay: Mapped[float] = mapped_column(Float)
+    minimum_acceptable_odds: Mapped[float] = mapped_column(Float)
+    recommendation_quality: Mapped[dict[str, float]] = mapped_column(JSON)
+    model_input_fingerprint: Mapped[str] = mapped_column(String(64))
+    feature_version: Mapped[str] = mapped_column(String(80))
+    fingerprint: Mapped[str] = mapped_column(String(64), unique=True)
+    __table_args__ = (
+        CheckConstraint("captured_at < kickoff_at"),
+        CheckConstraint("price_observed_at <= captured_at"),
+        CheckConstraint("offered_odds > 1 AND minimum_acceptable_odds > 1"),
+        CheckConstraint("lower_net_expected_value > 0"),
+        CheckConstraint("stake > 0 AND cash_outlay > 0"),
+    )
+
+
+class RecommendationTrackingState(Base):
+    __tablename__ = "recommendation_tracking_states"
+    recommendation_id: Mapped[int] = mapped_column(
+        ForeignKey("recommendation_snapshots.id", ondelete="CASCADE"), primary_key=True
+    )
+    closing_line_status: Mapped[str] = mapped_column(String(20), default="PENDING")
+    closing_odds_snapshot_id: Mapped[int | None] = mapped_column(ForeignKey("odds_snapshots.id"))
+    closing_odds: Mapped[float | None] = mapped_column(Float)
+    closing_observed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    closing_recorded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    closing_line_value: Mapped[float | None] = mapped_column(Float)
+    settlement_status: Mapped[str] = mapped_column(String(20), default="PENDING")
+    result_id: Mapped[int | None] = mapped_column(ForeignKey("match_results.id"))
+    settlement: Mapped[str | None] = mapped_column(String(20))
+    settled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    profit_units: Mapped[float | None] = mapped_column(Float)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        CheckConstraint("closing_line_status IN ('PENDING', 'AVAILABLE', 'UNAVAILABLE')"),
+        CheckConstraint("settlement_status IN ('PENDING', 'SETTLED')"),
+    )
+
+
+@sqlalchemy_event.listens_for(RecommendationSnapshot, "before_update")
+def _reject_recommendation_snapshot_update(
+    _mapper: object, _connection: object, _target: RecommendationSnapshot
+) -> None:
+    raise ValueError("recommendation decision snapshots are immutable")
 
 
 class ArbitrageOpportunity(Base):

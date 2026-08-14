@@ -8,11 +8,22 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_admin_key
 from app.db.session import get_db
+from app.schemas.recommendations import (
+    CaptureRecommendationRequest,
+    RecommendationSnapshotView,
+    RefreshRecommendationRequest,
+)
 from app.schemas.signals import (
     GenerateSignalsRequest,
     ResearchValueCandidateView,
     SignalBatchView,
     ValueSignalView,
+)
+from app.services.recommendation_tracking import (
+    RecommendationTrackingError,
+    capture_recommendation,
+    list_recommendation_snapshots,
+    refresh_recommendation,
 )
 from app.services.signals import (
     SignalGenerationError,
@@ -95,6 +106,63 @@ def recommendations(
         signal_type="VALUE",
         limit=limit,
     )
+
+
+@router.post(
+    "/recommendations/capture",
+    response_model=RecommendationSnapshotView,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_admin_key)],
+    tags=["recommendations"],
+)
+def capture_tracked_recommendation(
+    request: CaptureRecommendationRequest, database: Database
+) -> RecommendationSnapshotView:
+    try:
+        return capture_recommendation(
+            database,
+            signal_id=request.signal_id,
+            captured_at=request.captured_at,
+        )
+    except RecommendationTrackingError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+
+
+@router.get(
+    "/recommendations/tracked",
+    response_model=list[RecommendationSnapshotView],
+    tags=["recommendations"],
+)
+def tracked_recommendations(
+    database: Database,
+    limit: Annotated[int, Query(ge=1, le=1000)] = 200,
+) -> list[RecommendationSnapshotView]:
+    return list_recommendation_snapshots(database, limit=limit)
+
+
+@router.post(
+    "/recommendations/{recommendation_id}/refresh",
+    response_model=RecommendationSnapshotView,
+    dependencies=[Depends(require_admin_key)],
+    tags=["recommendations"],
+)
+def refresh_tracked_recommendation(
+    recommendation_id: int,
+    request: RefreshRecommendationRequest,
+    database: Database,
+) -> RecommendationSnapshotView:
+    try:
+        return refresh_recommendation(
+            database,
+            recommendation_id=recommendation_id,
+            as_of=request.as_of,
+        )
+    except RecommendationTrackingError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
 
 
 @router.get(

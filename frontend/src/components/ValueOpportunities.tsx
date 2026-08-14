@@ -3,7 +3,7 @@ import { AlertTriangle, Filter, TrendingUp } from 'lucide-react'
 
 import { formatDateTime, humanizeCode } from '../lib/format'
 import { useResearchPreference } from '../lib/researchPreferences'
-import type { DashboardData, ResearchValueCandidate, ValueSignal } from '../types'
+import type { DashboardData, RecommendationSnapshot, ResearchValueCandidate, ValueSignal } from '../types'
 
 type ValueSort = 'LOWER_EV' | 'EDGE' | 'CONFIDENCE' | 'FRESHNESS'
 
@@ -16,6 +16,7 @@ export function ValueOpportunities({ dashboard, onOpenEvent }: { dashboard: Dash
   const sort = sortPreference as ValueSort
   const events = useMemo(() => new Map(dashboard.events.map((event) => [event.id, event])), [dashboard.events])
   const researchCandidates = dashboard.research_candidates ?? []
+  const trackedRecommendations = dashboard.tracked_recommendations ?? []
   const competitions = unique(dashboard.signals.map((signal) => events.get(signal.event_id)?.competition))
   const markets = unique(dashboard.signals.map((signal) => signal.market_type))
   const filtered = useMemo(() => dashboard.signals
@@ -26,7 +27,7 @@ export function ValueOpportunities({ dashboard, onOpenEvent }: { dashboard: Dash
     .sort((left, right) => sortValue(right, sort) - sortValue(left, sort) || right.expected_value - left.expected_value),
   [competition, dashboard.signals, events, market, minimumConfidence, minimumLowerEv, sort])
 
-  if (!dashboard.signals.length && !researchCandidates.length) {
+  if (!dashboard.signals.length && !researchCandidates.length && !trackedRecommendations.length) {
     return <div className="space-y-5"><EmptyValue title="No value research for upcoming matches" detail="The screen will populate when an upcoming non-demo prediction joins a complete compatible pre-kickoff price." /><div className="border-l-4 border-amber-400 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">Qualified VALUE recommendations still require chronological calibration, fresh prices, adequate samples, and positive conservative EV.</div></div>
   }
 
@@ -42,6 +43,7 @@ export function ValueOpportunities({ dashboard, onOpenEvent }: { dashboard: Dash
   return <div className="space-y-7">
     <div><p className="text-xs font-bold uppercase text-emerald-700">Upcoming evidence versus market</p><h2 className="mt-1 text-lg font-bold">Value opportunity research</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-zinc-500">Qualified recommendations and exploratory model/price disagreements are kept separate. Research-only gaps show what looks interesting and exactly why it is not yet a VALUE signal.</p></div>
     <section className="grid grid-cols-2 border border-zinc-200 bg-white md:grid-cols-4"><ValueMetric label="Qualified VALUE" value={dashboard.signals.length.toString()} /><ValueMetric label="Research gaps" value={researchCandidates.length.toString()} /><ValueMetric label="Positive raw EV" value={positiveRawEv.toString()} /><ValueMetric label="Policy" value="Fail closed" /></section>
+    {trackedRecommendations.length ? <TrackedRecommendations records={trackedRecommendations} /> : null}
     {dashboard.signals.length ? <SignalEvidenceAudit signals={dashboard.signals} linkedSignals={linkedSignals} /> : null}
     {researchCandidates.length ? <section className="space-y-4"><div><p className="text-xs font-bold uppercase text-amber-700">Upcoming watchlist</p><h3 className="mt-1 font-bold">Research-only candidates</h3><p className="mt-1 text-sm leading-6 text-zinc-500">Ranked by raw model EV before calibration. Never treat these as recommendations while any listed gate remains blocked.</p></div>{researchCandidates.map((candidate, index) => <ResearchCandidateCard candidate={candidate} key={`${candidate.output_id}-${candidate.selection_id}`} rank={index + 1} onOpenEvent={onOpenEvent} />)}</section> : null}
     {dashboard.signals.length ? <>
@@ -58,6 +60,16 @@ export function ValueOpportunities({ dashboard, onOpenEvent }: { dashboard: Dash
     </> : <EmptyValue title="No qualified VALUE recommendations yet" detail="The watchlist above remains visible while calibration, sample, uncertainty, freshness, and market-coverage gates are unresolved." />}
     <div className="border-l-4 border-sky-500 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950">Model edge, raw expected value, conservative qualified value, line-shopping improvement, and bookmaker margin remain separate quantities.</div>
   </div>
+}
+
+function TrackedRecommendations({ records }: { records: RecommendationSnapshot[] }) {
+  return <section className="space-y-3" aria-labelledby="prospective-tracking-title"><div><p className="text-xs font-bold uppercase text-sky-700">Prospective evidence</p><h3 className="mt-1 font-bold" id="prospective-tracking-title">Tracked recommendation outcomes</h3><p className="mt-1 text-sm leading-6 text-zinc-500">Decision-time inputs are immutable. Closing-line and settlement states update separately and never rewrite the original edge.</p></div><div className="space-y-2">{records.map((record) => <article className="grid gap-3 border border-zinc-200 bg-white p-4 text-sm md:grid-cols-[1fr_repeat(4,auto)] md:items-center" key={record.id}><div><p className="font-bold">{humanizeCode(record.market_type)} / {humanizeCode(record.selection_code)}</p><p className="mt-1 text-xs text-zinc-500">Captured {formatDateTime(record.captured_at)} / fingerprint {record.fingerprint.slice(0, 12)}</p></div><CompactMetric label="Taken odds" value={record.offered_odds.toFixed(2)} /><CompactMetric label="Lower net EV" value={signedPercent(record.lower_net_expected_value)} /><CompactMetric label="Closing line" value={trackedClosingLine(record)} /><CompactMetric label="Settlement" value={record.tracking.settlement_status === 'SETTLED' ? record.tracking.settlement ?? 'UNKNOWN' : 'PENDING'} /></article>)}</div></section>
+}
+
+function trackedClosingLine(record: RecommendationSnapshot): string {
+  if (record.tracking.closing_line_status !== 'AVAILABLE' || record.tracking.closing_odds === null) return record.tracking.closing_line_status
+  const clv = record.tracking.closing_line_value
+  return `${record.tracking.closing_odds.toFixed(2)}${clv === null ? '' : ` / ${signedPercent(clv)} CLV`}`
 }
 
 function SignalEvidenceAudit({ signals, linkedSignals }: { signals: ValueSignal[]; linkedSignals: number }) {
