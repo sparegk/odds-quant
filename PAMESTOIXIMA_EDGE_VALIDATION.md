@@ -6,6 +6,9 @@ parked. It does not modify, replace, or satisfy the frozen two-book market-conse
 
 ## Fixed sequence
 
+- [x] Run the prospective collector as a durable per-user scheduled task that starts at logon,
+  restarts on failure, prevents duplicate task instances, uses production mode, and stores no
+  credentials or logs in the repository.
 - [x] Freeze the full Premier League 2026/27 cohort before its earliest stored kickoff and before
   inspecting any cohort outcome, CLV, or return. Bind model 12, complete full-time 1X2 evidence,
   the existing explainable-value policy, fixed coverage/sample thresholds, moving-block bootstrap

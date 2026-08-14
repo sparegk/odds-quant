@@ -53,6 +53,35 @@ def test_free_tunnel_starts_a_hardened_loopback_backend() -> None:
     assert "ODDSQUANT_API_FOOTBALL_KEY=" not in script
 
 
+def test_local_scheduler_task_is_durable_and_contains_no_credentials() -> None:
+    runner = (ROOT / "scripts" / "run-local-scheduler.ps1").read_text(encoding="utf-8")
+    installer = (ROOT / "scripts" / "install-local-scheduler-task.ps1").read_text(encoding="utf-8")
+
+    assert '$env:ODDSQUANT_ENVIRONMENT = "production"' in runner
+    assert '$env:ODDSQUANT_SEED_DEMO = "false"' in runner
+    assert "py -m alembic upgrade head" in runner
+    assert "py -m app.jobs.scheduler" in runner
+    assert '$ErrorActionPreference = "Continue"' in runner
+    assert "$migrationExitCode = $LASTEXITCODE" in runner
+    assert "$schedulerExitCode = $LASTEXITCODE" in runner
+    assert "while ($true)" in runner
+    assert "restarting in 60 seconds" in runner
+    assert "Start-Sleep -Seconds 60" in runner
+    assert "$env:LOCALAPPDATA" in runner
+    assert "ODDSQUANT_ODDS_API_IO_KEY=" not in runner
+    assert "ODDSQUANT_API_FOOTBALL_KEY=" not in runner
+
+    assert "New-ScheduledTaskTrigger -AtLogOn -User $currentUser" in installer
+    assert "-LogonType Interactive" in installer
+    assert "-RestartCount 255" in installer
+    assert "-RestartInterval (New-TimeSpan -Minutes 1)" in installer
+    assert "-MultipleInstances IgnoreNew" in installer
+    assert "Register-ScheduledTask -TaskName $TaskName -InputObject $task -Force" in installer
+    assert "[switch]$ReplaceRunningScheduler" in installer
+    assert "ODDSQUANT_ODDS_API_IO_KEY=" not in installer
+    assert "ODDSQUANT_API_FOOTBALL_KEY=" not in installer
+
+
 def test_backend_image_runs_as_non_root_without_embedded_secrets() -> None:
     dockerfile = (ROOT / "backend" / "Dockerfile").read_text(encoding="utf-8")
     assert dockerfile.startswith("FROM python:3.12-slim")

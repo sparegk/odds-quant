@@ -920,3 +920,17 @@ recommendation and explain why.
 - [x] Add a typed outcome-blind Pamestoixima-only audit through API and CLI. It reports aggregate
   single-book snapshot, decision-window, explicit-closing, result, prediction, and cost coverage;
   exposes no two-book or performance fields; and exits 4 while blocked.
+
+### Durable prospective collection (2026-08-14)
+
+- [x] Replace the ad-hoc hidden scheduler process with the per-user
+  `OddsQuant-Collector` scheduled task. It starts at interactive logon, runs the checked-in
+  production-mode runner with demo seeding disabled, ignores duplicate task starts, retains no
+  credentials or logs in the repository, and has schema-valid one-minute task restart settings.
+- [x] Add an explicit one-minute supervisor loop around the Python scheduler child. A controlled
+  termination of worker PID `15716` left the outer task running, logged exit code `-1`, and
+  created replacement worker PID `12040`. Provider jobs `343` and `344` remained healthy with
+  no monitoring alerts after recovery.
+- [ ] Continue the frozen Pamestoixima acquisition box outcome-blind. Current coverage remains
+  below its fixed thresholds; do not infer closing status, inspect interim returns, or check the
+  acquisition box early.
