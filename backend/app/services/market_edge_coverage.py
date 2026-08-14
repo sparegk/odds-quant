@@ -300,6 +300,7 @@ def _snapshots(session: Session, event_ids: list[int]) -> list[_Snapshot]:
             Market.period == "FULL_TIME",
             Market.line.is_(None),
             OddsSnapshot.is_complete.is_(True),
+            OddsSnapshot.source_updated_at.is_not(None),
             Bookmaker.is_demo.is_(False),
             Provider.is_demo.is_(False),
         )

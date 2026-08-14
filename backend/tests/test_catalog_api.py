@@ -253,6 +253,22 @@ def test_market_edge_coverage_is_outcome_blind_and_contract_specific(
     assert "roi" not in pamestoixima
     assert "clv" not in pamestoixima
 
+    missing_source_time = session.get_one(OddsSnapshot, 1)
+    missing_source_time.source_updated_at = None
+    session.commit()
+
+    without_source_time = client.get("/api/v1/data/market-edge-coverage").json()
+    assert without_source_time["permitted_snapshots"] == 7
+    assert without_source_time["decision_window_events"] == 4
+    assert without_source_time["two_bookmaker_events"] == 3
+    assert without_source_time["explicit_closing_events"] == 0
+
+    pamestoixima_without_source_time = client.get("/api/v1/data/pamestoixima-edge-coverage").json()
+    assert pamestoixima_without_source_time["permitted_snapshots"] == 3
+    assert pamestoixima_without_source_time["permitted_snapshot_events"] == 3
+    assert pamestoixima_without_source_time["decision_window_events"] == 3
+    assert pamestoixima_without_source_time["explicit_closing_events"] == 0
+
 
 def test_collection_monitoring_requires_two_fresh_completed_jobs(
     api: tuple[TestClient, Session, datetime],
