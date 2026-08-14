@@ -79,6 +79,16 @@ class ResearchGateView(BaseModel):
     reasons: list[str]
 
 
+class RecommendationQualityView(BaseModel):
+    probability_interval_retention: float
+    calibration_quality: float
+    price_freshness_quality: float
+    market_agreement_quality: float
+    net_economics_quality: float
+    bookmaker_disagreement: float
+    overall_quality_score: float
+
+
 class MatchSuggestionView(BaseModel):
     rank: int
     source_kind: Literal["single", "builder"]
@@ -102,6 +112,7 @@ class MatchSuggestionView(BaseModel):
     cost_calculation_cash_outlay: float
     cost_currency: str
     minimum_odds_for_positive_lower_net_ev: float
+    recommendation_quality: RecommendationQualityView
     confidence: float | None
     conservative_score: float
     price_observed_at: datetime

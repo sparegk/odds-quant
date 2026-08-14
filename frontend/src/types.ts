@@ -731,6 +731,16 @@ export interface ResearchGate {
 
 export type MatchdayBookmakerCode = 'allwyn' | 'novibet'
 
+export interface RecommendationQuality {
+  probability_interval_retention: number
+  calibration_quality: number
+  price_freshness_quality: number
+  market_agreement_quality: number
+  net_economics_quality: number
+  bookmaker_disagreement: number
+  overall_quality_score: number
+}
+
 export interface MatchSuggestion {
   rank: number
   source_kind: 'single' | 'builder'
@@ -754,6 +764,7 @@ export interface MatchSuggestion {
   cost_calculation_cash_outlay: number
   cost_currency: string
   minimum_odds_for_positive_lower_net_ev: number
+  recommendation_quality: RecommendationQuality
   confidence: number | null
   conservative_score: number
   price_observed_at: string

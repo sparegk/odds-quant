@@ -6,7 +6,7 @@ conditional decisions from timestamp-valid evidence, never guarantees.
 - [x] Require exact fresh quote identity, sourced costs, valid rounded stakes, and positive lower
   net EV before a candidate can appear as an executable recommendation.
 - [x] Add an actionable minimum-odds threshold after costs so users can reject a moved price.
-- [ ] Add a decomposed recommendation-quality score that keeps probability reliability, market
+- [x] Add a decomposed recommendation-quality score that keeps probability reliability, market
   disagreement, price freshness, and net economics separate.
 - [ ] Add prospective recommendation tracking with immutable decision-time snapshots and explicit
   closing-line and settlement status.
@@ -17,7 +17,7 @@ A single-selection recommendation must retain the exact stored VALUE signal snap
 fresh quote. Its market currency must be known, its tax and stake evidence must pass the existing
 source/cutoff/freshness gates, and the reference stake must satisfy minimum, maximum, and increment
 rules. Ranking uses lower net EV per cash-outlay unit multiplied by the independently calculated
-confidence score. Missing costs or lower net EV at or below zero suppress the recommendation even
+recommendation-quality score. Missing costs or lower net EV at or below zero suppress the recommendation even
 when pre-cost EV is positive.
 
 Builder quotes remain visible for research but cannot be recommendations until their exact quote,
@@ -30,3 +30,17 @@ profit using the lower probability bound equals zero. The equation includes stak
 winnings tax, payout withholding, and commission. The recommendation card shows this threshold and
 instructs the user to reject a moved live price unless it is strictly greater. Equality is break-even,
 not positive advantage. The threshold is recalculated from the same sourced terms used by net EV.
+
+## Decomposed recommendation quality
+
+Only signals belonging to the latest cutoff-safe prediction output can become current
+recommendations. Each executable candidate exposes five independently inspectable components:
+lower-bound interval retention, chronological calibration quality, exact-price freshness,
+bookmaker agreement, and lower net economics. Each component is normalized to zero through one,
+while raw bookmaker disagreement remains visible beside its normalized component.
+
+The combined quality score is the geometric mean, not an additive points system. A zero component
+therefore cannot be hidden by stronger components. Ranking uses lower net EV per cash-outlay unit
+multiplied by this decomposed quality score. The score changes ordering only; it does not rewrite
+the stored model probability, confidence interval, calibrated VALUE classification, market price,
+or realized-return evidence.

@@ -72,6 +72,7 @@ def test_builds_ranked_api_view_from_qualified_signal() -> None:
         event_is_demo=False,
         cost_evidence_by_snapshot_id={12: cost_evidence()},
         market_currency_by_id={9: "EUR"},
+        bookmaker_disagreement_by_signal_id={7: 0.02},
     )
 
     assert len(ranked) == 1
@@ -88,7 +89,17 @@ def test_builds_ranked_api_view_from_qualified_signal() -> None:
     assert suggestion.cost_currency == "EUR"
     assert suggestion.minimum_odds_for_positive_lower_net_ev == pytest.approx(1 / 0.62)
     assert suggestion.offered_odds > suggestion.minimum_odds_for_positive_lower_net_ev
-    assert suggestion.conservative_score == pytest.approx(0.0928)
+    quality = suggestion.recommendation_quality
+    assert quality.probability_interval_retention == pytest.approx(0.62 / 0.68)
+    assert quality.calibration_quality == pytest.approx(0.8)
+    assert quality.price_freshness_quality == pytest.approx(0.6)
+    assert quality.market_agreement_quality == pytest.approx(0.8)
+    assert quality.net_economics_quality == pytest.approx(1.0)
+    assert quality.bookmaker_disagreement == pytest.approx(0.02)
+    assert quality.overall_quality_score == pytest.approx(0.8106675707705512)
+    assert suggestion.conservative_score == pytest.approx(
+        suggestion.lower_net_expected_value * quality.overall_quality_score
+    )
     assert suggestion.price_observed_at < suggestion.generated_at
 
     missing_cost_views, _ = build_match_suggestions(
@@ -100,6 +111,7 @@ def test_builds_ranked_api_view_from_qualified_signal() -> None:
         event_is_demo=False,
         cost_evidence_by_snapshot_id={},
         market_currency_by_id={9: "EUR"},
+        bookmaker_disagreement_by_signal_id={7: 0.02},
     )
     expensive = cost_evidence()
     expensive = QuoteCostEvidence(
@@ -119,6 +131,7 @@ def test_builds_ranked_api_view_from_qualified_signal() -> None:
         event_is_demo=False,
         cost_evidence_by_snapshot_id={12: expensive},
         market_currency_by_id={9: "EUR"},
+        bookmaker_disagreement_by_signal_id={7: 0.02},
     )
 
     assert missing_cost_views == []
@@ -173,6 +186,7 @@ def test_api_view_builder_respects_bookmaker_filter() -> None:
         event_is_demo=False,
         cost_evidence_by_snapshot_id={},
         market_currency_by_id={9: "EUR"},
+        bookmaker_disagreement_by_signal_id={7: 0.02},
     )
 
     assert views == []

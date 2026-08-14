@@ -753,6 +753,13 @@ function SuggestionCard({ suggestion }: { suggestion: MatchSuggestion }) {
         <EvidenceMetric label="Lower net EV/cash unit" value={signedPercentage(suggestion.lower_net_expected_value)} />
         <EvidenceMetric label="Cost basis" value={`${suggestion.cost_calculation_stake.toFixed(2)} stake / ${suggestion.cost_calculation_cash_outlay.toFixed(2)} ${suggestion.cost_currency} outlay`} />
         <EvidenceMetric label="Minimum acceptable odds" value={`>${suggestion.minimum_odds_for_positive_lower_net_ev.toFixed(3)}`} />
+        <EvidenceMetric label="Recommendation quality" value={percentage(suggestion.recommendation_quality.overall_quality_score)} />
+        <EvidenceMetric label="Interval retention" value={percentage(suggestion.recommendation_quality.probability_interval_retention)} />
+        <EvidenceMetric label="Calibration quality" value={percentage(suggestion.recommendation_quality.calibration_quality)} />
+        <EvidenceMetric label="Price freshness quality" value={percentage(suggestion.recommendation_quality.price_freshness_quality)} />
+        <EvidenceMetric label="Market agreement quality" value={percentage(suggestion.recommendation_quality.market_agreement_quality)} />
+        <EvidenceMetric label="Bookmaker disagreement" value={percentage(suggestion.recommendation_quality.bookmaker_disagreement)} />
+        <EvidenceMetric label="Net economics quality" value={percentage(suggestion.recommendation_quality.net_economics_quality)} />
         <EvidenceMetric
           label="Confidence"
           value={suggestion.confidence === null ? 'Builder interval' : percentage(suggestion.confidence)}
@@ -760,7 +767,7 @@ function SuggestionCard({ suggestion }: { suggestion: MatchSuggestion }) {
       </div>
       {suggestion.reasons[0] ? <p className="mt-3 text-xs leading-5 text-emerald-950">{suggestion.reasons[0]}</p> : null}
       {suggestion.risks[0] ? <p className="mt-2 flex gap-2 text-xs leading-5 text-amber-900"><ShieldAlert aria-hidden="true" className="mt-0.5 shrink-0" size={14} />{suggestion.risks[0]}</p> : null}
-      <p className="mt-2 text-[11px] text-zinc-500">Exact price observed {formatDateTime(suggestion.price_observed_at)}. Recommendation requires complete sourced costs and positive lower net EV at the displayed rounded stake. Reject the bet if the live decimal price is not strictly above the minimum acceptable odds. Recheck every detail before placement; no bet is guaranteed.</p>
+      <p className="mt-2 text-[11px] text-zinc-500">Exact price observed {formatDateTime(suggestion.price_observed_at)}. Quality is the geometric mean of the five displayed components, so one weak component cannot be hidden by stronger ones. Recommendation requires complete sourced costs and positive lower net EV at the displayed rounded stake. Reject the bet if the live decimal price is not strictly above the minimum acceptable odds. Recheck every detail before placement; no bet is guaranteed.</p>
     </div>
   )
 }

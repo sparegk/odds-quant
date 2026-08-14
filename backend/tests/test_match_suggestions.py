@@ -131,6 +131,7 @@ def candidate(**overrides: object) -> SuggestionCandidate:
         "lower_expected_value": 0.116,
         "lower_net_expected_value": 0.10,
         "cost_evidence_complete": True,
+        "recommendation_quality_score": 0.8,
         "confidence": 0.8,
         "price_observed_at": NOW - timedelta(minutes=2),
         "generated_at": NOW,
@@ -164,6 +165,7 @@ def test_filters_by_selected_supported_bookmaker() -> None:
         ("lower_expected_value", 0.0),
         ("lower_net_expected_value", 0.0),
         ("cost_evidence_complete", False),
+        ("recommendation_quality_score", 0.0),
         ("confidence", 0.0),
         ("lower_probability", 0.49),
         ("price_observed_at", None),
@@ -201,18 +203,18 @@ def test_blocks_builder_without_exact_cost_evidence() -> None:
     assert ranked == []
 
 
-def test_ranks_by_confidence_weighted_conservative_value() -> None:
+def test_ranks_by_quality_weighted_lower_net_value() -> None:
     lower_raw_value = candidate(
         source_id=2,
         lower_expected_value=0.1,
         lower_net_expected_value=0.08,
-        confidence=0.9,
+        recommendation_quality_score=0.9,
     )
     higher_raw_but_less_reliable = candidate(
         source_id=1,
         lower_expected_value=0.12,
         lower_net_expected_value=0.10,
-        confidence=0.5,
+        recommendation_quality_score=0.5,
     )
 
     ranked = rank_match_suggestions(

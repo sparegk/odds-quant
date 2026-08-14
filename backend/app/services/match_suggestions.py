@@ -18,6 +18,7 @@ from app.quant.match_suggestions import (
     rank_match_suggestions,
 )
 from app.quant.model_market import compare_model_to_market
+from app.quant.recommendation_quality import RecommendationQuality, recommendation_quality
 from app.schemas.api import MarketComparison, PriceComparison, SnapshotComparison
 from app.schemas.builder import BetBuilderQuoteView
 from app.schemas.matchday import (
@@ -25,6 +26,7 @@ from app.schemas.matchday import (
     MatchdayBookmakerOptionView,
     MatchSuggestionView,
     ModelMarketComparisonView,
+    RecommendationQualityView,
     SuggestionMarketStatusView,
 )
 from app.schemas.models import ModelOutputView
@@ -236,12 +238,23 @@ def build_match_suggestions(
     event_is_demo: bool,
     cost_evidence_by_snapshot_id: dict[int, QuoteCostEvidence],
     market_currency_by_id: dict[int, str],
+    bookmaker_disagreement_by_signal_id: dict[int, float],
 ) -> tuple[list[MatchSuggestionView], list[RankedSuggestion]]:
     signal_economics = {
         signal.id: _signal_cost_economics(
             signal,
             evidence=cost_evidence_by_snapshot_id.get(signal.odds_snapshot_id),
             currency=market_currency_by_id.get(signal.market_id),
+        )
+        for signal in signals
+    }
+    signal_quality = {
+        signal.id: _signal_quality(
+            signal,
+            economics=signal_economics[signal.id],
+            bookmaker_disagreement=bookmaker_disagreement_by_signal_id.get(signal.id),
+            cutoff=cutoff,
+            maximum_price_age_minutes=max_price_age_minutes,
         )
         for signal in signals
     }
@@ -256,6 +269,7 @@ def build_match_suggestions(
             lower_expected_value=signal.lower_expected_value,
             lower_net_expected_value=_lower_net_expected_value(signal_economics[signal.id]),
             cost_evidence_complete=signal_economics[signal.id] is not None,
+            recommendation_quality_score=(_quality_score(signal_quality[signal.id])),
             confidence=signal.confidence,
             price_observed_at=_utc(signal.generated_at)
             - timedelta(minutes=signal.odds_age_minutes),
@@ -277,6 +291,7 @@ def build_match_suggestions(
             lower_expected_value=quote.lower_expected_value,
             lower_net_expected_value=None,
             cost_evidence_complete=False,
+            recommendation_quality_score=0,
             confidence=1.0,
             price_observed_at=quote.offered_odds_observed_at,
             generated_at=_utc(quote.quoted_at),
@@ -296,6 +311,7 @@ def build_match_suggestions(
             item,
             signals=signals,
             signal_economics=signal_economics,
+            signal_quality=signal_quality,
             rank=index,
         )
         for index, item in enumerate(ranked, start=1)
@@ -425,13 +441,16 @@ def _suggestion_view(
     *,
     signals: list[ValueSignalView],
     signal_economics: dict[int, SuggestionEconomics | None],
+    signal_quality: dict[int, RecommendationQuality | None],
     rank: int,
 ) -> MatchSuggestionView:
     candidate = ranked.candidate
     if candidate.kind == "single":
         signal = next(item for item in signals if item.id == candidate.source_id)
         economics = signal_economics[signal.id]
+        quality = signal_quality[signal.id]
         assert economics is not None
+        assert quality is not None
         return MatchSuggestionView(
             rank=rank,
             source_kind="single",
@@ -456,6 +475,15 @@ def _suggestion_view(
             cost_currency=economics.currency,
             minimum_odds_for_positive_lower_net_ev=(
                 economics.minimum_odds_for_positive_lower_net_ev
+            ),
+            recommendation_quality=RecommendationQualityView(
+                probability_interval_retention=quality.probability_interval_retention,
+                calibration_quality=quality.calibration_quality,
+                price_freshness_quality=quality.price_freshness_quality,
+                market_agreement_quality=quality.market_agreement_quality,
+                net_economics_quality=quality.net_economics_quality,
+                bookmaker_disagreement=quality.bookmaker_disagreement,
+                overall_quality_score=quality.overall_quality_score,
             ),
             confidence=signal.confidence,
             conservative_score=ranked.conservative_score,
@@ -522,3 +550,34 @@ def _lower_net_expected_value(
     economics: SuggestionEconomics | None,
 ) -> float | None:
     return economics.lower_net_expected_value if economics is not None else None
+
+
+def _signal_quality(
+    signal: ValueSignalView,
+    *,
+    economics: SuggestionEconomics | None,
+    bookmaker_disagreement: float | None,
+    cutoff: datetime,
+    maximum_price_age_minutes: float,
+) -> RecommendationQuality | None:
+    if (
+        economics is None
+        or economics.lower_net_expected_value <= 0
+        or bookmaker_disagreement is None
+    ):
+        return None
+    price_observed_at = _utc(signal.generated_at) - timedelta(minutes=signal.odds_age_minutes)
+    price_age_minutes = max(0.0, (cutoff - price_observed_at).total_seconds() / 60)
+    return recommendation_quality(
+        model_probability=signal.model_probability,
+        lower_probability=signal.lower_probability,
+        calibration_error=signal.calibration_error,
+        price_age_minutes=price_age_minutes,
+        maximum_price_age_minutes=maximum_price_age_minutes,
+        bookmaker_disagreement=bookmaker_disagreement,
+        lower_net_expected_value=economics.lower_net_expected_value,
+    )
+
+
+def _quality_score(quality: RecommendationQuality | None) -> float:
+    return quality.overall_quality_score if quality is not None else 0

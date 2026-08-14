@@ -358,6 +358,15 @@ const detail: MatchdayEventDetail = {
       cost_calculation_cash_outlay: 102,
       cost_currency: 'EUR',
       minimum_odds_for_positive_lower_net_ev: 1.65,
+      recommendation_quality: {
+        probability_interval_retention: 0.91,
+        calibration_quality: 0.8,
+        price_freshness_quality: 0.6,
+        market_agreement_quality: 0.75,
+        net_economics_quality: 0.72,
+        bookmaker_disagreement: 0.025,
+        overall_quality_score: 0.75,
+      },
       confidence: 0.8,
       conservative_score: 0.0928,
       price_observed_at: '2026-07-21T12:03:00Z',
@@ -652,6 +661,14 @@ describe('MatchdayResearch', () => {
     expect(screen.getByText('100.00 stake / 102.00 EUR outlay')).toBeInTheDocument()
     expect(screen.getByText('Minimum acceptable odds')).toBeInTheDocument()
     expect(screen.getByText('>1.650')).toBeInTheDocument()
+    expect(screen.getByText('Recommendation quality')).toBeInTheDocument()
+    expect(screen.getByText('Interval retention')).toBeInTheDocument()
+    expect(screen.getByText('Calibration quality')).toBeInTheDocument()
+    expect(screen.getByText('Price freshness quality')).toBeInTheDocument()
+    expect(screen.getByText('Market agreement quality')).toBeInTheDocument()
+    expect(screen.getByText('Bookmaker disagreement')).toBeInTheDocument()
+    expect(screen.getByText('Net economics quality')).toBeInTheDocument()
+    expect(screen.getByText(/geometric mean of the five displayed components/)).toBeInTheDocument()
     expect(screen.getByText(/Reject the bet if the live decimal price/)).toBeInTheDocument()
     expect(screen.getByText(/Recommendation requires complete sourced costs/)).toBeInTheDocument()
   })

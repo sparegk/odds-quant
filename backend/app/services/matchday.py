@@ -527,8 +527,23 @@ def get_matchday_event_detail(
         for snapshot in market.snapshots
         if not snapshot.is_stale and bookmaker_code(snapshot.bookmaker) in selected
     }
+    model_market_comparisons = build_model_market_comparisons(
+        latest_prediction=latest_prediction,
+        markets=markets,
+        selected_bookmakers=selected,
+        cost_evidence_by_snapshot_id=cost_evidence_by_snapshot_id,
+    )
+    comparison_disagreement = {
+        (comparison.market_id, comparison.selection_id): comparison.bookmaker_disagreement
+        for comparison in model_market_comparisons
+    }
+    recommendation_signals = [
+        signal
+        for signal in signals
+        if latest_prediction is not None and signal.output_id == latest_prediction.id
+    ]
     suggestions, ranked_suggestions = build_match_suggestions(
-        signals=signals,
+        signals=recommendation_signals,
         builder_quotes=builder_quotes,
         selected_bookmakers=selected,
         cutoff=cutoff,
@@ -536,12 +551,14 @@ def get_matchday_event_detail(
         event_is_demo=event.is_demo,
         cost_evidence_by_snapshot_id=cost_evidence_by_snapshot_id,
         market_currency_by_id={market.market_id: market.currency for market in markets},
-    )
-    model_market_comparisons = build_model_market_comparisons(
-        latest_prediction=latest_prediction,
-        markets=markets,
-        selected_bookmakers=selected,
-        cost_evidence_by_snapshot_id=cost_evidence_by_snapshot_id,
+        bookmaker_disagreement_by_signal_id={
+            signal.id: disagreement
+            for signal in recommendation_signals
+            if (
+                disagreement := comparison_disagreement.get((signal.market_id, signal.selection_id))
+            )
+            is not None
+        },
     )
 
     player_records = (
